@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
 project(PineappleCAS C)
 
-set(CMAKE_C_FLAGS "-std=c89 -Wall -Wextra -Werror -Wno-missing-field-initializers -DCOMPILE_PC")
+set(CMAKE_C_FLAGS "-std=c17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DCOMPILE_PC -DUSE_32BIT_WORDS")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG")
 
 include_directories(
     src
     src/cas
-    src/imath
+    lib
     src/pc
 )
 
-file(GLOB SOURCE_FILES "src/*.[ch]" "src/*/*.[ch]")
+file(GLOB SOURCE_FILES "src/*.[ch]" "src/*/*.[ch]" "lib/imath/imath.[ch]" "lib/imath/imrat.[ch]")
 
 add_executable(pineapple ${SOURCE_FILES})
 

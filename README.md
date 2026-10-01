@@ -20,7 +20,7 @@ PineappleCAS is a computer algebra system for the TI-84 Plus CE calculators. It 
 ![Basic interface](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/interface.png "Basic interface")
 
 # Installation
-* Download the latest PineappleCAS release from https://github.com/nathanfarlow/PineappleCAS/releases and send PCAS.8xp to your calculator's **archive memory**. It is very important that the program is archived to prevent Error: Memory when running the program.
+* Download the latest PineappleCAS release from the releases and send PCAS.8xp to your calculator's **archive memory**. It is very important that the program is archived to prevent Error: Memory when running the program.
 * Download the latest C libraries from https://github.com/CE-Programming/libraries/releases and send to your calculator.
 * If you have CE OS 5.3 or higher, simply execute prgmPCAS on the calculator. If not, you will have to unarchive PCAS and do Asm(prgmPCAS from the catalog.
 * Navigate the GUI with the arrow keys, and press enter on GUI elements to change their value.
@@ -35,7 +35,7 @@ On Fedora, `scripts/install-toolchain.sh` installs or updates it in `/opt/CEdev`
 
 **Compile for calculator:**
 ```
-git clone https://github.com/nathanfarlow/PineappleCAS
+git clone --recursive https://github.com/nathanfarlow/PineappleCAS
 cd PineappleCAS
 make
 ```
@@ -43,7 +43,7 @@ The calculator program compiles consistently on Ubuntu, but Windows has a proble
 
 **Compile for PC:**
 ```
-git clone https://github.com/nathanfarlow/PineappleCAS
+git clone --recursive https://github.com/nathanfarlow/PineappleCAS
 cd PineappleCAS
 make -f pc.makefile
 ```
