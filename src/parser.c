@@ -20,6 +20,7 @@ struct Identifier ti_table[AMOUNT_TOKENS] = {
 
     {2, {0xEF, 0x34}},          /*TOK_LOG_BASE*/
     {1, {0x25}},                /*TOK_DERIV*/
+    {1, {0x24}},                /*TOK_INTEGRAL*/
 
     {1, {0xB1}}, {1, {0xB2}},   /*TOK_INT, TOK_ABS*/
     {1, {0xBC}}, {1, {0xBD}},   /*TOK_SQRT, TOK_CUBED_ROOT*/
@@ -59,6 +60,7 @@ struct Identifier str_table[AMOUNT_TOKENS] = {
 
     {5, "logb("},                   /*TOK_LOG_BASE*/
     {6, "deriv("},                  /*TOK_DERIV*/
+    {6, "integ("},                  /*TOK_INTEGRAL*/
 
     {4, "int("}, {4, "abs("},       /*TOK_INT, TOK_ABS*/
     {5, "sqrt("}, {7, "cbrt("},     /*TOK_SQRT, TOK_CUBED_ROOT*/
@@ -298,7 +300,7 @@ uint8_t operand_count(TokenType type) {
     if(is_tok_binary_operator(type))
         return 2;
 
-    if(type == TOK_LOG_BASE)
+    if(type == TOK_LOG_BASE || type == TOK_INTEGRAL)
         return 2;
 
     if(type == TOK_DERIV)
@@ -357,6 +359,7 @@ void translate(pcas_ast_t *e) {
         ast_ChildAppend(e, ast_ChildRemoveIndex(e, 0));
         break;
     case TOK_DERIV:      optype(e) = OP_DERIV; break;
+    case TOK_INTEGRAL:   optype(e) = OP_INTEGRAL; break;
     case TOK_INT:        optype(e) = OP_INT; break;
     case TOK_ABS:        optype(e) = OP_ABS; break;
     case TOK_SQRT:

@@ -268,6 +268,13 @@ static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct 
             add_token(TOK_CLOSE_PAR);
 
             break;
+        } case OP_INTEGRAL: {
+            add_token(TOK_INTEGRAL);
+            index = _to_binary(ast_ChildGet(e, 0), data, index, lookup, err);
+            add_token(TOK_COMMA);
+            index = _to_binary(ast_ChildGet(e, 1), data, index, lookup, err);
+            add_token(TOK_CLOSE_PAR);
+            break;
         } case OP_FACTORIAL: {
 
             pcas_ast_t *a;
