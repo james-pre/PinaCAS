@@ -1,5 +1,4 @@
-#ifndef ERROR_H_
-#define ERROR_H_
+#pragma once
 
 typedef enum {
     E_SUCCESS,
@@ -24,5 +23,3 @@ typedef enum {
 } pcas_error_t;
 
 extern const char *error_text[AMOUNT_ERRORS];
-
-#endif

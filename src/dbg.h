@@ -1,5 +1,4 @@
-#ifndef PINEAPPLE_DEBUG_H_
-#define PINEAPPLE_DEBUG_H_
+#pragma once
 
 #include <stdio.h>
 #include <string.h>
@@ -38,5 +37,3 @@ void ti_debug(const char *format, ...);
 
 void dbg_print_tree(pcas_ast_t *e, unsigned indent);
 unsigned dbg_count_nodes(pcas_ast_t *e);
-
-#endif

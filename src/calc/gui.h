@@ -1,7 +1,6 @@
-#ifndef COMPILE_PC
+#pragma once
 
-#ifndef GUI_H_
-#define GUI_H_
+#ifndef COMPILE_PC
 
 #define COLOR_TRANSPARENT   10
 
@@ -13,7 +12,5 @@
 #define TEXT_HEIGHT 8
 
 void gui_Run();
-
-#endif
 
 #endif

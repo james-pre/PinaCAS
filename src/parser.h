@@ -1,5 +1,4 @@
-#ifndef PARSER_H_
-#define PARSER_H_
+#pragma once
 
 #include "ast.h"
 #include "error.h"
@@ -67,5 +66,3 @@ extern struct Identifier str_table[AMOUNT_TOKENS];
 
 pcas_ast_t *parse(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_error_t *e);
 uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, struct Identifier *lookup, pcas_error_t *err);
-
-#endif

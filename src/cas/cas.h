@@ -1,5 +1,4 @@
-#ifndef CAS_H_
-#define CAS_H_
+#pragma once
 
 #include "../ast.h"
 #include "derivative.h"
@@ -198,5 +197,3 @@ bool is_negative_for_sure(pcas_ast_t *a);
 
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
 bool absolute_val(pcas_ast_t *e);
-
-#endif

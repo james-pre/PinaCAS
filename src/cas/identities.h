@@ -1,5 +1,4 @@
-#ifndef IDENTITIES_H_
-#define IDENTITIES_H_
+#pragma once
 
 #include "../parser.h"
 
@@ -33,5 +32,3 @@ bool id_ExecuteTable(pcas_ast_t *e, pcas_id_t *table, unsigned table_len, bool r
 void id_UnloadTable(pcas_id_t *table, unsigned table_len);
 /*Calls unload table for all tables*/
 void id_UnloadAll();
-
-#endif

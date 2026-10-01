@@ -1,5 +1,4 @@
-#ifndef AST_H_
-#define AST_H_
+#pragma once
 
 #include "imath/imrat.h"
 #include "error.h"
@@ -138,5 +137,3 @@ pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child);
 pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index);
 
 LSIZE ast_ChildLength(pcas_ast_t *parent);
-
-#endif

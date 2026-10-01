@@ -1,5 +1,4 @@
-#ifndef STACK_H_
-#define STACK_H_
+#pragma once
 
 /*the default stack size*/
 #define STACK_START 10
@@ -18,5 +17,3 @@ void *stack_Pop(pcas_stack_t *s);
 void *stack_Peek(pcas_stack_t *s);
 
 void stack_Clear(pcas_stack_t *s);
-
-#endif

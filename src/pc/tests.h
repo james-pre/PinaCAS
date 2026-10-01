@@ -1,5 +1,4 @@
-#ifndef TESTS_H_
-#define TESTS_H_
+#pragma once
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -40,5 +39,3 @@ bool test_Run(test_t *t);
 void test_Cleanup(test_t *t);
 void test_CleanupArr(test_t **arr, unsigned len);
 void test_Print(test_t *t);
-
-#endif
