@@ -5,6 +5,7 @@
 /*Sum rule, constant rule, product rule, and power rule are hardcoded for speed or because of limitations in identity searching*/
 pcas_id_t id_derivative[ID_NUM_DERIV] = {
     {"deriv(X,X,T", "1"},
+    {"deriv(integ(A,X),X,T", "A"},
 
     {"deriv(A/B,X,T", "(deriv(A,X,T)B_deriv(B,X,T)A)/B^2"},
 

@@ -2,6 +2,7 @@
 
 #include "../ast.h"
 #include "derivative.h"
+#include "integral.h"
 
 /*
     Changes ast to a form we work with in the simpilfier.
@@ -40,6 +41,10 @@
     sin(X) + deriv(X^2,X,2) becomes sin(X) + 4
 */
 #define SIMP_DERIV                      (1u << 5u)
+/*
+    Change integral nodes to their evaluated antiderivative where one can be found
+*/
+#define SIMP_INTEGRAL                   (1u << 12u)
 /*
     Simplifies inverses like sin(asin(X)) = X
     as well as log identities

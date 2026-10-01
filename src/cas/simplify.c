@@ -773,6 +773,11 @@ static bool _simplify(pcas_ast_t *e, unsigned short flags) {
             did_change |= intermediate_change;
         }
 
+        if(flags & SIMP_INTEGRAL) {
+            intermediate_change |= eval_integrals(e);
+            did_change |= intermediate_change;
+        }
+
         /*Simplify identities. First factor the expression and simplify identities.
         Then expand the expression and simplify identities that we missed. Only factor and expand if 
         at least one id flag is set. The expression remains in the expanded state at the end of simplify().*/

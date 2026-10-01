@@ -16,7 +16,7 @@ TARGET   = pineapple
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -std=c17 -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -I. -Ilib
+CFLAGS   = -std=c17 -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
 
 LINKER   = gcc
 # linking flags here
@@ -37,6 +37,8 @@ $(BINDIR)/$(TARGET): $(OBJECTS)
 	@$(LINKER) $(OBJECTS) $(LFLAGS) -o $@
 	@echo "Linking complete!"
 
+-include $(OBJECTS:.o=.d)
+
 $(OBJECTS): $(OBJDIR)/%.o : %.c
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -c $< -o $@
@@ -44,7 +46,7 @@ $(OBJECTS): $(OBJDIR)/%.o : %.c
 
 .PHONY: clean
 clean:
-	@$(rm) $(OBJECTS)
+	@$(rm) $(OBJECTS) $(OBJECTS:.o=.d)
 	@echo "Cleanup complete!"
 
 .PHONY: remove

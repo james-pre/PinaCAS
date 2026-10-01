@@ -19,11 +19,13 @@
 #include "../dbg.h"
 
 #include "../cas/cas.h"
+#include "../work.h"
 
 #include "tests.h"
 
 void display_help(void) {
-    printf("Usage: ./pineapple [operation] [args]\n");
+    printf("Usage: ./pineapple [--work] [operation] [args]\n");
+    printf("\t--work\t\t\t\tPrints the steps taken\n");
     printf("Valid operations include:\n");
     printf("\ttest [file]\t\t\tRuns all tests in file\n");
     printf("\tsimplify [expression]\t\tSimplifies expression. Also evaluates constants.\n");
@@ -31,6 +33,7 @@ void display_help(void) {
     printf("\tfactor [expression]\t\tFactors expression\n");
     printf("\texpand [expression]\t\tExpands expression\n");
     printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
+    printf("\tintegral [expression] [respect to]\n");
 }
 
 /*Trim null terminated string*/
@@ -451,8 +454,101 @@ int run_derivative(int argc, char **argv) {
     return 0;
 }
 
+static void print_ast(pcas_ast_t *e) {
+    pcas_error_t err;
+    unsigned len;
+    uint8_t *output = export_to_binary(e, &len, str_table, &err);
+
+    if(err == E_SUCCESS && output != NULL) {
+        printf("%.*s", len, output);
+        free(output);
+    }
+}
+
+static void print_work(pcas_work_t *w) {
+    pcas_step_t *step;
+    bool first = true;
+
+    printf("Work:\n");
+
+    for(step = w->first; step != NULL; step = step->next) {
+        printf(step->type == STEP_STATE && !first ? "  = " : "    ");
+
+        switch(step->type) {
+        case STEP_STATE:
+            print_ast(step->after);
+            break;
+        case STEP_TEXT:
+            break;
+        default:
+            print_ast(step->before);
+            printf(" = ");
+            print_ast(step->after);
+            break;
+        }
+
+        if(step->text != NULL)
+            printf(step->type == STEP_TEXT ? "%s" : "\t[%s]", step->text);
+
+        printf("\n");
+        first = false;
+    }
+
+    printf("\n");
+}
+
+int run_integral(int argc, char **argv) {
+
+    uint8_t *trimmed;
+    unsigned trimmed_len;
+
+    pcas_error_t err;
+    pcas_ast_t *e = NULL, *respect_to = NULL;
+
+    if(argc <= 3) {
+        display_help();
+        return -1;
+    }
+
+    trimmed = trim(argv[2], &trimmed_len);
+    e = parse(trimmed, trimmed_len, str_table, &err);
+    free(trimmed);
+
+    if(err == E_SUCCESS) {
+        trimmed = trim(argv[3], &trimmed_len);
+        respect_to = parse(trimmed, trimmed_len, str_table, &err);
+        free(trimmed);
+    }
+
+    if(err == E_SUCCESS && e != NULL && respect_to != NULL) {
+        simplify(e, SIMP_ALL);
+        integral(e, respect_to);
+        simplify(e, SIMP_ALL);
+        simplify_canonical_form(e, CANONICAL_ALL);
+
+        printf("Output: ");
+        print_ast(e);
+        printf("\n");
+    } else {
+        printf("%s\n", error_text[err]);
+    }
+
+    ast_Cleanup(e);
+    ast_Cleanup(respect_to);
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     int ret;
+    pcas_work_t work;
+    bool show_work = argc > 1 && !strcmp(argv[1], "--work");
+
+    if(show_work) {
+        argc--;
+        argv++;
+        work_Start(&work);
+    }
 
     if(argc > 1) {
         if(!strcmp(argv[1], "test"))            ret = run_test(argc, argv);
@@ -461,9 +557,15 @@ int main(int argc, char **argv) {
         else if(!strcmp(argv[1], "factor"))     ret = run_factor(argc, argv);
         else if(!strcmp(argv[1], "expand"))     ret = run_expand(argc, argv);
         else if(!strcmp(argv[1], "derivative")) ret = run_derivative(argc, argv);
+        else if(!strcmp(argv[1], "integral"))   ret = run_integral(argc, argv);
         else {
             display_help();
             return -1;
+        }
+        if(show_work) {
+            work_Stop();
+            print_work(&work);
+            work_Cleanup(&work);
         }
         id_UnloadAll();
         return ret;

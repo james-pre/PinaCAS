@@ -2,7 +2,7 @@
 
 #include "identities.h"
 
-#define ID_NUM_DERIV 18
+#define ID_NUM_DERIV 19
 extern pcas_id_t id_derivative[ID_NUM_DERIV];
 
 extern pcas_id_t id_deriv_power_rule;
