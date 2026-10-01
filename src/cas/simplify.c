@@ -769,7 +769,7 @@ static bool _simplify(pcas_ast_t *e, unsigned short flags) {
             while(eval(e, EVAL_EASY))       intermediate_change = did_change = true;
         
         if(flags & SIMP_DERIV) {
-            intermediate_change |= eval_derivative_nodes(e);
+            intermediate_change |= eval_derivatives(e);
             did_change |= intermediate_change;
         }
 

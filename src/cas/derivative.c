@@ -1,5 +1,7 @@
 #include "cas.h"
 
+#include "../work.h"
+
 /*Sum rule, constant rule, product rule, and power rule are hardcoded for speed or because of limitations in identity searching*/
 pcas_id_t id_derivative[ID_NUM_DERIV] = {
     {"deriv(X,X,T", "1"},
@@ -132,14 +134,44 @@ bool eval_derivative_nodes(pcas_ast_t *e) {
     return changed;
 }
 
+bool eval_derivatives(pcas_ast_t *e) {
+    pcas_ast_t *child, *before;
+    bool changed = false;
+
+    if(e->type != NODE_OPERATOR)
+        return false;
+
+    for(child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+        changed |= eval_derivatives(child);
+
+    if(!isoptype(e, OP_DERIV))
+        return changed;
+
+    before = ast_Copy(e);
+
+    work_Pause();
+    while(eval_derivative_nodes(e));
+    simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+    work_Resume();
+
+    work_Step(STEP_DERIVATIVE, NULL, before, e);
+    ast_Cleanup(before);
+
+    return true;
+}
+
 void derivative(pcas_ast_t *e, pcas_ast_t *respect_to, pcas_ast_t *eval_at) {
     pcas_ast_t *deriv_node = ast_MakeOperator(OP_DERIV);
+
+    work_Enter(e);
 
     ast_ChildAppend(deriv_node, ast_Copy(e));           /*value to take the derivative of*/
     ast_ChildAppend(deriv_node, ast_Copy(respect_to));  /*variable in respect to*/
     ast_ChildAppend(deriv_node, ast_Copy(eval_at));     /*evaluate at*/
 
-    while(eval_derivative_nodes(deriv_node));
-    
+    eval_derivatives(deriv_node);
+
     replace_node(e, deriv_node);
+
+    work_Leave(e);
 }
