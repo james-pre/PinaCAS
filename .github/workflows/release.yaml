@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+env:
+  CEDEV_VERSION: v15.0
+
+permissions:
+  contents: write
+
+jobs:
+  calculator:
+    name: Attach calculator build
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install build dependencies
+        run: dnf install -y git make tar gzip zlib gh
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Install CE toolchain
+        run: |
+          scripts/install-toolchain.sh "$CEDEV_VERSION"
+          echo /opt/CEdev/bin >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          make
+          cp /opt/CEdev/clibs.8xg bin/
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" bin/PCAS.8xp bin/clibs.8xg --clobber --repo "$GITHUB_REPOSITORY"

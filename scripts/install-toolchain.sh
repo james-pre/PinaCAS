@@ -25,8 +25,11 @@ for arg in "$@"; do
 	esac
 done
 
+SUDO=
+((EUID == 0)) || SUDO=sudo
+
 sudo_if_needed() {
-	if [[ -w "$(dirname "$PREFIX")" ]]; then "$@"; else sudo "$@"; fi
+	if [[ -w "$(dirname "$PREFIX")" ]]; then "$@"; else $SUDO "$@"; fi
 }
 
 missing=()
@@ -35,7 +38,7 @@ for dep in make curl tar gzip 'libz.so.1()(64bit)'; do
 done
 if ((${#missing[@]})); then
 	echo "Installing host dependencies: ${missing[*]}"
-	sudo dnf install "${missing[@]}"
+	$SUDO dnf install "${missing[@]}"
 fi
 
 if [[ -z "$tag" ]]; then
@@ -76,7 +79,7 @@ snippet="export CEDEV=$PREFIX
 export PATH=\"\$CEDEV/bin:\$PATH\""
 if [[ "$(cat "$PROFILE_SNIPPET" 2>/dev/null)" != "$snippet" ]]; then
 	echo "Writing $PROFILE_SNIPPET"
-	printf '%s\n' "$snippet" | sudo tee "$PROFILE_SNIPPET" >/dev/null
+	printf '%s\n' "$snippet" | $SUDO tee "$PROFILE_SNIPPET" >/dev/null
 fi
 
 echo "$("$PREFIX/bin/ez80-clang" --version | head -1)"

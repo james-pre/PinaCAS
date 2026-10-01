@@ -1,7 +1,7 @@
 <p align="center"><img src="https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/logo.png"></p>
 <h2 align="center"><b>PineappleCAS</b></h2>
 <p align="center">
-<a href="https://travis-ci.org/nathanfarlow/PineappleCAS" alt="Build Status"><img src="https://travis-ci.org/nathanfarlow/PineappleCAS.svg"></a>
+<a href="https://github.com/james-pre/PineappleCAS/actions/workflows/ci.yaml" alt="Build Status"><img src="https://github.com/james-pre/PineappleCAS/actions/workflows/ci.yaml/badge.svg"></a>
 </p>
 <p>
 PineappleCAS is a computer algebra system for the TI-84 Plus CE calculators. It is designed as a faster, cleaner, more useful, memory-leak-free alternative to the <a href="https://github.com/nathanfarlow/SymbolicDerivative">SymbolicDerivative</a> project. PineappleCAS uses the <a href="https://github.com/creachadair/imath">imath library</a> for arbitrary precision math.
