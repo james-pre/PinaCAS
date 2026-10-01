@@ -1,5 +1,7 @@
 #include "cas.h"
 
+#include "../work.h"
+
 static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
     /*How many numbers were accumulated. If <= 1, nothing changed*/
     unsigned num_changed = false;
@@ -608,7 +610,7 @@ static bool eval_factorial(pcas_ast_t *e, unsigned short flags) {
 }
 
 /*Simplifies expressions like 5 + 5 to 10*/
-bool eval(pcas_ast_t *e, unsigned short flags) {
+static bool _eval(pcas_ast_t *e, unsigned short flags) {
 
     bool changed = false;
     pcas_ast_t *current;
@@ -644,7 +646,15 @@ bool eval(pcas_ast_t *e, unsigned short flags) {
     return changed;
 }
 
-bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
+bool eval(pcas_ast_t *e, unsigned short flags) {
+    bool changed;
+    work_Enter(e);
+    changed = _eval(e, flags);
+    work_Leave(e);
+    return changed;
+}
+
+static bool _substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
 
     if(ast_Compare(e, from)) {
         replace_node(e, ast_Copy(to));
@@ -662,4 +672,12 @@ bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
     }
 
     return false;
+}
+
+bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
+    bool changed;
+    work_Enter(e);
+    changed = _substitute(e, from, to);
+    work_Leave(e);
+    return changed;
 }

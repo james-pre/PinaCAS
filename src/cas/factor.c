@@ -1,5 +1,7 @@
 #include "cas.h"
 
+#include "../work.h"
+
 /*Handles gcd for AB, BC gcd = B*/
 static pcas_ast_t *gcd_mult(pcas_ast_t *mult, pcas_ast_t *b) {
     unsigned i;
@@ -230,11 +232,19 @@ bool factor_addition(pcas_ast_t *e, unsigned char flags) {
     return changed;
 }
 
-bool factor(pcas_ast_t *e, unsigned char flags) {
+static bool _factor(pcas_ast_t *e, unsigned char flags) {
     bool changed = false;
 
     if(flags & (FAC_SIMPLE_ADDITION_EVALUATEABLE | FAC_SIMPLE_ADDITION_NONEVALUATEABLE))
         changed |= factor_addition(e, flags);
     /*Need to implement polynomial factoring*/
+    return changed;
+}
+
+bool factor(pcas_ast_t *e, unsigned char flags) {
+    bool changed;
+    work_Enter(e);
+    changed = _factor(e, flags);
+    work_Leave(e);
     return changed;
 }

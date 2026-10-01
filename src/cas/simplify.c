@@ -1,4 +1,6 @@
 #include "cas.h"
+
+#include "../work.h"
 #include "identities.h"
 
 /*Executes the SIMP_COMMUTATIVE flag*/
@@ -750,7 +752,7 @@ bool simplify_identities(pcas_ast_t *e, unsigned short flags) {
 
     Returns true if ast was changed
 */
-bool simplify(pcas_ast_t *e, unsigned short flags) {
+static bool _simplify(pcas_ast_t *e, unsigned short flags) {
     bool did_change = false, intermediate_change, expand_changed;
 
     do {
@@ -811,4 +813,12 @@ bool simplify(pcas_ast_t *e, unsigned short flags) {
     } while(intermediate_change);
 
     return did_change;
+}
+
+bool simplify(pcas_ast_t *e, unsigned short flags) {
+    bool changed;
+    work_Enter(e);
+    changed = _simplify(e, flags);
+    work_Leave(e);
+    return changed;
 }

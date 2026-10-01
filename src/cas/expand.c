@@ -1,5 +1,7 @@
 #include "cas.h"
 
+#include "../work.h"
+
 pcas_ast_t *combine(pcas_ast_t *add, pcas_ast_t *b) {
     unsigned i, j;
     pcas_ast_t *expanded = ast_MakeOperator(OP_ADD);
@@ -182,9 +184,11 @@ static bool _expand(pcas_ast_t *e, unsigned char flags) {
 
 bool expand(pcas_ast_t *e, unsigned char flags) {
     bool changed = false;
+    work_Enter(e);
     /*Expand powers first to make things faster*/
     if(flags & EXP_EXPAND_POWERS)
         changed |= _expand(e, EXP_EXPAND_POWERS);
     changed |= _expand(e, flags & ~EXP_EXPAND_POWERS);
+    work_Leave(e);
     return changed;
 }
