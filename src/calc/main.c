@@ -3,7 +3,7 @@
 #include "gui.h"
 #include "interface.h"
 
-int main() {
+int main(void) {
 
     if(interface_Valid())
         interface_Run();

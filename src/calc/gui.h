@@ -11,6 +11,6 @@
 
 #define TEXT_HEIGHT 8
 
-void gui_Run();
+void gui_Run(void);
 
 #endif

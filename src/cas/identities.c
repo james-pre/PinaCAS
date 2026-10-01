@@ -570,7 +570,7 @@ void id_UnloadTable(pcas_id_t *table, unsigned table_len) {
 }
 
 #include "derivative.h"
-void id_UnloadAll() {
+void id_UnloadAll(void) {
     id_UnloadTable(id_general, ID_NUM_GENERAL);
     id_UnloadTable(id_trig_identities, ID_NUM_TRIG_IDENTITIES);
     id_UnloadTable(id_trig_constants, ID_NUM_TRIG_CONSTANTS);

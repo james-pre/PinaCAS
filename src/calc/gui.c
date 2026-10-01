@@ -27,7 +27,7 @@ void draw_string_centered(char *text, int x, int y) {
     gfx_PrintStringXY(text, x - len / 2, y);
 }
 
-void draw_background() {
+void draw_background(void) {
 
     gfx_SetMonospaceFont(0);
 
@@ -295,7 +295,7 @@ void draw_context(Context c) {
 bool console_drawn = false;
 int console_index = 0;
 
-void draw_console() {
+void draw_console(void) {
     gfx_SetColor(COLOR_BACKGROUND);
     gfx_FillRectangle(LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH - LCD_WIDTH / 3, LCD_HEIGHT - LCD_HEIGHT / 3);
     gfx_SetColor(COLOR_BLUE);
@@ -316,10 +316,10 @@ void console_write(char *text) {
     console_index++;
 }
 
-void execute_simplify();
-void execute_evaluate();
-void execute_expand();
-void execute_derivative();
+void execute_simplify(void);
+void execute_evaluate(void);
+void execute_expand(void);
+void execute_derivative(void);
 
 /*the key lookup tables for os_GetCSC()*/
 const char alpha_table[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x00, 0x57, 0x52, 0x4D, 0x48, 0x00, 0x00, 0x00, 0x40, 0x56, 0x51, 0x4C, 0x47, 0x00, 0x00, 0x00, 0x5A, 0x55, 0x50, 0x4B, 0x46, 0x43, 0x00, 0x00, 0x59, 0x54, 0x4F, 0x4A, 0x45, 0x42, 0x58, 0x00, 0x58, 0x53, 0x4E, 0x49, 0x44, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -469,7 +469,7 @@ void handle_input(uint8_t key) {
     }
 }
 
-void gui_Init() {
+void gui_Init(void) {
     io_context[0] = from_drop = view_create_dropdown(LCD_WIDTH / 4 + 20 - 25, 14 + 8 + 4, 0);
     io_context[1] = to_drop = view_create_dropdown(LCD_WIDTH / 4 * 3 - 20 - 25, 14 + 8 + 4, 1);
 
@@ -507,7 +507,7 @@ void gui_Init() {
     function_context[0]->active = true;
 }
 
-void gui_Cleanup() {
+void gui_Cleanup(void) {
     unsigned i, j;
 
     for(i = 0; i < NUM_CONTEXTS; i++) {
@@ -521,7 +521,7 @@ void gui_Cleanup() {
     id_UnloadAll();
 }
 
-void gui_Run() {
+void gui_Run(void) {
 
     gui_Init();
 
@@ -555,7 +555,7 @@ void compile(pcas_id_t *arr, unsigned len) {
     }
 }
 
-void compile_general() {
+void compile_general(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -565,7 +565,7 @@ void compile_general() {
     }
 }
 
-void compile_trig() {
+void compile_trig(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -575,7 +575,7 @@ void compile_trig() {
     }
 }
 
-void compile_trig_constants() {
+void compile_trig_constants(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -585,7 +585,7 @@ void compile_trig_constants() {
     }
 }
 
-void compile_trig_inv_constants() {
+void compile_trig_inv_constants(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -595,7 +595,7 @@ void compile_trig_inv_constants() {
     }
 }
 
-void compile_hyperbolic() {
+void compile_hyperbolic(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -605,7 +605,7 @@ void compile_hyperbolic() {
     }
 }
 
-void compile_complex() {
+void compile_complex(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -615,7 +615,7 @@ void compile_complex() {
     }
 }
 
-void compile_derivative() {
+void compile_derivative(void) {
     static bool compiled = false;
 
     if(!compiled) {
@@ -625,7 +625,7 @@ void compile_derivative() {
     }
 }
 
-void compile_all() {
+void compile_all(void) {
     compile_general();
     compile_trig();
     compile_trig_constants();
@@ -647,7 +647,7 @@ void write_to_dropdown_index(unsigned index, pcas_ast_t *expression, pcas_error_
     write_to_tok((uint8_t*)token_table[index], expression, err);
 }
 
-void execute_simplify() {
+void execute_simplify(void) {
     char buffer[50];
 
     pcas_ast_t *expression;
@@ -721,7 +721,7 @@ void execute_simplify() {
     view_draw(console_button);
 }
 
-void execute_evaluate() {
+void execute_evaluate(void) {
     char buffer[50];
 
     bool should_sub, should_eval;
@@ -818,7 +818,7 @@ void execute_evaluate() {
     view_draw(console_button);
 }
 
-void execute_expand() {
+void execute_expand(void) {
     char buffer[50];
 
     pcas_ast_t *expression;
@@ -876,7 +876,7 @@ void execute_expand() {
     view_draw(console_button);
 }
 
-void execute_derivative() {
+void execute_derivative(void) {
     char buffer[50];
 
     pcas_ast_t *expression;

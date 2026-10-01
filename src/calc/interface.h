@@ -10,9 +10,9 @@
 #include "../ast.h"
 
 /*Checks if Ans is trying to call a function of PCAS*/
-bool interface_Valid();
+bool interface_Valid(void);
 /*Run function specified by Ans variable without gui*/
-void interface_Run();
+void interface_Run(void);
 
 /*Helper functions*/
 pcas_ast_t *parse_from_tok(uint8_t *tok, pcas_error_t *err);

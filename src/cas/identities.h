@@ -31,4 +31,4 @@ bool id_Execute(pcas_ast_t *e, pcas_id_t *id, bool recursive);
 bool id_ExecuteTable(pcas_ast_t *e, pcas_id_t *table, unsigned table_len, bool recursive);
 void id_UnloadTable(pcas_id_t *table, unsigned table_len);
 /*Calls unload table for all tables*/
-void id_UnloadAll();
+void id_UnloadAll(void);

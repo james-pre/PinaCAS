@@ -22,7 +22,7 @@
 
 #include "tests.h"
 
-void display_help() {
+void display_help(void) {
     printf("Usage: ./pineapple [operation] [args]\n");
     printf("Valid operations include:\n");
     printf("\ttest [file]\t\t\tRuns all tests in file\n");

@@ -141,7 +141,7 @@ void write_ans(int val) {
     ti_SetVar(TI_REAL_TYPE, ti_Ans, &real);
 }
 
-void success() {
+void success(void) {
     write_ans(1);
 }
 
@@ -579,7 +579,7 @@ bool interface_arg_equals(uint8_t *arg, unsigned arg_len, char *str2) {
     return true;
 }
 
-void interface_Run() {
+void interface_Run(void) {
     uint8_t *ans;
     unsigned ans_len;
 
@@ -611,7 +611,7 @@ void interface_Run() {
 
 
 /*Checks if Ans is trying to call a function of PCAS*/
-bool interface_Valid() {
+bool interface_Valid(void) {
     uint8_t *ans;
     unsigned ans_len;
 
