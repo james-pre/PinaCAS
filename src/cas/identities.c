@@ -7,6 +7,7 @@
 
 #include "cas.h"
 #include "../dbg.h"
+#include "../work.h"
 
 /*
     IDENTITY RULES:
@@ -528,8 +529,10 @@ bool id_Load(pcas_id_t *id) {
 
     if(id->from != NULL && id->to != NULL) {
         /*Assumes that from and to are already simplified. This just puts it into a form we can compare*/
+        work_Pause();
         simplify(id->from, SIMP_NORMALIZE | SIMP_COMMUTATIVE);
         simplify(id->to, SIMP_NORMALIZE | SIMP_COMMUTATIVE);
+        work_Resume();
         return true;
     }
 
