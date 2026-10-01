@@ -31,6 +31,8 @@ Note that if you encounter the error "Attempted to use a variable or function wh
 # Build
 Download and install the latest CE C toolchain from https://github.com/CE-Programming/toolchain
 
+On Fedora, `scripts/install-toolchain.sh` installs or updates it in `/opt/CEdev` (override with `CEDEV_PREFIX`), along with the matching `clibs.8xg` for the calculator.
+
 **Compile for calculator:**
 ```
 git clone https://github.com/nathanfarlow/PineappleCAS
