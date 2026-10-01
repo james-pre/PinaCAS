@@ -11,6 +11,23 @@ static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
     if(!(flags & EVAL_COMMUTATIVE))
         return false;
 
+    /*A lone fraction is already normalized, so it is only combined with other numbers*/
+    if(isoptype(e, OP_ADD)) {
+        unsigned numbers = 0, fractions = 0;
+
+        for(i = 0; i < ast_ChildLength(e); i++) {
+            pcas_ast_t *child = ast_ChildGet(e, i);
+
+            if(child->type == NODE_NUMBER)
+                numbers++;
+            else if(isoptype(child, OP_DIV) && ast_ChildGet(child, 0)->type == NODE_NUMBER && ast_ChildGet(child, 1)->type == NODE_NUMBER)
+                fractions++;
+        }
+
+        if(numbers == 0 && fractions == 1)
+            return false;
+    }
+
     accumulator = num_FromInt(optype(e) == OP_MULT ? 1 : 0);
 
     for(i = 0; i < ast_ChildLength(e); i++) {
