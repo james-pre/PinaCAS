@@ -102,7 +102,7 @@ char *dropdown_entries[NUM_DROPDOWN_ENTRIES] = {
 #define NUM_EXPAND 3
 #define NUM_DERIVATIVE 3
 #define NUM_INTEGRAL 3
-#define NUM_DE 3
+#define NUM_DE 5
 #define NUM_HELP 0
 
 view_t *io_context[NUM_IO];
@@ -280,6 +280,10 @@ void draw_context(Context c) {
     }
 
     gfx_SetTextFGColor(COLOR_TEXT);
+    if(c == CONTEXT_DE) {
+        gfx_PrintStringXY("Solution in:", 136, 136 + 10 - TEXT_HEIGHT / 2);
+    }
+
     if(c == CONTEXT_EVALUATE) {
         gfx_PrintStringXY("From: ", 124 + 25, 96 + 12 + 10 - TEXT_HEIGHT / 2);
         gfx_PrintStringXY("To: ", 124 + 25, 96 + 12 + 24 + 10 - TEXT_HEIGHT / 2);
@@ -529,7 +533,9 @@ void gui_Init(void) {
 
     de_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
     de_context[1] = view_create_checkbox(124, 104, "Show work", true);
-    de_context[2] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
+    de_context[2] = view_create_checkbox(124, 124, "Verify solution", false);
+    de_context[3] = view_create_dropdown(124 + 90, 136, 2);
+    de_context[4] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
 
     console_button = view_create_button(LCD_WIDTH / 2, LCD_HEIGHT - LCD_HEIGHT / 6 - 20, "Close");
 
@@ -917,22 +923,35 @@ pcas_ast_t *parse_respect_to(view_t *charselect, pcas_error_t *err) {
     return parse((uint8_t*)&charselect->character, 1, str_table, err);
 }
 
+unsigned parse_list_from_dropdown_index(unsigned index, pcas_ast_t **items, pcas_error_t *err) {
+    return parse_list_from_tok((uint8_t*)token_table[index], items, MAX_ITEMS, err);
+}
+
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/
 void execute_calculus(Calculus kind, view_t **context, const char *title) {
     char buffer[50];
 
-    pcas_ast_t *expression, *respect_to;
+    pcas_ast_t *items[MAX_ITEMS], *respect_to, *solution = NULL;
     pcas_error_t err;
     pcas_work_t work;
+    unsigned count;
     bool show_work = context[1]->checked;
+    bool verify = kind == CALCULUS_DE && context[2]->checked;
+    bool satisfied = false;
 
     compile_derivative();
 
     console_write("Parsing input...");
 
-    expression = parse_from_dropdown_index(from_drop->index, &err);
+    count = parse_list_from_dropdown_index(from_drop->index, items, &err);
 
-    if(err == E_SUCCESS && expression == NULL) {
+    if(err == E_SUCCESS && verify) {
+        solution = parse_from_dropdown_index(context[3]->index, &err);
+        if(err == E_SUCCESS && solution == NULL)
+            err = E_GENERIC;
+    }
+
+    if(err == E_SUCCESS && (count == 0 || items[0] == NULL)) {
         console_write("Failed. Empty input.");
     } else if(err != E_SUCCESS) {
         sprintf(buffer, "Failed. %s.", error_text[err]);
@@ -945,26 +964,35 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
         if(show_work)
             work_Start(&work);
 
-        console_write(kind == CALCULUS_DERIVATIVE ? "Differentiating..." : kind == CALCULUS_INTEGRAL ? "Integrating..." : "Solving...");
+        if(verify) {
+            console_write("Verifying...");
+            err = calculus_Verify(items, count, respect_to, solution, &satisfied);
+            if(err == E_SUCCESS)
+                console_write(satisfied ? "It is a solution." : "It is not a solution.");
+        } else {
+            console_write(kind == CALCULUS_DERIVATIVE ? "Differentiating..." : kind == CALCULUS_INTEGRAL ? "Integrating..." : "Solving...");
+            err = calculus_Run(kind, items, count, respect_to, buffer);
 
-        err = calculus_Run(kind, expression, respect_to, buffer);
-
-        if(err == E_SUCCESS && kind == CALCULUS_DE)
-            console_write(buffer);
+            if(err == E_SUCCESS && kind == CALCULUS_DE)
+                console_write(buffer);
+        }
 
         if(show_work)
             work_Stop();
 
-        if(err == E_SUCCESS) {
+        if(err == E_SUCCESS && !verify) {
             console_write("Exporting...");
-            write_to_dropdown_index(to_drop->index, expression, &err);
+            write_to_dropdown_index(to_drop->index, items[0], &err);
         }
 
-        ast_Cleanup(expression);
         ast_Cleanup(respect_to);
 
         if(err == E_SUCCESS && show_work) {
-            viewer_Show(&work, title);
+            while(count > 0)
+                ast_Cleanup(items[--count]);
+            ast_Cleanup(solution);
+
+            viewer_Show(&work, verify ? "Verify solution" : title);
             work_Cleanup(&work);
             close_console();
             return;
@@ -980,6 +1008,10 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
             console_write(buffer);
         }
     }
+
+    while(count > 0)
+        ast_Cleanup(items[--count]);
+    ast_Cleanup(solution);
 
     console_button->active = true;
     view_draw(console_button);

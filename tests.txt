@@ -403,3 +403,20 @@ order; Y'''+3Y''_4Y'_12Y=0; X; 3
 linear; Y''_2Y'+Y=e^Tatan(T); T; Y''_2Y'+Y=e^Tatan(T)
 linear; X''+W^2X=Fcos(GT); T; X''+W^2X=Fcos(GT)
 linear; Y''+16Y; X; Y''+16Y=0
+
+#Differential equations: verifying solutions
+solves; Y'+2Y=e^(-X),Y(0)=3; e^(-X)+2e^(-2X); X
+solves; Y'=(Y^2+2XY)/X^2,Y(2)=-4; X^2/(1_X); X
+solves; XY'+Y=X^3,Y(2)=4; Y=4/X+X^3/4; X
+solves; 9Y''_12Y'+4Y=0; e^(2X/3); X
+solves; 9Y''_12Y'+4Y=0; Xe^(2X/3); X
+solves; 4X^2Y''+Y=0; sqrt(X)ln(X); X
+solves; 4X^2Y''+Y=0; sqrt(X); X
+solves; Y''_36Y=0; e^(6X)+3e^(-6X); X
+solves; Y''+16Y=0,Y(0)=2,Y'(0)=-2; 2cos(4X)_1/2sin(4X); X
+solves; XY'_3Y=X^5,Y(1)=2; X^5/2+3/2X^3; X
+solves; Y'=X/sin(Y),Y(0)=pi/4; acos(1/sqrt(2)_X^2/2); X
+solves; X''+16X=0,X(0)=1; cos(4T); T
+notsolves; Y'+2Y=e^(-X); e^X; X
+notsolves; Y'+2Y=e^(-X),Y(0)=1; e^(-X)+2e^(-2X); X
+notsolves; Y''+16Y=0,Y(0)=2,Y'(0)=2; 2cos(4X)_1/2sin(4X); X

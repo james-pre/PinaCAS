@@ -193,40 +193,30 @@ void tok_fix(uint8_t **symbol, unsigned *symbol_len) {
     (*symbol_len) += 2;
 }
 
-pcas_ast_t *parse_from_tok(uint8_t *tok, pcas_error_t *err) {
+unsigned parse_list_from_tok(uint8_t *tok, pcas_ast_t **items, unsigned max, pcas_error_t *err) {
     ti_var_t var;
+    unsigned count;
 
     ti_CloseAll();
 
     var = ti_OpenVar((char*)tok, "r", tok[0] == 0x5Eu ? TI_EQU_TYPE : TI_STRING_TYPE);
 
     /*If we're opening Ans or a string and the type is not a string type*/
-    if(tok[0] != 0x5Eu && !is_var_string_type(var)) {
+    if(var == 0 || (tok[0] != 0x5Eu && !is_var_string_type(var))) {
         *err = E_GENERIC;
-        return NULL;
+        return 0;
     }
 
-    if(var != NULL) {
-        const uint8_t *data;
-        uint16_t size;
+    count = parse_list(ti_GetDataPtr(var), ti_GetSize(var), ti_table, items, max, err);
 
-        pcas_ast_t *result;
+    ti_Close(var);
 
-        data = ti_GetDataPtr(var);
-        size = ti_GetSize(var);
+    return count;
+}
 
-        result = parse(data, size, ti_table, err);
-
-        ti_Close(var);
-
-        if(*err == E_SUCCESS)
-            return result;
-
-        return NULL;
-    }
-
-    *err = E_GENERIC;
-    return NULL;
+pcas_ast_t *parse_from_tok(uint8_t *tok, pcas_error_t *err) {
+    pcas_ast_t *result;
+    return parse_list_from_tok(tok, &result, 1, err) == 1 ? result : NULL;
 }
 
 void write_to_tok(uint8_t *tok, pcas_ast_t *expression, pcas_error_t *err) {
@@ -508,9 +498,13 @@ bool valid_respect_to(uint8_t *symbol, unsigned symbol_len) {
     return symbol_len == 1 && symbol[0] >= 'A' && symbol[0] <= ('Z' + 1); /*Z + 1 is theta*/
 }
 
-pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, char *summary) {
+pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, char *summary) {
+    pcas_ast_t *e = items[0];
     pcas_error_t err = E_SUCCESS;
     pcas_de_t de;
+
+    if(kind != CALCULUS_DE && count > 1)
+        return E_PARSE_BAD_COMMA;
 
     switch(kind) {
     case CALCULUS_DERIVATIVE:
@@ -522,7 +516,7 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, 
         integral_Indefinite(e, respect_to);
         break;
     case CALCULUS_DE:
-        err = de_Load(&de, e, respect_to);
+        err = de_LoadList(&de, items, count, respect_to);
 
         if(err == E_SUCCESS) {
             if(summary != NULL)
@@ -544,60 +538,108 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, 
     return err;
 }
 
+pcas_error_t calculus_Verify(pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, pcas_ast_t *solution, bool *satisfied) {
+    pcas_de_t de;
+    pcas_error_t err;
+
+    err = de_LoadList(&de, items, count, respect_to);
+
+    if(err == E_SUCCESS)
+        err = de_Verify(&de, solution, satisfied);
+
+    de_Cleanup(&de);
+
+    return err;
+}
+
 /*
     Syntax: DERIV,Y1,Y2,X or INTEG,Y1,Y2,X or DE,Y1,Y2,X
 
     Takes the derivative or integral of, or classifies the differential equation in, the input with respect to the 4th argument
 */
-void interface_Calculus(arg_list *args, Calculus kind) {
-    pcas_ast_t *expression, *respect_to_expr;
-    pcas_error_t err;
-
-    uint8_t *input, *output, *respect_to;
-    unsigned input_len, output_len, respect_to_len;
-
+/*Parses the "respect to" argument, which is a letter or theta*/
+static pcas_ast_t *parse_respect_to(uint8_t *respect_to, unsigned respect_to_len, pcas_error_t *err) {
     char *theta = "theta";
+
+    if(respect_to[0] == 'Z' + 1)
+        return parse((uint8_t*)theta, strlen(theta), str_table, err);
+
+    return parse(respect_to, respect_to_len, str_table, err);
+}
+
+static void cleanup_items(pcas_ast_t **items, unsigned count) {
+    while(count > 0)
+        ast_Cleanup(items[--count]);
+}
+
+void interface_Calculus(arg_list *args, Calculus kind) {
+    pcas_ast_t *items[MAX_ITEMS], *respect_to_expr;
+    pcas_error_t err;
+    unsigned count;
 
     interface_assert(args->amount >= 4, "Not enough arguments");
 
     tok_fix(&args->args[1], &args->arg_len[1]);
     tok_fix(&args->args[2], &args->arg_len[2]);
 
-    input = args->args[1];
-    output = args->args[2];
-    respect_to = args->args[3];
+    interface_assert(tok_valid(args->args[1], args->arg_len[1]), "Not a valid input variable");
+    interface_assert(tok_valid(args->args[2], args->arg_len[2]), "Not a valid output variable");
+    interface_assert(valid_respect_to(args->args[3], args->arg_len[3]), "Not a valid \"respect to\" variable");
 
-    input_len = args->arg_len[1];
-    output_len = args->arg_len[2];
-    respect_to_len = args->arg_len[3];
-
-    interface_assert(tok_valid(input, input_len), "Not a valid input variable");
-    interface_assert(tok_valid(output, output_len), "Not a valid output variable");
-    interface_assert(valid_respect_to(respect_to, respect_to_len), "Not a valid \"respect to\" variable");
-
-    expression = parse_from_tok(input, &err);
+    count = parse_list_from_tok(args->args[1], items, MAX_ITEMS, &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
-    interface_assert(err == E_SUCCESS && expression != NULL, NULL);
+    interface_assert(err == E_SUCCESS && count > 0 && items[0] != NULL, NULL);
 
-    /*If input is theta, parse theta string instead*/
-    if(respect_to[0] == 'Z' + 1) {
-        respect_to_expr = parse((uint8_t*)theta, strlen(theta), str_table, &err);
-    } else {
-        respect_to_expr = parse(respect_to, respect_to_len, str_table, &err);
-    }
+    respect_to_expr = parse_respect_to(args->args[3], args->arg_len[3], &err);
     interface_assert(err == E_SUCCESS && respect_to_expr != NULL, NULL);
 
-    err = calculus_Run(kind, expression, respect_to_expr, NULL);
+    err = calculus_Run(kind, items, count, respect_to_expr, NULL);
 
     if(err == E_SUCCESS)
-        write_to_tok(output, expression, &err);
+        write_to_tok(args->args[2], items[0], &err);
 
-    ast_Cleanup(expression);
+    cleanup_items(items, count);
     ast_Cleanup(respect_to_expr);
 
     interface_assert(err == E_SUCCESS, NULL);
 
     success();
+}
+
+/*
+    Syntax: VERIFY,Y1,Y2,X
+
+    Checks whether the solution in the 3rd argument satisfies the differential equation and initial conditions in the 2nd. Writes 1 to Ans if it does and 0 if not.
+*/
+void interface_Verify(arg_list *args) {
+    pcas_ast_t *items[MAX_ITEMS], *solution, *respect_to_expr;
+    pcas_error_t err;
+    unsigned count;
+    bool satisfied = false;
+
+    interface_assert(args->amount >= 4, "Not enough arguments");
+
+    tok_fix(&args->args[1], &args->arg_len[1]);
+    tok_fix(&args->args[2], &args->arg_len[2]);
+
+    interface_assert(tok_valid(args->args[1], args->arg_len[1]), "Not a valid equation variable");
+    interface_assert(tok_valid(args->args[2], args->arg_len[2]), "Not a valid solution variable");
+    interface_assert(valid_respect_to(args->args[3], args->arg_len[3]), "Not a valid \"respect to\" variable");
+
+    count = parse_list_from_tok(args->args[1], items, MAX_ITEMS, &err);
+    interface_assert(err == E_SUCCESS && count > 0 && items[0] != NULL, NULL);
+
+    solution = parse_from_tok(args->args[2], &err);
+    respect_to_expr = parse_respect_to(args->args[3], args->arg_len[3], &err);
+
+    if(solution != NULL && respect_to_expr != NULL)
+        err = calculus_Verify(items, count, respect_to_expr, solution, &satisfied);
+
+    cleanup_items(items, count);
+    ast_Cleanup(solution);
+    ast_Cleanup(respect_to_expr);
+
+    write_ans(err == E_SUCCESS && satisfied);
 }
 
 bool interface_arg_equals(uint8_t *arg, unsigned arg_len, char *str2) {
@@ -637,6 +679,8 @@ void interface_Run(void) {
             interface_Calculus(&args, CALCULUS_INTEGRAL);
         } else if(interface_arg_equals(args.args[0], args.arg_len[0], "DE")) {
             interface_Calculus(&args, CALCULUS_DE);
+        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "VERIFY")) {
+            interface_Verify(&args);
         }
 
         id_UnloadAll();
@@ -666,7 +710,8 @@ bool interface_Valid(void) {
                 || interface_arg_equals(args.args[0], args.arg_len[0], "EXP")
                 || interface_arg_equals(args.args[0], args.arg_len[0], "DERIV")
                 || interface_arg_equals(args.args[0], args.arg_len[0], "INTEG")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "DE");
+                || interface_arg_equals(args.args[0], args.arg_len[0], "DE")
+                || interface_arg_equals(args.args[0], args.arg_len[0], "VERIFY");
 
         cleanup_args(&args);
     }

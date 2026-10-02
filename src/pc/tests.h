@@ -20,6 +20,8 @@ typedef enum {
     TEST_DE_ORDER,
     TEST_DE_LINEAR,
     TEST_DE_NONLINEAR,
+    TEST_DE_SOLVES,
+    TEST_DE_NOT_SOLVES,
 
     TEST_INVALID
 } TestType;

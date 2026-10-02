@@ -37,6 +37,7 @@ void display_help(void) {
     printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
     printf("\tintegral [expression] [respect to]\n");
     printf("\tde [equation] [(optional) respect to]\tClassifies a differential equation\n");
+    printf("\tverify [equation,conditions] [solution] [(optional) respect to]\tChecks a solution of a differential equation\n");
 }
 
 /*Trim null terminated string*/
@@ -591,6 +592,64 @@ int run_de(int argc, char **argv) {
     return err == E_SUCCESS ? 0 : -1;
 }
 
+#define MAX_ITEMS (DE_MAX_CONDITIONS + 1)
+
+int run_verify(int argc, char **argv) {
+
+    uint8_t *trimmed;
+    unsigned trimmed_len, count, i;
+
+    pcas_error_t err;
+    pcas_ast_t *items[MAX_ITEMS], *solution = NULL, *x = NULL;
+    pcas_de_t de;
+    bool satisfied = false;
+
+    if(argc <= 3) {
+        display_help();
+        return -1;
+    }
+
+    trimmed = trim(argv[2], &trimmed_len);
+    count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
+    free(trimmed);
+
+    if(err == E_SUCCESS) {
+        trimmed = trim(argv[3], &trimmed_len);
+        solution = parse(trimmed, trimmed_len, str_table, &err);
+        free(trimmed);
+    }
+
+    if(err == E_SUCCESS) {
+        if(argc >= 5) {
+            trimmed = trim(argv[4], &trimmed_len);
+            x = parse(trimmed, trimmed_len, str_table, &err);
+            free(trimmed);
+        } else {
+            x = ast_MakeSymbol(SYM_X);
+        }
+    }
+
+    if(err == E_SUCCESS && count > 0 && items[0] != NULL && solution != NULL && x != NULL) {
+        err = de_LoadList(&de, items, count, x);
+
+        if(err == E_SUCCESS)
+            err = de_Verify(&de, solution, &satisfied);
+
+        printf("%s\n", err == E_SUCCESS ? (satisfied ? "Solution" : "Not a solution") : error_text[err]);
+
+        de_Cleanup(&de);
+    } else {
+        printf("%s\n", error_text[err]);
+    }
+
+    for(i = 0; i < count; i++)
+        ast_Cleanup(items[i]);
+    ast_Cleanup(solution);
+    ast_Cleanup(x);
+
+    return err == E_SUCCESS && satisfied ? 0 : -1;
+}
+
 int main(int argc, char **argv) {
     int ret;
     pcas_work_t work;
@@ -611,6 +670,7 @@ int main(int argc, char **argv) {
         else if(!strcmp(argv[1], "derivative")) ret = run_derivative(argc, argv);
         else if(!strcmp(argv[1], "integral"))   ret = run_integral(argc, argv);
         else if(!strcmp(argv[1], "de"))         ret = run_de(argc, argv);
+        else if(!strcmp(argv[1], "verify"))     ret = run_verify(argc, argv);
         else {
             display_help();
             return -1;

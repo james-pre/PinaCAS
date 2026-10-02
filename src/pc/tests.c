@@ -42,6 +42,8 @@ TestType resolve_type(char *type) {
     if(!strcmp(type, "order"))      return TEST_DE_ORDER;
     if(!strcmp(type, "linear"))     return TEST_DE_LINEAR;
     if(!strcmp(type, "nonlinear"))  return TEST_DE_NONLINEAR;
+    if(!strcmp(type, "solves"))     return TEST_DE_SOLVES;
+    if(!strcmp(type, "notsolves"))  return TEST_DE_NOT_SOLVES;
 
     return TEST_INVALID;
 }
@@ -157,10 +159,47 @@ bool check(test_t *t, pcas_ast_t *actual, pcas_ast_t *expected) {
     return true;
 }
 
+#define MAX_ITEMS (DE_MAX_CONDITIONS + 1)
+
+/*arg1 is an equation with initial conditions, arg2 a solution, and arg3 the independent variable*/
+static bool run_verify(test_t *t) {
+    pcas_ast_t *items[MAX_ITEMS], *solution, *x;
+    pcas_error_t err;
+    pcas_de_t de;
+    unsigned count, i;
+    bool satisfied = false, passed = false;
+
+    count = parse_list((uint8_t*)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+    solution = parse((uint8_t*)t->arg2, strlen(t->arg2), str_table, &err);
+    x = parse((uint8_t*)t->arg3, strlen(t->arg3), str_table, &err);
+
+    if(count == 0 || items[0] == NULL || solution == NULL || x == NULL) {
+        printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
+    } else if((err = de_LoadList(&de, items, count, x)) != E_SUCCESS || (err = de_Verify(&de, solution, &satisfied)) != E_SUCCESS) {
+        printf("Test failed on line %u. %s\n", t->line, error_text[err]);
+        de_Cleanup(&de);
+    } else {
+        passed = satisfied == (t->type == TEST_DE_SOLVES);
+        if(!passed)
+            printf("Test failed on line %u. Expected %s.\n", t->line, satisfied ? "not a solution" : "a solution");
+        de_Cleanup(&de);
+    }
+
+    for(i = 0; i < count; i++)
+        ast_Cleanup(items[i]);
+    ast_Cleanup(solution);
+    ast_Cleanup(x);
+
+    return passed;
+}
+
 bool test_Run(test_t *t) {
     pcas_ast_t *a = NULL, *b = NULL, *c = NULL, *expected, *actual;
     pcas_error_t err;
     bool passed = false;
+
+    if(t->type == TEST_DE_SOLVES || t->type == TEST_DE_NOT_SOLVES)
+        return run_verify(t);
 
     a = parse((uint8_t*)t->arg1, strlen(t->arg1), str_table, &err);
     if(err != E_SUCCESS) {
