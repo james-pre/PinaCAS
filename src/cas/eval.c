@@ -11,20 +11,24 @@ static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
     if(!(flags & EVAL_COMMUTATIVE))
         return false;
 
-    /*A lone fraction is already normalized, so it is only combined with other numbers*/
-    if(isoptype(e, OP_ADD)) {
+    {
         unsigned numbers = 0, fractions = 0;
+        pcas_ast_t *child, *first = opbase(e);
 
-        for(i = 0; i < ast_ChildLength(e); i++) {
-            pcas_ast_t *child = ast_ChildGet(e, i);
-
+        for(child = first; child != NULL; child = child->next) {
             if(child->type == NODE_NUMBER)
                 numbers++;
-            else if(isoptype(child, OP_DIV) && ast_ChildGet(child, 0)->type == NODE_NUMBER && ast_ChildGet(child, 1)->type == NODE_NUMBER)
+            else if(isoptype(e, OP_ADD) && isoptype(child, OP_DIV) && opbase(child)->type == NODE_NUMBER && opbase(child)->next->type == NODE_NUMBER)
                 fractions++;
         }
 
-        if(numbers == 0 && fractions == 1)
+        /*A lone fraction is already normalized, so it is only combined with other numbers*/
+        if(first != NULL && numbers == 0 && fractions <= 1)
+            return false;
+
+        /*A lone number that is already first and is not an identity element stays as it is*/
+        if(numbers == 1 && fractions == 0 && first->type == NODE_NUMBER && first->next != NULL
+            && mp_rat_compare_zero(first->op.num) != 0 && !(optype(e) == OP_MULT && is_ast_int(first, 1)))
             return false;
     }
 
