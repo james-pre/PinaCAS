@@ -42,7 +42,7 @@ void draw_background(void) {
     gfx_Rectangle(1, 1, LCD_WIDTH - 2, LCD_HEIGHT - 2);
     gfx_HorizLine(1, LCD_HEIGHT - 21, LCD_WIDTH - 2);
 
-    draw_string_centered("PineappleCAS v1.1 by Nathan Farlow", LCD_WIDTH / 2, LCD_HEIGHT - 14);
+    draw_string_centered("PinaCAS v2.0 by James Prevett & Nathan Farlow", LCD_WIDTH / 2, LCD_HEIGHT - 14);
 
     draw_string_centered("Input", LCD_WIDTH / 4 + 20, 14);
     draw_string_centered("Output", LCD_WIDTH / 4 * 3 - 20, 14);
@@ -273,16 +273,16 @@ void draw_context(Context c) {
         gfx_PrintStringXY("To: ", 124 + 25, 96 + 12 + 24 + 10 - TEXT_HEIGHT / 2);
     } else if(c == CONTEXT_HELP) {
         gfx_PrintStringXY("View https://github.com/", 115, 80 + 10 * 0);
-        gfx_PrintStringXY("nathanfarlow/PineappleCAS", 115, 80 + 10 * 1);
+        gfx_PrintStringXY("james-pre/PinaCAS", 115, 80 + 10 * 1);
         gfx_PrintStringXY("for usage instructions.", 115, 80 + 10 * 2);
 
-        gfx_PrintStringXY("PineappleCAS uses the imath", 115, 80 + 10 * 4);
-        gfx_PrintStringXY("library by Michael J.", 115, 80 + 10 * 5);
-        gfx_PrintStringXY("Fromberger.", 115, 80 + 10 * 6);
-
-        gfx_PrintStringXY("Thanks Adriweb and Mateo", 115, 80 + 10 * 8);
-        gfx_PrintStringXY("for help and contributions", 115, 80 + 10 * 9);
-        gfx_PrintStringXY("to this project.", 115, 80 + 10 * 10);
+        gfx_PrintStringXY("PinaCAS is a fork of", 115, 80 + 10 * 4);
+        gfx_PrintStringXY("PineappleCAS by Nathan", 115, 80 + 10 * 5);
+        gfx_PrintStringXY("Farlow. It uses the imath", 115, 80 + 10 * 6);
+        gfx_PrintStringXY("library by Michael J.", 115, 80 + 10 * 7);
+        gfx_PrintStringXY("Fromberger. Thanks Adriweb", 115, 80 + 10 * 8);
+        gfx_PrintStringXY("and Mateo for help and", 115, 80 + 10 * 9);
+        gfx_PrintStringXY("contributions.", 115, 80 + 10 * 10);
     } else if(c == CONTEXT_DERIVATIVE) {
         gfx_PrintStringXY("Respect to: ", 124, 80);
     }

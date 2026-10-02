@@ -12,7 +12,7 @@
 # ------------------------------------------------
 
 # project name (generate executable with this name)
-TARGET   = pineapple
+TARGET   = pinacas
 
 CC       = gcc
 # compiling flags here
@@ -55,4 +55,4 @@ remove: clean
 	@echo "Executable removed!"
 
 test:
-	./bin/pineapple test tests.txt
+	./bin/pinacas test tests.txt

@@ -1,15 +1,24 @@
-<p align="center"><img src="https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/logo.png"></p>
-<h2 align="center"><b>PineappleCAS</b></h2>
+<h2 align="center"><b>PinaCAS</b></h2>
 <p align="center">
-<a href="https://github.com/james-pre/PineappleCAS/actions/workflows/ci.yaml" alt="Build Status"><img src="https://github.com/james-pre/PineappleCAS/actions/workflows/ci.yaml/badge.svg"></a>
+<a href="https://github.com/james-pre/PinaCAS/actions/workflows/ci.yaml" alt="Build Status"><img src="https://github.com/james-pre/PinaCAS/actions/workflows/ci.yaml/badge.svg"></a>
 </p>
 <p>
-PineappleCAS is a computer algebra system for the TI-84 Plus CE calculators. It is designed as a faster, cleaner, more useful, memory-leak-free alternative to the <a href="https://github.com/nathanfarlow/SymbolicDerivative">SymbolicDerivative</a> project. PineappleCAS uses the <a href="https://github.com/creachadair/imath">imath library</a> for arbitrary precision math.
+PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that shows its work. It is a fork of <a href="https://github.com/nathanfarlow/PineappleCAS">PineappleCAS</a> by Nathan Farlow, which provides the simplifier, identities, derivatives, and the calculator interface. PinaCAS adds integration and differential equations, with support for showing work. Both use the <a href="https://github.com/creachadair/imath">imath library</a> for arbitrary precision math.
 </p>
+
+## Changes from PineappleCAS
+- Indefinite integration: linearity, a table of elementary integrals, u-substitution, and integration by parts
+- Step-by-step work for derivatives and integrals
+- Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
+- Builds with the LLVM-based CE C toolchain, with imath as a git submodule
+
+The program is still called PCAS on the calculator, and the TI-Basic interface is unchanged.
 
 <hr>
 
 ## Screenshots
+These are from PineappleCAS.
+
 ![Main screen](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/simplify.png "GUI")
 ![Complex example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/i^i.png "Complex simplification")
 ![Trig example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/trig.png "Trig identity simplification")
@@ -20,13 +29,13 @@ PineappleCAS is a computer algebra system for the TI-84 Plus CE calculators. It 
 ![Basic interface](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/interface.png "Basic interface")
 
 # Installation
-* Download the latest PineappleCAS release from the releases and send PCAS.8xp to your calculator's **archive memory**. It is very important that the program is archived to prevent Error: Memory when running the program.
+* Download the latest release from the releases and send PCAS.8xp to your calculator's **archive memory**. It is very important that the program is archived to prevent Error: Memory when running the program.
 * Download the latest C libraries from https://github.com/CE-Programming/libraries/releases and send to your calculator.
 * If you have CE OS 5.3 or higher, simply execute prgmPCAS on the calculator. If not, you will have to unarchive PCAS and do Asm(prgmPCAS from the catalog.
 * Navigate the GUI with the arrow keys, and press enter on GUI elements to change their value.
 * Press clear to exit the program.
 
-Note that if you encounter the error "Attempted to use a variable or function where it is not valid" on OS versions 5.5 or newer, this is because TI removed the ability to run ASM programs on these OS versions. This is not an issue with PineappleCAS. You can jailbreak your calculator with [this tool](https://yvantt.github.io/arTIfiCE/) to restore the functionality and then try running PineappleCAS again.
+Note that if you encounter the error "Attempted to use a variable or function where it is not valid" on OS versions 5.5 or newer, this is because TI removed the ability to run ASM programs on these OS versions. This is not an issue with PinaCAS. You can jailbreak your calculator with [arTIfiCE](https://yvantt.github.io/arTIfiCE/) to restore the functionality and then try running PinaCAS again.
 
 # Build
 Download and install the latest CE C toolchain from https://github.com/CE-Programming/toolchain
@@ -35,8 +44,8 @@ On Fedora, `scripts/install-toolchain.sh` installs or updates it in `/opt/CEdev`
 
 **Compile for calculator:**
 ```
-git clone --recursive https://github.com/nathanfarlow/PineappleCAS
-cd PineappleCAS
+git clone --recursive https://github.com/james-pre/PinaCAS
+cd PinaCAS
 make
 ```
 The calculator program compiles consistently on Ubuntu, but Windows has a problem with it. Executing make on Windows many times seems to work for some reason. (I blame the compiler!)
@@ -49,8 +58,8 @@ Builds PCAS, starts [CEmu](https://ce-programming.github.io/CEmu/) with the ROM 
 
 **Compile for PC:**
 ```
-git clone --recursive https://github.com/nathanfarlow/PineappleCAS
-cd PineappleCAS
+git clone --recursive https://github.com/james-pre/PinaCAS
+cd PinaCAS
 make -f pc.makefile
 ```
 # TI-Basic interface
@@ -164,6 +173,13 @@ Remember that you can definitely use strings as input and output as well. You ca
 :Disp "FAIL :("
 :End
 ```
+
+## Credits
+
+- James Prevett: PinaCAS
+- Nathan Farlow: PineappleCAS, which PinaCAS is built on
+- Michael J. Fromberger: the imath library
+- Adriweb and Mateo: help and contributions to PineappleCAS
 
 ## Licensing
 

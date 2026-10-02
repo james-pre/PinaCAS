@@ -154,7 +154,7 @@ void fail(char *message) {
         os_SetCursorPos(0, 0);
 
         if(strlen(message) < 50) {
-            sprintf(buffer, "Wrong command syntax. %s. See github.com/nathanfarlow/PineappleCAS for usage.", message);
+            sprintf(buffer, "Wrong command syntax. %s. See github.com/james-pre/PinaCAS for usage.", message);
             os_PutStrFull(buffer);   
         }
 

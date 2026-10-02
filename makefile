@@ -5,7 +5,7 @@
 NAME         = PCAS
 COMPRESSED   = YES
 ICON         = iconc.png
-DESCRIPTION  = "PineappleCAS"
+DESCRIPTION  = "PinaCAS"
 
 CFLAGS       = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
 CXXFLAGS     = -Wall -Oz -Ilib -DUSE_32BIT_WORDS

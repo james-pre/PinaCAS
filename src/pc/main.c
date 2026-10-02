@@ -1,8 +1,9 @@
 /*
-    PineappleCAS: the multi-purpose CAS specifically for the TI-84+ CE
+    PinaCAS: the multi-purpose CAS specifically for the TI-84+ CE
 
     Authors:
-    Nathan Farlow
+    James Prevett
+    Nathan Farlow (PineappleCAS)
 */
 
 #ifdef COMPILE_PC
@@ -24,7 +25,7 @@
 #include "tests.h"
 
 void display_help(void) {
-    printf("Usage: ./pineapple [--work] [operation] [args]\n");
+    printf("Usage: ./pinacas [--work] [operation] [args]\n");
     printf("\t--work\t\t\t\tPrints the steps taken\n");
     printf("Valid operations include:\n");
     printf("\ttest [file]\t\t\tRuns all tests in file\n");
