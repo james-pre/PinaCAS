@@ -30,6 +30,20 @@ void draw_string_centered(char *text, int x, int y) {
 	gfx_PrintStringXY(text, x - len / 2, y);
 }
 
+#define ABOUT_WIDTH 190
+
+static const char *about_lines[] = {
+	"github.com/",
+	"james-pre/PinaCAS",
+	"",
+	"Credits:",
+	"James Prevett",
+	"Nathan Farlow",
+	"(PineappleCAS)",
+	"Michael Fromberger",
+	"(imath)"
+};
+
 void draw_background(void) {
 	gfx_SetMonospaceFont(0);
 
@@ -44,7 +58,10 @@ void draw_background(void) {
 	gfx_Rectangle(1, 1, LCD_WIDTH - 2, LCD_HEIGHT - 2);
 	gfx_HorizLine(1, LCD_HEIGHT - 21, LCD_WIDTH - 2);
 
-	draw_string_centered("PinaCAS v" PCAS_VERSION " by James Prevett", LCD_WIDTH / 2, LCD_HEIGHT - 14);
+	if (gfx_GetStringWidth("PinaCAS v" PCAS_VERSION " by James Prevett") < LCD_WIDTH - 8)
+		draw_string_centered("PinaCAS v" PCAS_VERSION " by James Prevett", LCD_WIDTH / 2, LCD_HEIGHT - 14);
+	else
+		draw_string_centered("PinaCAS v" PCAS_VERSION, LCD_WIDTH / 2, LCD_HEIGHT - 14);
 
 	draw_string_centered("Input", LCD_WIDTH / 4 + 20, 14);
 	draw_string_centered("Output", LCD_WIDTH / 4 * 3 - 20, 14);
@@ -269,22 +286,22 @@ void draw_context(Context c) {
 		gfx_PrintStringXY("From: ", 124 + 25, 96 + 12 + 10 - TEXT_HEIGHT / 2);
 		gfx_PrintStringXY("To: ", 124 + 25, 96 + 12 + 24 + 10 - TEXT_HEIGHT / 2);
 	} else if (c == CONTEXT_ABOUT) {
-		const char *title = "PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE;
 		int line = 0;
 
-		if (gfx_GetStringWidth(title) <= 190) {
-			gfx_PrintStringXY(title, 115, 80);
+		if (gfx_GetStringWidth("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE) <= ABOUT_WIDTH) {
+			gfx_PrintStringXY("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE, 115, 80);
 		} else {
-			gfx_PrintStringXY("PinaCAS v" PCAS_VERSION, 115, 80);
+			if (gfx_GetStringWidth("PinaCAS v" PCAS_VERSION) <= ABOUT_WIDTH) {
+				gfx_PrintStringXY("PinaCAS v" PCAS_VERSION, 115, 80);
+			} else {
+				gfx_PrintStringXY("PinaCAS", 115, 80);
+				gfx_PrintStringXY("v" PCAS_VERSION, 115, 80 + 10 * ++line);
+			}
 			gfx_PrintStringXY(PCAS_BUILD_DATE, 115, 80 + 10 * ++line);
 		}
 
-		gfx_PrintStringXY("github.com/james-pre/PinaCAS", 115, 80 + 10 * (line + 1));
-
-		gfx_PrintStringXY("Credits:", 115, 80 + 10 * (line + 3));
-		gfx_PrintStringXY("James Prevett", 115, 80 + 10 * (line + 4));
-		gfx_PrintStringXY("Nathan Farlow (PineappleCAS)", 115, 80 + 10 * (line + 5));
-		gfx_PrintStringXY("Michael Fromberger (imath)", 115, 80 + 10 * (line + 6));
+		for (i = 0; i < sizeof(about_lines) / sizeof(about_lines[0]); i++)
+			gfx_PrintStringXY(about_lines[i], about_lines[i][0] == '(' ? 125 : 115, 80 + 10 * (line + 1 + i));
 	} else if (c == CONTEXT_DERIVATIVE || c == CONTEXT_INTEGRAL || c == CONTEXT_DE) {
 		gfx_PrintStringXY("Respect to: ", 124, 80);
 	}
