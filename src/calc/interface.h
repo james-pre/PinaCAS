@@ -9,6 +9,15 @@
 
 #include "../ast.h"
 
+typedef enum {
+    CALCULUS_DERIVATIVE,
+    CALCULUS_INTEGRAL,
+    CALCULUS_DE
+} Calculus;
+
+/*Replaces e with the result of kind with respect to respect_to, ready to export. Writes a one line summary to summary if it is not NULL.*/
+pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, char *summary);
+
 /*Checks if Ans is trying to call a function of PCAS*/
 bool interface_Valid(void);
 /*Run function specified by Ans variable without gui*/

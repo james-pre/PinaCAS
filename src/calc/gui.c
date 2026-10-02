@@ -917,35 +917,6 @@ pcas_ast_t *parse_respect_to(view_t *charselect, pcas_error_t *err) {
     return parse((uint8_t*)&charselect->character, 1, str_table, err);
 }
 
-typedef enum {
-    CALCULUS_DERIVATIVE,
-    CALCULUS_INTEGRAL,
-    CALCULUS_DE
-} Calculus;
-
-/*Replaces expression with what to output for the differential equation, and reports its classification*/
-pcas_error_t classify(pcas_ast_t *expression, pcas_ast_t *respect_to) {
-    char buffer[50];
-    pcas_de_t de;
-    pcas_error_t err;
-
-    err = de_Load(&de, expression, respect_to);
-
-    if(err == E_SUCCESS) {
-        sprintf(buffer, "Order %u, %s.", de.order, de.linear ? "linear" : "nonlinear");
-        console_write(buffer);
-
-        if(de.linear)
-            replace_node(expression, ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g)));
-
-        simplify_canonical_form(expression, CANONICAL_ALL);
-    }
-
-    de_Cleanup(&de);
-
-    return err;
-}
-
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/
 void execute_calculus(Calculus kind, view_t **context, const char *title) {
     char buffer[50];
@@ -974,26 +945,12 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
         if(show_work)
             work_Start(&work);
 
-        switch(kind) {
-        case CALCULUS_DERIVATIVE:
-            console_write("Differentiating...");
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
-            derivative(expression, respect_to, respect_to);
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
-            simplify_canonical_form(expression, CANONICAL_ALL);
-            break;
-        case CALCULUS_INTEGRAL:
-            console_write("Integrating...");
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
-            integral(expression, respect_to);
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
-            simplify_canonical_form(expression, CANONICAL_ALL);
-            break;
-        case CALCULUS_DE:
-            console_write("Solving...");
-            err = classify(expression, respect_to);
-            break;
-        }
+        console_write(kind == CALCULUS_DERIVATIVE ? "Differentiating..." : kind == CALCULUS_INTEGRAL ? "Integrating..." : "Solving...");
+
+        err = calculus_Run(kind, expression, respect_to, buffer);
+
+        if(err == E_SUCCESS && kind == CALCULUS_DE)
+            console_write(buffer);
 
         if(show_work)
             work_Stop();

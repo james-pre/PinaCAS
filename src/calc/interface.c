@@ -508,12 +508,48 @@ bool valid_respect_to(uint8_t *symbol, unsigned symbol_len) {
     return symbol_len == 1 && symbol[0] >= 'A' && symbol[0] <= ('Z' + 1); /*Z + 1 is theta*/
 }
 
-/*
-    Syntax: DERIV,Y1,Y2,X
+pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, char *summary) {
+    pcas_error_t err = E_SUCCESS;
+    pcas_de_t de;
 
-    Solves derivative with respect to 3rd argument
+    switch(kind) {
+    case CALCULUS_DERIVATIVE:
+        simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
+        derivative(e, respect_to, respect_to);
+        break;
+    case CALCULUS_INTEGRAL:
+        simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
+        integral(e, respect_to);
+        break;
+    case CALCULUS_DE:
+        err = de_Load(&de, e, respect_to);
+
+        if(err == E_SUCCESS) {
+            if(summary != NULL)
+                sprintf(summary, "Order %u, %s.", de.order, de.linear ? "linear" : "nonlinear");
+
+            if(de.linear)
+                replace_node(e, ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g)));
+
+            simplify_canonical_form(e, CANONICAL_ALL);
+        }
+
+        de_Cleanup(&de);
+        return err;
+    }
+
+    simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+    simplify_canonical_form(e, CANONICAL_ALL);
+
+    return err;
+}
+
+/*
+    Syntax: DERIV,Y1,Y2,X or INTEG,Y1,Y2,X or DE,Y1,Y2,X
+
+    Takes the derivative or integral of, or classifies the differential equation in, the input with respect to the 4th argument
 */
-void interface_Derivative(arg_list *args) {
+void interface_Calculus(arg_list *args, Calculus kind) {
     pcas_ast_t *expression, *respect_to_expr;
     pcas_error_t err;
 
@@ -551,12 +587,10 @@ void interface_Derivative(arg_list *args) {
     }
     interface_assert(err == E_SUCCESS && respect_to_expr != NULL, NULL);
 
-    simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
-    derivative(expression, respect_to_expr, respect_to_expr);
-    simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
-    simplify_canonical_form(expression, CANONICAL_ALL);
+    err = calculus_Run(kind, expression, respect_to_expr, NULL);
 
-    write_to_tok(output, expression, &err);
+    if(err == E_SUCCESS)
+        write_to_tok(output, expression, &err);
 
     ast_Cleanup(expression);
     ast_Cleanup(respect_to_expr);
@@ -598,7 +632,11 @@ void interface_Run(void) {
         } else if(interface_arg_equals(args.args[0], args.arg_len[0], "EXP")) {
             interface_Expand(&args);
         } else if(interface_arg_equals(args.args[0], args.arg_len[0], "DERIV")) {
-            interface_Derivative(&args);
+            interface_Calculus(&args, CALCULUS_DERIVATIVE);
+        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "INTEG")) {
+            interface_Calculus(&args, CALCULUS_INTEGRAL);
+        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "DE")) {
+            interface_Calculus(&args, CALCULUS_DE);
         }
 
         id_UnloadAll();
@@ -626,7 +664,9 @@ bool interface_Valid(void) {
                 || interface_arg_equals(args.args[0], args.arg_len[0], "EVAL")
                 || interface_arg_equals(args.args[0], args.arg_len[0], "SUB")
                 || interface_arg_equals(args.args[0], args.arg_len[0], "EXP")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "DERIV");
+                || interface_arg_equals(args.args[0], args.arg_len[0], "DERIV")
+                || interface_arg_equals(args.args[0], args.arg_len[0], "INTEG")
+                || interface_arg_equals(args.args[0], args.arg_len[0], "DE");
 
         cleanup_args(&args);
     }
