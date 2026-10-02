@@ -10,6 +10,7 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Indefinite integration: linearity, a table of elementary integrals, u-substitution, and integration by parts
 - Step-by-step work for derivatives and integrals, shown in a scrollable viewer with fractions, exponents, roots, and integral signs drawn as in print
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
+- Checking that a function solves a differential equation and its initial conditions
 - Integral and Solve DE functions in the GUI, and `INTEG` and `DE` commands in the TI-Basic interface
 - Much faster simplification, especially when showing work
 - Builds with the LLVM-based CE C toolchain, with imath as a git submodule
@@ -18,6 +19,10 @@ The program is still called PCAS on the calculator, and the existing TI-Basic co
 
 ## Entering differential equations
 Type the equation into a Y= variable or string. Write derivatives of the unknown function with primes from the ANGLE menu (2nd, APPS), and the equals sign from the TEST menu (2nd, MATH). For example, y'' + 16y = 0 is `Y''+16Y=0`. Choose the independent variable with "Respect to", which is X by default. Any letter can be the unknown function, so x'' + w²x = F cos(gt) is `X''+W²X=Fcos(GT)` with respect to T.
+
+Add initial conditions after the equation, separated by commas: y'' + 16y = 0, y(0) = 2, y'(0) = -2 is `Y''+16Y=0,Y(0)=2,Y'(0)=-2`.
+
+To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X)` or just `2cos(4X)-1/2sin(4X)`. On the Solve DE page, check "Verify solution" and choose that variable under "Solution in". PinaCAS differentiates the solution, substitutes it into both sides of the equation, and checks each initial condition.
 
 <hr>
 
@@ -189,6 +194,20 @@ Boolean options from left to right:
 :"Write the standard form of the differential equation in Y1 to Y2."
 :"DE,Y1,Y2,X"
 :Asm(prgmPCAS)
+```
+
+## Verify
+**Usage:** VERIFY,[Equation],[Solution],[Variable respect to]
+
+**Description:** Checks whether the solution satisfies the differential equation and the initial conditions in [Equation]. Writes 1 to Ans if it does, and 0 if it does not.
+
+**Example program:**
+```
+:"Y1 holds Y'+2Y=e^(-X),Y(0)=3 and Y2 holds e^(-X)+2e^(-2X)."
+:"VERIFY,Y1,Y2,X"
+:Asm(prgmPCAS)
+:If Ans
+:Disp "SOLUTION"
 ```
 
 ## Good things to know:
