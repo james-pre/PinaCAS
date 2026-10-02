@@ -137,6 +137,12 @@ static pcas_ast_t *reciprocal(pcas_ast_t *e) {
         return power(ast_Copy(ast_ChildGet(e, 0)), ast_MakeNumber(exponent));
     }
 
+    if(isoptype(e, OP_POW) && ast_ChildGet(e, 0)->type != NODE_OPERATOR) {
+        pcas_ast_t *r = power(ast_Copy(ast_ChildGet(e, 0)), negate(ast_Copy(ast_ChildGet(e, 1))));
+        simplify_quietly(ast_ChildGet(r, 1));
+        return r;
+    }
+
     return power(ast_Copy(e), integer(-1));
 }
 

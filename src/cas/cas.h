@@ -116,6 +116,8 @@ bool simplify(pcas_ast_t *e, unsigned short flags);
 #define CANONICAL_POWERS_TO_ROOTS       (1u << 2u)
 /*Combine a^5b^5 to (ab)^5.*/
 #define CANONICAL_COMBINE_POWERS        (1u << 3u)
+/*Write 1/e^A as e^(-A)*/
+#define CANONICAL_EXPONENTIALS          (1u << 4u)
 #define CANONICAL_ALL                   (0xFFu)
 /*
     Use only when exporting and do not plan to simplify again

@@ -383,6 +383,10 @@ integ; X^2ln(X); X; ln(X)X^3/3_X^3/9
 integ; asin(X); X; Xasin(X)+sqrt(1_X^2)
 integ; Xe^X+3X^2; X; X^3+Xe^X_e^X
 integ; e^(X^2); X; integ(e^(X^2),X)
+integ; Xe^(-X); X; -Xe^(-X)_e^(-X)
+integ; e^(-X); X; -e^(-X)
+integ; X^2e^(-3X); X; -X^2e^(-3X)/3_2Xe^(-3X)/9_2e^(-3X)/27
+integ; e^(X/2)/e^X; X; -2e^(-X/2)
 deriv; integ(e^(X^2),X); X; e^(X^2)
 
 #Differential equations: order and linearity

@@ -501,6 +501,52 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
     return 0;
 }
 
+static bool is_exponential(pcas_ast_t *e) {
+    return isoptype(e, OP_POW) && opbase(e)->type == NODE_SYMBOL && opbase(e)->op.symbol == SYM_EULER;
+}
+
+/*Moves powers of e out of the denominator of the division e, negating their exponents*/
+static bool exponentials_to_numerator(pcas_ast_t *e) {
+    pcas_ast_t *den = opbase(e)->next, *moved = ast_MakeOperator(OP_MULT), *rest, *child;
+
+    if(isoptype(den, OP_MULT)) {
+        rest = ast_MakeOperator(OP_MULT);
+        for(child = opbase(den); child != NULL; child = child->next)
+            ast_ChildAppend(is_exponential(child) ? moved : rest, ast_Copy(child));
+    } else if(is_exponential(den)) {
+        ast_ChildAppend(moved, ast_Copy(den));
+        rest = ast_MakeNumber(num_FromInt(1));
+    } else {
+        ast_Cleanup(moved);
+        return false;
+    }
+
+    if(ast_ChildLength(moved) == 0) {
+        ast_Cleanup(moved);
+        ast_Cleanup(rest);
+        return false;
+    }
+
+    for(child = opbase(moved); child != NULL; child = child->next) {
+        pcas_ast_t *exponent = opbase(child)->next;
+        replace_node(exponent, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(exponent)));
+        simplify(exponent, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_EVAL);
+    }
+
+    ast_ChildInsert(moved, ast_Copy(opbase(e)), 0);
+    simplify(rest, SIMP_COMMUTATIVE);
+    simplify(moved, SIMP_COMMUTATIVE);
+
+    if(is_ast_int(rest, 1)) {
+        ast_Cleanup(rest);
+        replace_node(e, moved);
+    } else {
+        replace_node(e, ast_MakeBinary(OP_DIV, moved, rest));
+    }
+
+    return true;
+}
+
 /*
     Order multiplication and division.
     Change XAZ to AXZ and 1+sin(X)ZA5 to 5AZsin(X)+1
@@ -570,6 +616,9 @@ static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
             } while(inner_intermediate);
 
         }
+
+        if((flags & CANONICAL_EXPONENTIALS) && isoptype(e, OP_DIV) && exponentials_to_numerator(e))
+            intermediate_change = changed = true;
 
         if((flags & CANONICAL_POWERS_TO_ROOTS) && isoptype(e, OP_POW)) {
             pcas_ast_t *base, *power;
