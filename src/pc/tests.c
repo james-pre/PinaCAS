@@ -39,6 +39,9 @@ TestType resolve_type(char *type) {
     if(!strcmp(type, "expand"))     return TEST_EXPAND;
     if(!strcmp(type, "deriv"))      return TEST_DERIV;
     if(!strcmp(type, "integ"))      return TEST_INTEGRAL;
+    if(!strcmp(type, "order"))      return TEST_DE_ORDER;
+    if(!strcmp(type, "linear"))     return TEST_DE_LINEAR;
+    if(!strcmp(type, "nonlinear"))  return TEST_DE_NONLINEAR;
 
     return TEST_INVALID;
 }
@@ -284,6 +287,41 @@ bool test_Run(test_t *t) {
 
         passed = check(t, actual, expected);
         break;
+    case TEST_DE_ORDER:
+    case TEST_DE_LINEAR:
+    case TEST_DE_NONLINEAR: {
+        pcas_de_t de;
+
+        if(t->type != TEST_DE_NONLINEAR && c == NULL) {
+            printf("Test failed on line %u. Empty third argument.\n", t->line);
+            break;
+        }
+
+        err = de_Load(&de, a, b);
+
+        if(err != E_SUCCESS) {
+            printf("Test failed on line %u. %s\n", t->line, error_text[err]);
+        } else if(t->type == TEST_DE_ORDER) {
+            actual = ast_MakeNumber(num_FromInt(de.order));
+            passed = check(t, actual, c);
+            ast_Cleanup(actual);
+        } else if(t->type == TEST_DE_NONLINEAR) {
+            passed = !de.linear;
+            if(!passed)
+                printf("Test failed on line %u. Expected nonlinear.\n", t->line);
+        } else if(!de.linear) {
+            printf("Test failed on line %u. Expected linear.\n", t->line);
+        } else {
+            actual = ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g));
+            simplify(actual, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
+            simplify(c, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
+            passed = check(t, actual, c);
+            ast_Cleanup(actual);
+        }
+
+        de_Cleanup(&de);
+        break;
+    }
     default:
         break;
     }

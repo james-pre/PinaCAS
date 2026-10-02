@@ -384,3 +384,22 @@ integ; asin(X); X; Xasin(X)+sqrt(1_X^2)
 integ; Xe^X+3X^2; X; X^3+Xe^X_e^X
 integ; e^(X^2); X; integ(e^(X^2),X)
 deriv; integ(e^(X^2),X); X; e^(X^2)
+
+#Differential equations: order and linearity
+order; Y''+2Y'=3X; X; 2
+linear; Y''+2Y'=3X; X; Y''+2Y'=3X
+order; Y'+Y^2=0; X; 1
+nonlinear; Y'+Y^2=0; X
+linear; Y''+sin(X)Y'_ln(X)Y=sqrt(X); X; Y''+sin(X)Y'_ln(X)Y=sqrt(X)
+linear; Y''+sin(X)Y=ln(X); X; Y''+sin(X)Y=ln(X)
+linear; XY'_3Y=X^5; X; XY'_3Y=X^5
+linear; (1+X^2)Y'=2XY+X^2+X^4; X; (1+X^2)Y'_2XY=X^2+X^4
+linear; Y'=X^2Y; X; Y'_X^2Y=0
+nonlinear; Y'=X/sin(Y); X
+nonlinear; Y(6Y^2_X_1)+2XY'=0; X
+nonlinear; Y'+Y=e^(2X)Y^3; X
+linear; 1/4Y''+Y'+Y=X^2_2X; X; 1/4Y''+Y'+Y=X^2_2X
+order; Y'''+3Y''_4Y'_12Y=0; X; 3
+linear; Y''_2Y'+Y=e^Tatan(T); T; Y''_2Y'+Y=e^Tatan(T)
+linear; X''+W^2X=Fcos(GT); T; X''+W^2X=Fcos(GT)
+linear; Y''+16Y; X; Y''+16Y=0
