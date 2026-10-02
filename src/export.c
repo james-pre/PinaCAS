@@ -67,6 +67,18 @@ pcas_ast_t *leftmost(pcas_ast_t *e) {
     return e;
 }
 
+/*True if every factor of the multiplication is 1 or -1*/
+static bool only_units(pcas_ast_t *e) {
+    pcas_ast_t *child;
+
+    for(child = opbase(e); child != NULL; child = child->next) {
+        if(!is_ast_int(child, 1) && !is_ast_int(child, -1))
+            return false;
+    }
+
+    return true;
+}
+
 /*Returns length of buffer. Writes to buffer is buffer != NULL*/
 static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct Identifier *lookup, pcas_error_t *err) {
 
@@ -174,7 +186,7 @@ static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct 
             child = ast_ChildGetLast(e);
             root_special_case = isoptype(child, OP_ROOT) && !is_ast_int(ast_ChildGet(child, 0), 2);
 
-            if(!is_ast_int(child, 1)) {
+            if(!is_ast_int(child, 1) || only_units(e)) {
                 if(need_paren(e, child) || root_special_case) add_token(TOK_OPEN_PAR);
                 index = _to_binary(child, data, index, lookup, err);
                 if(need_paren(e, child) || root_special_case) add_token(TOK_CLOSE_PAR);

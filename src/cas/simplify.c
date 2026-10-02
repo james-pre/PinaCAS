@@ -225,6 +225,34 @@ bool has_imaginary_node(pcas_ast_t *e) {
     return false;
 }
 
+bool contains_symbol(pcas_ast_t *e, Symbol symbol) {
+    pcas_ast_t *child;
+
+    if(e->type == NODE_SYMBOL)
+        return e->op.symbol == symbol;
+
+    if(e->type == NODE_OPERATOR) {
+        for(child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
+            if(contains_symbol(child, symbol))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+Symbol fresh_symbol(pcas_ast_t *e) {
+    const char *candidates = "UVWTSRQPNMKJHGFDCBA";
+    unsigned i;
+
+    for(i = 0; candidates[i] != '\0'; i++) {
+        if(!contains_symbol(e, (Symbol)candidates[i]))
+            return (Symbol)candidates[i];
+    }
+
+    return SYM_INVALID;
+}
+
 /*Expects everything to be completely simplified*/
 bool is_negative_for_sure(pcas_ast_t *a) {
     if(a->type == NODE_NUMBER && mp_rat_compare_zero(a->op.num) < 0)
@@ -260,11 +288,45 @@ bool absolute_val(pcas_ast_t *e) {
 
     return false;
 }
-#include <stdio.h>
+static Symbol function_symbol = SYM_INVALID;
+
+void canonical_SetFunction(Symbol symbol) {
+    function_symbol = symbol;
+}
+
+/*0 if e does not involve the unknown function, otherwise one more than the highest derivative of it in e*/
+static unsigned function_rank(pcas_ast_t *e) {
+    pcas_ast_t *child;
+    unsigned rank = 0;
+
+    if(e->type == NODE_SYMBOL)
+        return function_symbol != SYM_INVALID && e->op.symbol == function_symbol;
+
+    if(isoptype(e, OP_PRIME)) {
+        rank = function_rank(opbase(e));
+        return (rank == 0 ? 1 : rank) + 1;
+    }
+
+    if(e->type == NODE_OPERATOR) {
+        for(child = opbase(e); child != NULL; child = child->next) {
+            unsigned child_rank = function_rank(child);
+            if(child_rank > rank)
+                rank = child_rank;
+        }
+    }
+
+    return rank;
+}
+
 /*returns negative if a < b, 0 if a=b, positive if a > b in terms of sorting order*/
 int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
     pcas_ast_t *temp;
     int multiplier = 1;
+    int rank_a = function_rank(a), rank_b = function_rank(b);
+
+    /*Highest derivatives first in sums, and the unknown function last in products*/
+    if(rank_a != rank_b)
+        return add ? rank_b - rank_a : rank_a - rank_b;
 
     if(isoptype(b, OP_MULT)) {
         temp = a;

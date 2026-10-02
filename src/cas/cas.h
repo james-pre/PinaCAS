@@ -124,6 +124,9 @@ bool simplify(pcas_ast_t *e, unsigned short flags);
 */
 bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags);
 
+/*Sorts the unknown function of a differential equation after its coefficients. SYM_INVALID clears it.*/
+void canonical_SetFunction(Symbol symbol);
+
 /*Factor A + A to A(1 + 1) where at least one part of the
 resulting multiplication can be evauated numerically*/
 #define FAC_SIMPLE_ADDITION_EVALUATEABLE    (1u << 0u)
@@ -194,6 +197,10 @@ void replace_node(pcas_ast_t *a, pcas_ast_t *b);
 
 /*Returns true if the node has an imaginary node.*/
 bool has_imaginary_node(pcas_ast_t *e);
+
+bool contains_symbol(pcas_ast_t *e, Symbol symbol);
+/*Returns a symbol that does not appear in e, or SYM_INVALID if every candidate does*/
+Symbol fresh_symbol(pcas_ast_t *e);
 
 /*Returns true if the node is being multiplied by at least one negative or is already a negative number node.
 The node must be completely simplified for this to work, because it does not detect

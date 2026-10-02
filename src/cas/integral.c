@@ -71,22 +71,6 @@ static bool is_ast_symbol(pcas_ast_t *e, Symbol symbol) {
     return e->type == NODE_SYMBOL && e->op.symbol == symbol;
 }
 
-static bool contains_symbol(pcas_ast_t *e, Symbol symbol) {
-    pcas_ast_t *child;
-
-    if(e->type == NODE_SYMBOL)
-        return e->op.symbol == symbol;
-
-    if(e->type == NODE_OPERATOR) {
-        for(child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
-            if(contains_symbol(child, symbol))
-                return true;
-        }
-    }
-
-    return false;
-}
-
 static void simplify_quietly(pcas_ast_t *e) {
     work_Pause();
     simplify(e, SIMP_BASIC);
@@ -451,19 +435,6 @@ static pcas_ast_t *split(pcas_ast_t *f, pcas_ast_t *x, bool *progress) {
     }
 
     return pull_constants(f, x, progress);
-}
-
-/*Returns a symbol that does not appear in e*/
-static Symbol fresh_symbol(pcas_ast_t *e) {
-    const char *candidates = "UVWTSRQPNMKJHGFDCBA";
-    unsigned i;
-
-    for(i = 0; candidates[i] != '\0'; i++) {
-        if(!contains_symbol(e, (Symbol)candidates[i]))
-            return (Symbol)candidates[i];
-    }
-
-    return SYM_INVALID;
 }
 
 /*Returns the argument of h that could be the inner function of a substitution*/
