@@ -1,24 +1,24 @@
 #include "error.h"
 
 const char *error_text[AMOUNT_ERRORS] = {
-    "Success",
+	"Success",
 
-    "Generic failure",
+	"Generic failure",
 
-    "AST operation not allowed",
-    "AST index out of bounds",
+	"AST operation not allowed",
+	"AST index out of bounds",
 
-    "Invalid token",
+	"Invalid token",
 
-    "Bad operator",
-    "Unmatched closing parentheses",
-    "Bad comma",
+	"Bad operator",
+	"Unmatched closing parentheses",
+	"Bad comma",
 
-    "No mapping for symbol",
+	"No mapping for symbol",
 
-    "No derivative in equation",
-    "Primes must follow one function",
-    "Order too high",
-    "Bad initial condition",
-    "Solution must be explicit",
+	"No derivative in equation",
+	"Primes must follow one function",
+	"Order too high",
+	"Bad initial condition",
+	"Solution must be explicit",
 };

@@ -4,30 +4,30 @@
 #include "typeset.h"
 
 typedef enum {
-    /*after is a snapshot of the whole expression being worked on*/
-    STEP_STATE,
-    /*before is a derivative node, after is its value*/
-    STEP_DERIVATIVE,
-    /*before is an integral node, after is its value*/
-    STEP_INTEGRAL,
-    /*before = after, such as a substitution*/
-    STEP_EQUATION,
-    /*Only text*/
-    STEP_TEXT
+	/*after is a snapshot of the whole expression being worked on*/
+	STEP_STATE,
+	/*before is a derivative node, after is its value*/
+	STEP_DERIVATIVE,
+	/*before is an integral node, after is its value*/
+	STEP_INTEGRAL,
+	/*before = after, such as a substitution*/
+	STEP_EQUATION,
+	/*Only text*/
+	STEP_TEXT
 } StepType;
 
 typedef struct _pcas_Step {
-    StepType type;
-    /*Static string naming the rule or method used. May be NULL.*/
-    const char *text;
-    pcas_ast_t *before, *after;
-    struct _pcas_Step *next;
+	StepType type;
+	/*Static string naming the rule or method used. May be NULL.*/
+	const char *text;
+	pcas_ast_t *before, *after;
+	struct _pcas_Step *next;
 } pcas_step_t;
 
 typedef struct {
-    pcas_step_t *first, *last;
-    /*True when the last step is a state that continues a run of states*/
-    bool extend;
+	pcas_step_t *first, *last;
+	/*True when the last step is a state that continues a run of states*/
+	bool extend;
 } pcas_work_t;
 
 /*Records steps into w until work_Stop() is called.*/

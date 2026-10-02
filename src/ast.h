@@ -9,9 +9,7 @@
 #define LSIZE unsigned
 #define RADIX 10
 
-typedef enum {
-    NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR
-} NodeType;
+typedef enum { NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR } NodeType;
 
 #define is_op_commutative(op) ((op) == OP_ADD || (op) == OP_MULT)
 
@@ -22,87 +20,117 @@ typedef enum {
 #define is_op_unary(op) ((op) >= OP_FACTORIAL && (op) <= OP_TANH_INV)
 
 typedef enum {
-    /*nary*/
-    OP_ADD,
-    OP_MULT, OP_DIV,
+	/*nary*/
+	OP_ADD,
+	OP_MULT,
+	OP_DIV,
 
-    OP_POW, OP_ROOT,
-    OP_LOG,
+	OP_POW,
+	OP_ROOT,
+	OP_LOG,
 
-    /*1st child = f(var), 2nd child = var, 3rd child = value for var*/
-    OP_DERIV,
-    /*1st child = f(var), 2nd child = var*/
-    OP_INTEGRAL,
+	/*1st child = f(var), 2nd child = var, 3rd child = value for var*/
+	OP_DERIV,
+	/*1st child = f(var), 2nd child = var*/
+	OP_INTEGRAL,
 
-    /*1st child = left side, 2nd child = right side*/
-    OP_EQUALS,
-    /*Derivative of the unknown function that is its child*/
-    OP_PRIME,
-    /*1st child = function, 2nd child = point it is evaluated at*/
-    OP_AT,
+	/*1st child = left side, 2nd child = right side*/
+	OP_EQUALS,
+	/*Derivative of the unknown function that is its child*/
+	OP_PRIME,
+	/*1st child = function, 2nd child = point it is evaluated at*/
+	OP_AT,
 
-    /*Unary*/
-    OP_FACTORIAL,
+	/*Unary*/
+	OP_FACTORIAL,
 
-    OP_INT, OP_ABS,
+	OP_INT,
+	OP_ABS,
 
-    OP_SIN, OP_SIN_INV,
-    OP_COS, OP_COS_INV,
-    OP_TAN, OP_TAN_INV,
+	OP_SIN,
+	OP_SIN_INV,
+	OP_COS,
+	OP_COS_INV,
+	OP_TAN,
+	OP_TAN_INV,
 
-    OP_SINH, OP_SINH_INV,
-    OP_COSH, OP_COSH_INV,
-    OP_TANH, OP_TANH_INV,
+	OP_SINH,
+	OP_SINH_INV,
+	OP_COSH,
+	OP_COSH_INV,
+	OP_TANH,
+	OP_TANH_INV,
 
-    AMOUNT_OPS
+	AMOUNT_OPS
 } OperatorType;
 
 #define AMOUNT_SYMBOLS 30
 
 typedef enum {
-    SYM_A = 'A',
-    SYM_B, SYM_C, SYM_D, SYM_E, SYM_F,
-    SYM_G, SYM_H, SYM_I, SYM_J, SYM_K,
-    SYM_L, SYM_M, SYM_N, SYM_O, SYM_P,
-    SYM_Q, SYM_R, SYM_S, SYM_T, SYM_U,
-    SYM_V, SYM_W, SYM_X, SYM_Y, SYM_Z,
+	SYM_A = 'A',
+	SYM_B,
+	SYM_C,
+	SYM_D,
+	SYM_E,
+	SYM_F,
+	SYM_G,
+	SYM_H,
+	SYM_I,
+	SYM_J,
+	SYM_K,
+	SYM_L,
+	SYM_M,
+	SYM_N,
+	SYM_O,
+	SYM_P,
+	SYM_Q,
+	SYM_R,
+	SYM_S,
+	SYM_T,
+	SYM_U,
+	SYM_V,
+	SYM_W,
+	SYM_X,
+	SYM_Y,
+	SYM_Z,
 
-    SYM_IMAG,
+	SYM_IMAG,
 
-    SYM_PI, SYM_EULER, SYM_THETA,
+	SYM_PI,
+	SYM_EULER,
+	SYM_THETA,
 
-    SYM_INVALID
+	SYM_INVALID
 } Symbol;
 
 /*Shortcuts for NODE_OPERATOR*/
-#define optype(e)       e->op.operator.type
+#define optype(e) e->op.operator.type
 #define isoptype(e, op) ((e)->type == NODE_OPERATOR && optype(e) == (op))
-#define opbase(e)       e->op.operator.base
+#define opbase(e) e->op.operator.base
 
 #define is_ast_int(e, val) ((e)->type == NODE_NUMBER && num_IsInt((e)->op.num, val))
 
 typedef struct _pcas_Node {
+	NodeType type;
+	/*For the linked list implementation*/
+	struct _pcas_Node *next;
 
-    NodeType type;
-    /*For the linked list implementation*/
-    struct _pcas_Node *next;
+	union {
+		/*NODE_NUMBER*/
+		mp_rat num;
 
-    union {
-        /*NODE_NUMBER*/
-        mp_rat num;
+		/*NODE_SYMBOL*/
+		Symbol symbol;
 
-        /*NODE_SYMBOL*/
-        Symbol symbol;
+		/*NODE_OPERATOR*/
+		struct {
+			OperatorType type;
 
-        /*NODE_OPERATOR*/
-        struct {
-            OperatorType type;
+			/*The base node for the linked list*/
+			struct _pcas_Node *base;
 
-            /*The base node for the linked list*/
-            struct _pcas_Node *base;
-
-        } operator;
-    } op;
+		} operator;
+	} op;
 
 } pcas_ast_t;
 

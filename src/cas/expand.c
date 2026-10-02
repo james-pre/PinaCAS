@@ -3,195 +3,187 @@
 #include "../work.h"
 
 pcas_ast_t *combine(pcas_ast_t *add, pcas_ast_t *b) {
-    unsigned i, j;
-    pcas_ast_t *expanded = ast_MakeOperator(OP_ADD);
+	unsigned i, j;
+	pcas_ast_t *expanded = ast_MakeOperator(OP_ADD);
 
-    if(isoptype(b, OP_ADD)) {
+	if (isoptype(b, OP_ADD)) {
+		for (i = 0; i < ast_ChildLength(add); i++) {
+			for (j = 0; j < ast_ChildLength(b); j++) {
+				ast_ChildAppend(
+					expanded, ast_MakeBinary(OP_MULT, ast_Copy(ast_ChildGet(add, i)), ast_Copy(ast_ChildGet(b, j)))
+				);
+			}
+		}
 
-        for(i = 0; i < ast_ChildLength(add); i++) {
-            for(j = 0; j < ast_ChildLength(b); j++) {
+	} else {
+		for (i = 0; i < ast_ChildLength(add); i++) {
+			ast_ChildAppend(expanded, ast_MakeBinary(OP_MULT, ast_Copy(ast_ChildGet(add, i)), ast_Copy(b)));
+		}
+	}
 
-                ast_ChildAppend(expanded, ast_MakeBinary(OP_MULT,
-                                            ast_Copy(ast_ChildGet(add, i)),
-                                            ast_Copy(ast_ChildGet(b, j))
-                                        ));
-            }
-        }
-
-    } else {
-
-        for(i = 0; i < ast_ChildLength(add); i++) {
-            ast_ChildAppend(expanded, ast_MakeBinary(OP_MULT,
-                                        ast_Copy(ast_ChildGet(add, i)),
-                                        ast_Copy(b)
-                                    ));
-        }
-    }
-
-    return expanded;
+	return expanded;
 }
 
 static bool _expand(pcas_ast_t *e, unsigned char flags) {
-    unsigned i, j;
+	unsigned i, j;
 
-    bool did_change = false;
-    bool intermediate_change = false;
+	bool did_change = false;
+	bool intermediate_change = false;
 
-    if(e->type == NODE_SYMBOL || (e->type == NODE_NUMBER && mp_rat_is_integer(e->op.num)))
-        return false;
+	if (e->type == NODE_SYMBOL || (e->type == NODE_NUMBER && mp_rat_is_integer(e->op.num)))
+		return false;
 
-    for(i = 0; i < ast_ChildLength(e); i++)
-        did_change |= _expand(ast_ChildGet(e, i), flags);
+	for (i = 0; i < ast_ChildLength(e); i++)
+		did_change |= _expand(ast_ChildGet(e, i), flags);
 
-    do {
-        intermediate_change = false;
-        simplify(e, SIMP_COMMUTATIVE);
+	do {
+		intermediate_change = false;
+		simplify(e, SIMP_COMMUTATIVE);
 
-        if(isoptype(e, OP_MULT)) {
+		if (isoptype(e, OP_MULT)) {
+			for (i = 0; i < ast_ChildLength(e); i++) {
+				pcas_ast_t *ichild = ast_ChildGet(e, i);
 
-            for(i = 0; i < ast_ChildLength(e); i++) {
-                pcas_ast_t *ichild = ast_ChildGet(e, i);
+				if (isoptype(ichild, OP_ADD)) {
+					for (j = 0; j < ast_ChildLength(e); j++) {
+						pcas_ast_t *jchild = ast_ChildGet(e, j);
+						if (i != j) {
+							bool should_expand;
 
-                if(isoptype(ichild, OP_ADD)) {
-
-                    for(j = 0; j < ast_ChildLength(e); j++) {
-                        pcas_ast_t *jchild = ast_ChildGet(e, j);
-                        if(i != j) {
-                            bool should_expand;
-
-                            /*Yes I am sure I can do this in one line in the if statement
+							/*Yes I am sure I can do this in one line in the if statement
                             but this is clearer*/
 
-                            if(jchild->type == NODE_NUMBER)
-                                should_expand = flags & EXP_DISTRIB_NUMBERS;
-                            else if(isoptype(jchild, OP_ADD))
-                                should_expand = flags & EXP_DISTRIB_ADDITION;
-                            else
-                                should_expand = flags & EXP_DISTRIB_MULTIPLICATION;
+							if (jchild->type == NODE_NUMBER)
+								should_expand = flags & EXP_DISTRIB_NUMBERS;
+							else if (isoptype(jchild, OP_ADD))
+								should_expand = flags & EXP_DISTRIB_ADDITION;
+							else
+								should_expand = flags & EXP_DISTRIB_MULTIPLICATION;
 
-                            if(should_expand) {
-                                pcas_ast_t *combined = combine(ichild, jchild);
+							if (should_expand) {
+								pcas_ast_t *combined = combine(ichild, jchild);
 
-                                ast_ChildAppend(e, combined);
+								ast_ChildAppend(e, combined);
 
-                                ast_Cleanup(ast_ChildRemove(e, ichild));
-                                ast_Cleanup(ast_ChildRemove(e, jchild));
+								ast_Cleanup(ast_ChildRemove(e, ichild));
+								ast_Cleanup(ast_ChildRemove(e, jchild));
 
-                                intermediate_change = true;
-                                did_change = true;
-                                break;
-                            }
+								intermediate_change = true;
+								did_change = true;
+								break;
+							}
+						}
+					}
 
-                        }
-                    }
+					if (intermediate_change)
+						break;
+				}
+			}
+		}
 
-                    if(intermediate_change)
-                        break;
-                }
+		if ((flags & EXP_DISTRIB_DIVISION) && isoptype(e, OP_DIV)) {
+			pcas_ast_t *num, *den;
 
-            }
+			num = ast_ChildGet(e, 0);
+			den = ast_ChildGet(e, 1);
 
-        } 
+			/*Split A/B into A * (1/B)*/
+			replace_node(
+				e,
+				ast_MakeBinary(
+					OP_MULT, ast_Copy(num), ast_MakeBinary(OP_DIV, ast_MakeNumber(num_FromInt(1)), ast_Copy(den))
+				)
+			);
 
-        if((flags & EXP_DISTRIB_DIVISION) && isoptype(e, OP_DIV)) {
-            pcas_ast_t *num, *den;
+			/*This could be dangerous, but we'll cross that bridge when we get there.*/
+			_expand(
+				e,
+				EXP_DISTRIB_NUMBERS | EXP_DISTRIB_ADDITION | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION |
+					EXP_DISTRIB_POWERS
+			);
 
-            num = ast_ChildGet(e, 0);
-            den = ast_ChildGet(e, 1);
+			intermediate_change = true;
+			did_change = true;
+			continue;
+		}
 
-            /*Split A/B into A * (1/B)*/
-            replace_node(e, ast_MakeBinary(OP_MULT, ast_Copy(num), ast_MakeBinary(OP_DIV, ast_MakeNumber(num_FromInt(1)), ast_Copy(den))));
+		if (optype(e) == OP_POW) {
+			pcas_ast_t *base, *power;
 
-            /*This could be dangerous, but we'll cross that bridge when we get there.*/
-            _expand(e, EXP_DISTRIB_NUMBERS | EXP_DISTRIB_ADDITION | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION | EXP_DISTRIB_POWERS);
+			base = ast_ChildGet(e, 0);
+			power = ast_ChildGet(e, 1);
 
-            intermediate_change = true;
-            did_change = true;
-            continue;
-        }
+			if (flags & EXP_DISTRIB_POWERS) {
+				/*Change (AB)^2 to A^2B^2*/
+				if (isoptype(base, OP_MULT)) {
+					pcas_ast_t *replacement = ast_MakeOperator(OP_MULT);
 
-        if(optype(e) == OP_POW) {
-            pcas_ast_t *base, *power;
+					for (j = 0; j < ast_ChildLength(base); j++) {
+						pcas_ast_t *cur = ast_ChildGet(base, j);
 
-            base = ast_ChildGet(e, 0);
-            power = ast_ChildGet(e, 1);
+						ast_ChildAppend(replacement, ast_MakeBinary(OP_POW, ast_Copy(cur), ast_Copy(power)));
+					}
 
-            if(flags & EXP_DISTRIB_POWERS) {
+					replace_node(e, replacement);
 
-                /*Change (AB)^2 to A^2B^2*/
-                if(isoptype(base, OP_MULT)) {
-                    pcas_ast_t *replacement = ast_MakeOperator(OP_MULT);
+					intermediate_change = true;
+					did_change = true;
+					continue;
+				}
 
-                    for(j = 0; j < ast_ChildLength(base); j++) {
-                        pcas_ast_t *cur = ast_ChildGet(base, j);
+				/*Change (A/B)^2 to A^2/B^2&*/
+				else if (isoptype(base, OP_DIV)) {
+					pcas_ast_t *new_num, *new_den, *new_div;
+					new_num = ast_MakeBinary(OP_POW, ast_Copy(ast_ChildGet(base, 0)), ast_Copy(power));
+					new_den = ast_MakeBinary(OP_POW, ast_Copy(ast_ChildGet(base, 1)), ast_Copy(power));
+					new_div = ast_MakeBinary(OP_DIV, new_num, new_den);
 
-                        ast_ChildAppend(replacement, ast_MakeBinary(OP_POW,
-                                                                    ast_Copy(cur),
-                                                                    ast_Copy(power)
-                        ));
-                    }
+					replace_node(e, new_div);
 
-                    replace_node(e, replacement);
+					intermediate_change = true;
+					did_change = true;
+					continue;
+				}
+			}
 
-                    intermediate_change = true;
-                    did_change = true;
-                    continue;
-                }
+			if (flags & EXP_EXPAND_POWERS) {
+				mp_int val;
+				pcas_ast_t *replacement;
 
-                /*Change (A/B)^2 to A^2/B^2&*/
-                else if(isoptype(base, OP_DIV)) {
-                    pcas_ast_t *new_num, *new_den, *new_div;
-                    new_num = ast_MakeBinary(OP_POW, ast_Copy(ast_ChildGet(base, 0)), ast_Copy(power));
-                    new_den = ast_MakeBinary(OP_POW, ast_Copy(ast_ChildGet(base, 1)), ast_Copy(power));
-                    new_div = ast_MakeBinary(OP_DIV, new_num, new_den);
+				if (isoptype(base, OP_ADD) && power->type == NODE_NUMBER && mp_rat_is_integer(power->op.num) &&
+					mp_rat_compare_zero(power->op.num) > 0) {
+					val = &power->op.num->num;
+					replacement = ast_MakeOperator(OP_MULT);
 
-                    replace_node(e, new_div);
+					while (mp_int_compare_zero(val) > 0) {
+						ast_ChildAppend(replacement, ast_Copy(base));
 
-                    intermediate_change = true;
-                    did_change = true;
-                    continue;
-                }
+						mp_int_sub_value(val, 1, val);
+					}
 
-            }
+					replace_node(e, replacement);
 
-            if(flags & EXP_EXPAND_POWERS) {
-                mp_int val;
-                pcas_ast_t *replacement;
+					intermediate_change = true;
+					did_change = true;
+					continue;
+				}
+			}
+		}
 
-                if(isoptype(base, OP_ADD) && power->type == NODE_NUMBER && mp_rat_is_integer(power->op.num) && mp_rat_compare_zero(power->op.num) > 0) {
-                    val = &power->op.num->num;
-                    replacement = ast_MakeOperator(OP_MULT);
+	} while (intermediate_change);
 
-                    while(mp_int_compare_zero(val) > 0) {
+	simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE);
 
-                        ast_ChildAppend(replacement, ast_Copy(base));
-
-                        mp_int_sub_value(val, 1, val);
-                    }
-
-                    replace_node(e, replacement);
-
-                    intermediate_change = true;
-                    did_change = true;
-                    continue;
-                }
-            }
-        }
-
-    } while(intermediate_change);
-
-    simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE);
-
-    return did_change;
+	return did_change;
 }
 
 bool expand(pcas_ast_t *e, unsigned char flags) {
-    bool changed = false;
-    work_Enter(e);
-    /*Expand powers first to make things faster*/
-    if(flags & EXP_EXPAND_POWERS)
-        changed |= _expand(e, EXP_EXPAND_POWERS);
-    changed |= _expand(e, flags & ~EXP_EXPAND_POWERS);
-    work_Leave(e);
-    return changed;
+	bool changed = false;
+	work_Enter(e);
+	/*Expand powers first to make things faster*/
+	if (flags & EXP_EXPAND_POWERS)
+		changed |= _expand(e, EXP_EXPAND_POWERS);
+	changed |= _expand(e, flags & ~EXP_EXPAND_POWERS);
+	work_Leave(e);
+	return changed;
 }

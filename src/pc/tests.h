@@ -11,28 +11,27 @@
 #define MAX_TESTS 1024
 
 typedef enum {
-    TEST_SIMPLIFY,
-    TEST_GCD,
-    TEST_FACTOR,
-    TEST_EXPAND,
-    TEST_DERIV,
-    TEST_INTEGRAL,
-    TEST_DE_ORDER,
-    TEST_DE_LINEAR,
-    TEST_DE_NONLINEAR,
-    TEST_DE_SOLVES,
-    TEST_DE_NOT_SOLVES,
+	TEST_SIMPLIFY,
+	TEST_GCD,
+	TEST_FACTOR,
+	TEST_EXPAND,
+	TEST_DERIV,
+	TEST_INTEGRAL,
+	TEST_DE_ORDER,
+	TEST_DE_LINEAR,
+	TEST_DE_NONLINEAR,
+	TEST_DE_SOLVES,
+	TEST_DE_NOT_SOLVES,
 
-    TEST_INVALID
+	TEST_INVALID
 } TestType;
 
 typedef struct {
+	TestType type;
 
-    TestType type;
+	char arg1[MAX_PAR], arg2[MAX_PAR], arg3[MAX_PAR];
 
-    char arg1[MAX_PAR], arg2[MAX_PAR], arg3[MAX_PAR];
-
-    unsigned line;
+	unsigned line;
 
 } test_t;
 

@@ -3,709 +3,687 @@
 #include "../work.h"
 
 static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
-    /*How many numbers were accumulated. If <= 1, nothing changed*/
-    unsigned num_changed = false;
-    unsigned i;
-    mp_rat accumulator;
+	/*How many numbers were accumulated. If <= 1, nothing changed*/
+	unsigned num_changed = false;
+	unsigned i;
+	mp_rat accumulator;
 
-    if(!(flags & EVAL_COMMUTATIVE))
-        return false;
+	if (!(flags & EVAL_COMMUTATIVE))
+		return false;
 
-    {
-        unsigned numbers = 0, fractions = 0;
-        pcas_ast_t *child, *first = opbase(e);
+	{
+		unsigned numbers = 0, fractions = 0;
+		pcas_ast_t *child, *first = opbase(e);
 
-        for(child = first; child != NULL; child = child->next) {
-            if(child->type == NODE_NUMBER)
-                numbers++;
-            else if(isoptype(e, OP_ADD) && isoptype(child, OP_DIV) && opbase(child)->type == NODE_NUMBER && opbase(child)->next->type == NODE_NUMBER)
-                fractions++;
-        }
+		for (child = first; child != NULL; child = child->next) {
+			if (child->type == NODE_NUMBER)
+				numbers++;
+			else if (
+				isoptype(e, OP_ADD) && isoptype(child, OP_DIV) && opbase(child)->type == NODE_NUMBER &&
+				opbase(child)->next->type == NODE_NUMBER
+			)
+				fractions++;
+		}
 
-        /*A lone fraction is already normalized, so it is only combined with other numbers*/
-        if(first != NULL && numbers == 0 && fractions <= 1)
-            return false;
+		/*A lone fraction is already normalized, so it is only combined with other numbers*/
+		if (first != NULL && numbers == 0 && fractions <= 1)
+			return false;
 
-        /*A lone number that is already first and is not an identity element stays as it is*/
-        if(numbers == 1 && fractions == 0 && first->type == NODE_NUMBER && first->next != NULL
-            && mp_rat_compare_zero(first->op.num) != 0 && !(optype(e) == OP_MULT && is_ast_int(first, 1)))
-            return false;
-    }
+		/*A lone number that is already first and is not an identity element stays as it is*/
+		if (numbers == 1 && fractions == 0 && first->type == NODE_NUMBER && first->next != NULL &&
+			mp_rat_compare_zero(first->op.num) != 0 && !(optype(e) == OP_MULT && is_ast_int(first, 1)))
+			return false;
+	}
 
-    accumulator = num_FromInt(optype(e) == OP_MULT ? 1 : 0);
+	accumulator = num_FromInt(optype(e) == OP_MULT ? 1 : 0);
 
-    for(i = 0; i < ast_ChildLength(e); i++) {
-        pcas_ast_t *child = ast_ChildGet(e, i);
+	for (i = 0; i < ast_ChildLength(e); i++) {
+		pcas_ast_t *child = ast_ChildGet(e, i);
 
-        if(child->type == NODE_NUMBER) {
-            if(optype(e) == OP_MULT)
-                mp_rat_mul(accumulator, child->op.num, accumulator);
-            else
-                mp_rat_add(accumulator, child->op.num, accumulator);
+		if (child->type == NODE_NUMBER) {
+			if (optype(e) == OP_MULT)
+				mp_rat_mul(accumulator, child->op.num, accumulator);
+			else
+				mp_rat_add(accumulator, child->op.num, accumulator);
 
-            ast_Cleanup(ast_ChildRemoveIndex(e, i));
-            i--;
-            num_changed++;
-        } else if(isoptype(e, OP_ADD) && isoptype(child, OP_DIV)) {
+			ast_Cleanup(ast_ChildRemoveIndex(e, i));
+			i--;
+			num_changed++;
+		} else if (isoptype(e, OP_ADD) && isoptype(child, OP_DIV)) {
+			pcas_ast_t *c_num, *c_den;
 
-            pcas_ast_t *c_num, *c_den;
+			c_num = ast_ChildGet(child, 0);
+			c_den = ast_ChildGet(child, 1);
 
-            c_num = ast_ChildGet(child, 0);
-            c_den = ast_ChildGet(child, 1);
+			if (c_num->type == NODE_NUMBER && c_den->type == NODE_NUMBER) {
+				mp_int a, b, c, d;
+				mp_int first, second, num, den;
 
-            if(c_num->type == NODE_NUMBER && c_den->type == NODE_NUMBER) {
-                mp_int a, b, c, d;
-                mp_int first, second, num, den;
+				/*a/b + c/d = (ad + bc)/(bd)*/
 
-                /*a/b + c/d = (ad + bc)/(bd)*/
+				a = &accumulator->num;
+				b = &accumulator->den;
+				c = &c_num->op.num->num;
+				d = &c_den->op.num->num;
 
-                a = &accumulator->num;
-                b = &accumulator->den;
-                c = &c_num->op.num->num;
-                d = &c_den->op.num->num;
+				first = mp_int_alloc();
+				mp_int_init(first);
 
-                first = mp_int_alloc();
-                mp_int_init(first);
+				mp_int_mul(a, d, first);
 
-                mp_int_mul(a, d, first);
+				second = mp_int_alloc();
+				mp_int_init(second);
 
-                second = mp_int_alloc();
-                mp_int_init(second);
+				mp_int_mul(b, c, second);
 
-                mp_int_mul(b, c, second);
+				num = mp_int_alloc();
+				mp_int_add(first, second, num);
 
-                num = mp_int_alloc();
-                mp_int_add(first, second, num);
+				den = mp_int_alloc();
+				mp_int_init(den);
 
-                den = mp_int_alloc();
-                mp_int_init(den);
+				mp_int_mul(b, d, den);
 
-                mp_int_mul(b, d, den);
+				mp_int_copy(num, a);
+				mp_int_copy(den, b);
 
-                mp_int_copy(num, a);
-                mp_int_copy(den, b);
+				mp_int_free(first);
+				mp_int_free(second);
+				mp_int_free(num);
+				mp_int_free(den);
 
-                mp_int_free(first);
-                mp_int_free(second);
-                mp_int_free(num);
-                mp_int_free(den);
+				ast_Cleanup(ast_ChildRemoveIndex(e, i));
 
-                ast_Cleanup(ast_ChildRemoveIndex(e, i));
+				i--;
+				num_changed++;
+			}
+		}
+	}
 
-                i--;
-                num_changed++;
-            }
-        }
-    }
+	/*If all children nodes were numbers or if multiplied by -*/
+	if (ast_ChildLength(e) == 0 || (optype(e) == OP_MULT && mp_rat_compare_zero(accumulator) == 0)) {
+		replace_node(e, ast_MakeNumber(accumulator));
+		return true;
+	}
+	/*Do not append accumulator if multiplying by 1 or adding 0*/
+	else if (!((optype(e) == OP_ADD && mp_rat_compare_zero(accumulator) == 0) ||
+			   (optype(e) == OP_MULT && mp_rat_compare_value(accumulator, 1, 1) == 0))) {
+		ast_ChildInsert(e, ast_MakeNumber(accumulator), 0);
+	} else
+		num_Cleanup(accumulator);
 
-    /*If all children nodes were numbers or if multiplied by -*/
-    if(ast_ChildLength(e) == 0
-        || (optype(e) == OP_MULT && mp_rat_compare_zero(accumulator) == 0)) {
-        replace_node(e, ast_MakeNumber(accumulator));
-        return true;
-    }
-    /*Do not append accumulator if multiplying by 1 or adding 0*/
-    else if(!((optype(e) == OP_ADD && mp_rat_compare_zero(accumulator) == 0)
-        || (optype(e) == OP_MULT && mp_rat_compare_value(accumulator, 1, 1) == 0))) {
-        ast_ChildInsert(e, ast_MakeNumber(accumulator), 0);
-    }
-    else
-        num_Cleanup(accumulator);
-
-    return num_changed > 1;
+	return num_changed > 1;
 }
 
 static bool eval_div(pcas_ast_t *e, unsigned short flags);
 
 static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, unsigned short flags) {
+	pcas_ast_t *temp_num, *temp_den, *temp_div;
 
-    pcas_ast_t *temp_num, *temp_den, *temp_div;
+	bool changed = false;
+	bool div_changed = false;
 
-    bool changed = false;
-    bool div_changed = false;
+	if (isoptype(num, OP_MULT)) {
+		unsigned i = 0;
 
-    if(isoptype(num, OP_MULT)) {
-        unsigned i = 0;
+		for (i = 0; i < ast_ChildLength(num); i++) {
+			temp_num = ast_ChildGet(num, i);
 
-        for(i = 0; i < ast_ChildLength(num); i++) {
+			if (isoptype(den, OP_MULT)) {
+				unsigned j;
 
-            temp_num = ast_ChildGet(num, i);
+				for (j = 0; j < ast_ChildLength(den); j++) {
+					temp_den = ast_ChildGet(den, j);
 
-            if(isoptype(den, OP_MULT)) {
-                unsigned j;
+					temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
 
-                for(j = 0; j < ast_ChildLength(den); j++) {
-                    temp_den = ast_ChildGet(den, j);
+					div_changed = eval_div(temp_div, flags);
 
-                    temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
+					if (div_changed) {
+						ast_Cleanup(ast_ChildRemoveIndex(num, i));
+						ast_Cleanup(ast_ChildRemoveIndex(den, j));
 
-                    div_changed = eval_div(temp_div, flags);
+						ast_ChildAppend(num, temp_div);
 
-                    if(div_changed) {
-                        ast_Cleanup(ast_ChildRemoveIndex(num, i));
-                        ast_Cleanup(ast_ChildRemoveIndex(den, j));
+						changed = true;
 
-                        ast_ChildAppend(num, temp_div);
+						j--;
+						break;
+					} else {
+						ast_Cleanup(temp_div);
+					}
+				}
+			} else {
+				temp_den = den;
 
-                        changed = true;
+				temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
 
-                        j--;
-                        break;
-                    } else {
-                        ast_Cleanup(temp_div);
-                    }
+				div_changed = eval_div(temp_div, flags);
 
-                }
-            } else {
-                temp_den = den;
+				if (div_changed) {
+					ast_Cleanup(ast_ChildRemoveIndex(num, i));
+					replace_node(den, ast_MakeNumber(num_FromInt(1)));
 
-                temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
+					ast_ChildAppend(num, temp_div);
 
-                div_changed = eval_div(temp_div, flags);
+					changed = true;
+				} else {
+					ast_Cleanup(temp_div);
+				}
+			}
+		}
 
-                if(div_changed) {
-                    ast_Cleanup(ast_ChildRemoveIndex(num, i));
-                    replace_node(den, ast_MakeNumber(num_FromInt(1)));
+	} else if (isoptype(den, OP_MULT)) {
+		unsigned j;
 
-                    ast_ChildAppend(num, temp_div);
+		temp_num = num;
 
-                    changed = true;
-                } else {
-                    ast_Cleanup(temp_div);
-                }
+		for (j = 0; j < ast_ChildLength(den); j++) {
+			temp_den = ast_ChildGet(den, j);
 
-            }
-        }
+			temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
 
-    } else if(isoptype(den, OP_MULT)) {
-        unsigned j;
+			div_changed = eval_div(temp_div, flags);
 
-        temp_num = num;
+			if (div_changed) {
+				replace_node(num, temp_div);
+				ast_Cleanup(ast_ChildRemoveIndex(den, j));
 
-        for(j = 0; j < ast_ChildLength(den); j++) {
-            temp_den = ast_ChildGet(den, j);
+				changed = true;
 
-            temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
+				j--;
+				break;
+			} else {
+				ast_Cleanup(temp_div);
+			}
+		}
+	}
 
-            div_changed = eval_div(temp_div, flags);
-
-            if(div_changed) {
-
-                replace_node(num, temp_div);
-                ast_Cleanup(ast_ChildRemoveIndex(den, j));
-
-                changed = true;
-
-                j--;
-                break;
-            } else {
-                ast_Cleanup(temp_div);
-            }
-        }
-
-    }
-
-    return changed;
+	return changed;
 }
 
 static bool eval_div(pcas_ast_t *e, unsigned short flags) {
-    pcas_ast_t *num, *den;
+	pcas_ast_t *num, *den;
 
-    bool changed = false;
+	bool changed = false;
 
-    num = ast_ChildGet(e, 0);
-    den = ast_ChildGet(e, 1);
+	num = ast_ChildGet(e, 0);
+	den = ast_ChildGet(e, 1);
 
-    if(flags & EVAL_BASIC_IDENTITIES) {
+	if (flags & EVAL_BASIC_IDENTITIES) {
+		if (is_negative_for_sure(num) && is_negative_for_sure(den)) {
+			pcas_ast_t *new_div;
 
-        if(is_negative_for_sure(num) && is_negative_for_sure(den)) {
-            pcas_ast_t *new_div;
+			absolute_val(num);
+			absolute_val(den);
 
-            absolute_val(num);
-            absolute_val(den);
+			new_div = ast_MakeBinary(OP_DIV, ast_Copy(num), ast_Copy(den));
 
-            new_div = ast_MakeBinary(OP_DIV, ast_Copy(num), ast_Copy(den));
+			eval_div(new_div, flags);
+			replace_node(e, new_div);
 
-            eval_div(new_div, flags);
-            replace_node(e, new_div);
+			return true;
+		}
 
-            return true;
-        }
+		/*If numerator and denominator are equal, replace node with "1"*/
+		if (ast_Compare(num, den)) {
+			replace_node(e, ast_MakeNumber(num_FromInt(1)));
+			return true;
+		}
 
-        /*If numerator and denominator are equal, replace node with "1"*/
-        if(ast_Compare(num, den)) {
-            replace_node(e, ast_MakeNumber(num_FromInt(1)));
-            return true;
-        }
+		if (num->type == NODE_NUMBER && mp_rat_compare_zero(num->op.num) == 0) {
+			replace_node(e, ast_MakeNumber(num_FromInt(0)));
+			return true;
+		}
 
-        if(num->type == NODE_NUMBER && mp_rat_compare_zero(num->op.num) == 0) {
-            replace_node(e, ast_MakeNumber(num_FromInt(0)));
-            return true;
-        }
+		if (den->type == NODE_NUMBER && mp_rat_compare_value(den->op.num, 1, 1) == 0) {
+			replace_node(e, num);
+			return true;
+		}
 
-        if(den->type == NODE_NUMBER && mp_rat_compare_value(den->op.num, 1, 1) == 0) {
-            replace_node(e, num);
-            return true;
-        }
+		/*Move the sign of a negative denominator to the numerator*/
+		if (den->type == NODE_NUMBER && mp_rat_compare_zero(den->op.num) < 0) {
+			mp_rat_neg(den->op.num, den->op.num);
+			replace_node(num, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(num)));
+			return true;
+		}
+	}
 
-        /*Move the sign of a negative denominator to the numerator*/
-        if(den->type == NODE_NUMBER && mp_rat_compare_zero(den->op.num) < 0) {
-            mp_rat_neg(den->op.num, den->op.num);
-            replace_node(num, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(num)));
-            return true;
-        }
-    }
+	if (!(flags & EVAL_DIVISION))
+		return false;
 
-    if(!(flags & EVAL_DIVISION))
-        return false;
+	if (isoptype(num, OP_POW)) {
+		pcas_ast_t *base1, *power1;
 
-    if(isoptype(num, OP_POW)) {
-        pcas_ast_t *base1, *power1;
+		base1 = ast_ChildGet(num, 0);
+		power1 = ast_ChildGet(num, 1);
 
-        base1 = ast_ChildGet(num, 0);
-        power1 = ast_ChildGet(num, 1);
+		if (isoptype(den, OP_POW)) {
+			pcas_ast_t *base2, *power2;
 
-        if(isoptype(den, OP_POW)) {
-            pcas_ast_t *base2, *power2;
+			base2 = ast_ChildGet(den, 0);
+			power2 = ast_ChildGet(den, 1);
 
-            base2 = ast_ChildGet(den, 0);
-            power2 = ast_ChildGet(den, 1);
+			if (ast_Compare(base1, base2)) {
+				/*Subtract powers*/
+				replace_node(
+					power1,
+					ast_MakeBinary(
+						OP_ADD,
+						ast_Copy(power1),
+						ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(power2))
+					)
+				);
+				replace_node(den, ast_MakeNumber(num_FromInt(1)));
+				return true;
+			}
 
-            if(ast_Compare(base1, base2)) {
-                /*Subtract powers*/
-                replace_node(power1, ast_MakeBinary(OP_ADD,
-                                                    ast_Copy(power1),
-                                                    ast_MakeBinary(OP_MULT,
-                                                                    ast_MakeNumber(num_FromInt(-1)),
-                                                                    ast_Copy(power2))));
-                replace_node(den, ast_MakeNumber(num_FromInt(1)));
-                return true;
-            }
+		} else if (ast_Compare(base1, den)) {
+			/*Subtract powers*/
+			replace_node(power1, ast_MakeBinary(OP_ADD, ast_MakeNumber(num_FromInt(-1)), ast_Copy(power1)));
+			replace_node(den, ast_MakeNumber(num_FromInt(1)));
 
-        } else if(ast_Compare(base1, den)) {
-            /*Subtract powers*/
-            replace_node(power1, ast_MakeBinary(OP_ADD,
-                                                ast_MakeNumber(num_FromInt(-1)),
-                                                ast_Copy(power1)));
-            replace_node(den, ast_MakeNumber(num_FromInt(1)));
+			return true;
+		}
+	} else if (isoptype(den, OP_POW) && ast_Compare(num, ast_ChildGet(den, 0))) {
+		/*Subtract powers*/
+		pcas_ast_t *power2 = ast_ChildGet(den, 1);
 
-            return true;
-        }
-    } else if(isoptype(den, OP_POW) && ast_Compare(num, ast_ChildGet(den, 0))) {
-        /*Subtract powers*/
-        pcas_ast_t *power2 = ast_ChildGet(den, 1);
+		replace_node(power2, ast_MakeBinary(OP_ADD, ast_MakeNumber(num_FromInt(-1)), ast_Copy(power2)));
+		replace_node(num, ast_MakeNumber(num_FromInt(1)));
 
-        replace_node(power2, ast_MakeBinary(OP_ADD,
-                                                ast_MakeNumber(num_FromInt(-1)),
-                                                ast_Copy(power2)));
-        replace_node(num, ast_MakeNumber(num_FromInt(1)));
+		return true;
+	}
 
-        return true;
-    }
+	if (eval_div_mult(num, den, flags))
+		return true;
 
-    if(eval_div_mult(num, den, flags))
-        return true;
+	if (num->type != NODE_NUMBER || den->type != NODE_NUMBER)
+		return false;
 
-    if(num->type != NODE_NUMBER || den->type != NODE_NUMBER)
-        return false;
+	/*Simplify fractions using GCD*/
+	if (mp_rat_is_integer(num->op.num) && mp_rat_is_integer(den->op.num)) {
+		mpz_t gcd;
+		mp_int a = &num->op.num->num, b = &den->op.num->num;
 
-    /*Simplify fractions using GCD*/
-    if(mp_rat_is_integer(num->op.num) && mp_rat_is_integer(den->op.num)) {
-        mpz_t gcd;
-        mp_int a = &num->op.num->num, b = &den->op.num->num;
+		/*TODO: check for division by zero?*/
 
-        /*TODO: check for division by zero?*/
+		mp_int_init(&gcd);
+		mp_int_gcd(a, b, &gcd);
 
-        mp_int_init(&gcd);
-        mp_int_gcd(a, b, &gcd);
+		if (mp_int_compare_value(&gcd, 1) != 0) {
+			mp_int_div(a, &gcd, a, NULL);
+			mp_int_div(b, &gcd, b, NULL);
+			changed = true;
+		}
 
-        if(mp_int_compare_value(&gcd, 1) != 0) {
-            mp_int_div(a, &gcd, a, NULL);
-            mp_int_div(b, &gcd, b, NULL);
-            changed = true;
-        }
+		mp_int_clear(&gcd);
+	}
 
-        mp_int_clear(&gcd);
-    }
-
-    return changed; 
+	return changed;
 }
 
-#define power_in_small_range(a, b) (mp_rat_compare_value((a)->op.num, -1, 1) == 0 || (mp_rat_compare_value((a)->op.num, 10, 1) <= 0 && mp_rat_compare_value((b)->op.num, 10, 1) <= 0))
+#define power_in_small_range(a, b)                                                                                     \
+	(mp_rat_compare_value((a)->op.num, -1, 1) == 0 ||                                                                  \
+	 (mp_rat_compare_value((a)->op.num, 10, 1) <= 0 && mp_rat_compare_value((b)->op.num, 10, 1) <= 0))
 
 static bool eval_pow(pcas_ast_t *e, unsigned short flags) {
-    /*a^b*/
-    pcas_ast_t *a, *b;
-    bool changed = false;
+	/*a^b*/
+	pcas_ast_t *a, *b;
+	bool changed = false;
 
-    a = ast_ChildGet(e, 0);
-    b = ast_ChildGet(e, 1);
+	a = ast_ChildGet(e, 0);
+	b = ast_ChildGet(e, 1);
 
-    if (!a || !b) {
-        return false;
-    }
+	if (!a || !b) {
+		return false;
+	}
 
-    if(flags & EVAL_BASIC_IDENTITIES) {
-        /*If a == 0*/
-        if(is_ast_int(a, 0)) {
-            /*If b != 0, e = 0*/
-            if(!is_ast_int(b, 0)) {
-                replace_node(e, ast_MakeNumber(num_FromInt(0)));
-                return true;
-            }
-        }
+	if (flags & EVAL_BASIC_IDENTITIES) {
+		/*If a == 0*/
+		if (is_ast_int(a, 0)) {
+			/*If b != 0, e = 0*/
+			if (!is_ast_int(b, 0)) {
+				replace_node(e, ast_MakeNumber(num_FromInt(0)));
+				return true;
+			}
+		}
 
-        /*b == 0*/
-        else if(is_ast_int(b, 0)) {
-            /*If a != 0, e = 1*/
-            if(!is_ast_int(a, 0)) {
-                replace_node(e, ast_MakeNumber(num_FromInt(1)));
-                return true;
-            }
-        }
+		/*b == 0*/
+		else if (is_ast_int(b, 0)) {
+			/*If a != 0, e = 1*/
+			if (!is_ast_int(a, 0)) {
+				replace_node(e, ast_MakeNumber(num_FromInt(1)));
+				return true;
+			}
+		}
 
-        /*a == 1*/
-        else if(is_ast_int(a, 1)) {
-            replace_node(e, a);
-            return true;
-        }
+		/*a == 1*/
+		else if (is_ast_int(a, 1)) {
+			replace_node(e, a);
+			return true;
+		}
 
-        /*b == 1*/
-        else if(is_ast_int(b, 1)) {
-            replace_node(e, a);
-            return true;
-        }
+		/*b == 1*/
+		else if (is_ast_int(b, 1)) {
+			replace_node(e, a);
+			return true;
+		}
 
-        /*(A^B)^C = A^(BC)*/
-        if(isoptype(a, OP_POW)) {
-            replace_node(e, ast_MakeBinary(OP_POW,
-                                            ast_Copy(ast_ChildGet(a, 0)),
-                                            ast_MakeBinary(OP_MULT,
-                                                ast_Copy(ast_ChildGet(a, 1)),
-                                                ast_Copy(b)
-                                                )
-                                            ));
-            return true;
-        }
+		/*(A^B)^C = A^(BC)*/
+		if (isoptype(a, OP_POW)) {
+			replace_node(
+				e,
+				ast_MakeBinary(
+					OP_POW,
+					ast_Copy(ast_ChildGet(a, 0)),
+					ast_MakeBinary(OP_MULT, ast_Copy(ast_ChildGet(a, 1)), ast_Copy(b))
+				)
+			);
+			return true;
+		}
 
-        /*A^(-B) = 1/(A^B) */
-        if(is_negative_for_sure(b)) {
-            absolute_val(b);
-            replace_node(e, ast_MakeBinary(OP_DIV,
-                                ast_MakeNumber(num_FromInt(1)),
-                                ast_Copy(e)
-                            ));
-            return true;
-        }
-    }
+		/*A^(-B) = 1/(A^B) */
+		if (is_negative_for_sure(b)) {
+			absolute_val(b);
+			replace_node(e, ast_MakeBinary(OP_DIV, ast_MakeNumber(num_FromInt(1)), ast_Copy(e)));
+			return true;
+		}
+	}
 
-    /*Evaluate a^b if a and b are integers*/
-    if(a->type == NODE_NUMBER && b->type == NODE_NUMBER) {
+	/*Evaluate a^b if a and b are integers*/
+	if (a->type == NODE_NUMBER && b->type == NODE_NUMBER) {
+		if (mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
+			if (flags & EVAL_POWERS_FULL || (flags & EVAL_POWERS_SMALL && power_in_small_range(a, b))) {
+				mp_rat result;
 
-        if(mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num)
-            && mp_rat_compare_zero(b->op.num) > 0) {
+				result = num_FromInt(1);
 
-            if(flags & EVAL_POWERS_FULL ||
-                (flags & EVAL_POWERS_SMALL && power_in_small_range(a, b))) {
-                mp_rat result;
+				mp_int_expt_full(&a->op.num->num, &b->op.num->num, &result->num);
 
-                result = num_FromInt(1);
+				replace_node(e, ast_MakeNumber(result));
 
-                mp_int_expt_full(&a->op.num->num, &b->op.num->num, &result->num);
+				return true;
+			}
+		}
 
-                replace_node(e, ast_MakeNumber(result));
+	}
+	/*Evaluate i^b if b is an integer*/
+	else if (
+		(flags & EVAL_POWERS_SMALL || flags & EVAL_POWERS_FULL) && a->type == NODE_SYMBOL && a->op.symbol == SYM_IMAG &&
+		b->type == NODE_NUMBER
+	) {
+		if (mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
+			mp_small remainder;
 
-                return true;
-            }
+			mp_int_mod_value(&b->op.num->num, 4, &remainder);
 
-        }
+			if (remainder == 0) {
+				replace_node(e, ast_MakeNumber(num_FromInt(1)));
+			} else if (remainder == 1) {
+				replace_node(e, ast_MakeSymbol(SYM_IMAG));
+			} else if (remainder == 2) {
+				replace_node(e, ast_MakeNumber(num_FromInt(-1)));
+			} else if (remainder == 3) {
+				replace_node(e, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_MakeSymbol(SYM_IMAG)));
+			}
 
-    }
-    /*Evaluate i^b if b is an integer*/
-    else if((flags & EVAL_POWERS_SMALL || flags & EVAL_POWERS_FULL) && a->type == NODE_SYMBOL && a->op.symbol == SYM_IMAG && b->type == NODE_NUMBER) {
-        if(mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
-            mp_small remainder;
+			return true;
+		}
+	}
 
-            mp_int_mod_value(&b->op.num->num, 4, &remainder);
+	/*Do roots*/
+	if ((flags & EVAL_POWERS_SMALL || flags & EVAL_POWERS_FULL) && a->type == NODE_NUMBER && b->type == NODE_OPERATOR &&
+		optype(b) == OP_DIV && is_ast_int(ast_ChildGet(b, 0), 1) && ast_ChildGet(b, 1)->type == NODE_NUMBER) {
+		/*a root of b*/
+		pcas_ast_t *temp = b;
+		b = a;
+		a = ast_ChildGet(temp, 1);
 
-            if(remainder == 0) {
-                replace_node(e, ast_MakeNumber(num_FromInt(1)));
-            } else if(remainder == 1) {
-                replace_node(e, ast_MakeSymbol(SYM_IMAG));
-            } else if(remainder == 2) {
-                replace_node(e, ast_MakeNumber(num_FromInt(-1)));                
-            } else if(remainder == 3) {
-                replace_node(e, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_MakeSymbol(SYM_IMAG)));
-            }
+		if (mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
+			mp_int answer, check;
+			mp_small small;
+			/*Set answer = small root of a*/
+			answer = mp_int_alloc();
+			mp_int_init(answer);
 
-            return true;
-        }
-    }
+			mp_int_to_int(&a->op.num->num, &small);
 
-    /*Do roots*/
-    if((flags & EVAL_POWERS_SMALL || flags & EVAL_POWERS_FULL) && a->type == NODE_NUMBER && b->type == NODE_OPERATOR && optype(b) == OP_DIV && is_ast_int(ast_ChildGet(b, 0), 1) && ast_ChildGet(b, 1)->type == NODE_NUMBER) {
-        /*a root of b*/
-        pcas_ast_t *temp = b;
-        b = a;
-        a = ast_ChildGet(temp, 1);
+			mp_int_root(&b->op.num->num, small, answer);
 
-        if(mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
-            mp_int answer, check;
-            mp_small small;
-            /*Set answer = small root of a*/
-            answer = mp_int_alloc();
-            mp_int_init(answer);
+			/*Check if answer ^ small == b*/
+			check = mp_int_alloc();
+			mp_int_init(check);
 
-            mp_int_to_int(&a->op.num->num, &small);
+			mp_int_expt(answer, small, check);
 
-            mp_int_root(&b->op.num->num, small, answer);
+			if (mp_int_compare(check, &b->op.num->num) == 0) {
+				/*Then this was successful*/
+				mp_rat ret = num_FromInt(1);
+				mp_int_copy(answer, &ret->num);
 
-            /*Check if answer ^ small == b*/
-            check = mp_int_alloc();
-            mp_int_init(check);
+				replace_node(e, ast_MakeNumber(ret));
 
-            mp_int_expt(answer, small, check);
+				changed = true;
+			}
 
-            if(mp_int_compare(check, &b->op.num->num) == 0) {
-                /*Then this was successful*/
-                mp_rat ret = num_FromInt(1);
-                mp_int_copy(answer, &ret->num);
+			mp_int_free(check);
+			mp_int_free(answer);
+		}
+	}
 
-                replace_node(e, ast_MakeNumber(ret));
-
-                changed = true;
-            }
-
-            mp_int_free(check);
-            mp_int_free(answer);
-
-        }
-    }
-
-    return changed;
+	return changed;
 }
 
 static bool eval_int(pcas_ast_t *e, unsigned short flags) {
-    bool changed = false;
-    mp_rat res;
-    pcas_ast_t *a;
-    mp_int remainder;
+	bool changed = false;
+	mp_rat res;
+	pcas_ast_t *a;
+	mp_int remainder;
 
-    if(!(flags & EVAL_INT))
-        return false;
+	if (!(flags & EVAL_INT))
+		return false;
 
-    a = ast_ChildGet(e, 0);
+	a = ast_ChildGet(e, 0);
 
-    remainder = mp_int_alloc();
-    mp_int_init(remainder);
+	remainder = mp_int_alloc();
+	mp_int_init(remainder);
 
-    if(a->type == NODE_NUMBER) {
+	if (a->type == NODE_NUMBER) {
+		res = num_FromInt(1);
 
-        res = num_FromInt(1);
+		mp_int_div(&a->op.num->num, &a->op.num->den, &res->num, remainder);
 
-        mp_int_div(&a->op.num->num, &a->op.num->den, &res->num, remainder);
+		if (mp_int_compare_zero(remainder) != 0 && mp_int_compare_zero(&res->num) < 0)
+			mp_int_sub_value(&res->num, 1, &res->num);
 
-        if(mp_int_compare_zero(remainder) != 0 && mp_int_compare_zero(&res->num) < 0)
-            mp_int_sub_value(&res->num, 1, &res->num);
+		replace_node(e, ast_MakeNumber(res));
 
-        replace_node(e, ast_MakeNumber(res));
+		changed = true;
+	} else if (isoptype(a, OP_DIV)) {
+		pcas_ast_t *num, *den;
 
-        changed = true;
-    } else if(isoptype(a, OP_DIV)) {
-        pcas_ast_t *num, *den;
+		num = ast_ChildGet(a, 0);
+		den = ast_ChildGet(a, 1);
 
-        num = ast_ChildGet(a, 0);
-        den = ast_ChildGet(a, 1);
+		if (num->type == NODE_NUMBER && den->type == NODE_NUMBER) {
+			res = num_FromInt(1);
 
-        if(num->type == NODE_NUMBER && den->type == NODE_NUMBER) {
-            res = num_FromInt(1);
+			/*That is a lot of num lol*/
+			mp_int_div(&num->op.num->num, &den->op.num->num, &res->num, remainder);
 
-            /*That is a lot of num lol*/
-            mp_int_div(&num->op.num->num, &den->op.num->num, &res->num, remainder);
+			if (mp_int_compare_zero(remainder) != 0 && mp_int_compare_zero(&res->num) < 0)
+				mp_int_sub_value(&res->num, 1, &res->num);
 
-            if(mp_int_compare_zero(remainder) != 0 && mp_int_compare_zero(&res->num) < 0)
-                mp_int_sub_value(&res->num, 1, &res->num);
+			replace_node(e, ast_MakeNumber(res));
 
-            replace_node(e, ast_MakeNumber(res));
+			changed = true;
+		}
+	}
 
-            changed = true;
-        }
-    }
+	mp_int_free(remainder);
 
-    mp_int_free(remainder);
-
-    return changed;
+	return changed;
 }
 
 static bool eval_abs(pcas_ast_t *e, unsigned short flags) {
-    bool changed = false;
-    pcas_ast_t *a = ast_ChildGet(e, 0);
+	bool changed = false;
+	pcas_ast_t *a = ast_ChildGet(e, 0);
 
-    if(!(flags & EVAL_ABS))
-        return false;
+	if (!(flags & EVAL_ABS))
+		return false;
 
-    changed = absolute_val(a) || a->type == NODE_NUMBER;
+	changed = absolute_val(a) || a->type == NODE_NUMBER;
 
-    if(changed)
-        replace_node(e, a);
+	if (changed)
+		replace_node(e, a);
 
-    return changed;
+	return changed;
 }
 
 static bool eval_log(pcas_ast_t *e, unsigned short flags) {
-    pcas_ast_t *base, *val;
+	pcas_ast_t *base, *val;
 
-    base = ast_ChildGet(e, 0);
-    val = ast_ChildGet(e, 1);
+	base = ast_ChildGet(e, 0);
+	val = ast_ChildGet(e, 1);
 
-    if(flags & EVAL_BASIC_IDENTITIES) {
-        /*log(1) = 0*/
-        if(is_ast_int(val, 1)) {
-            replace_node(e, ast_MakeNumber(num_FromInt(0)));
-            return true;
-        }
+	if (flags & EVAL_BASIC_IDENTITIES) {
+		/*log(1) = 0*/
+		if (is_ast_int(val, 1)) {
+			replace_node(e, ast_MakeNumber(num_FromInt(0)));
+			return true;
+		}
 
-        /*This is hardcoded here because we want this to happen before
+		/*This is hardcoded here because we want this to happen before
         powers are evaluated*/
-        /*log(A^B)=Blog(A)*/
+		/*log(A^B)=Blog(A)*/
 
-        if(isoptype(val, OP_POW)) {
-            pcas_ast_t *power_base, *power_exponent;
+		if (isoptype(val, OP_POW)) {
+			pcas_ast_t *power_base, *power_exponent;
 
-            power_base = ast_ChildGet(val, 0);
-            power_exponent = ast_ChildGet(val, 1);
+			power_base = ast_ChildGet(val, 0);
+			power_exponent = ast_ChildGet(val, 1);
 
-            replace_node(e, ast_MakeBinary(OP_MULT,
-                                ast_Copy(power_exponent),
-                                ast_MakeBinary(OP_LOG,
-                                    ast_Copy(base),
-                                    ast_Copy(power_base)
-                                )
-                            ));
-            return true;
+			replace_node(
+				e,
+				ast_MakeBinary(
+					OP_MULT, ast_Copy(power_exponent), ast_MakeBinary(OP_LOG, ast_Copy(base), ast_Copy(power_base))
+				)
+			);
+			return true;
+		}
+	}
 
-        }
-    }
+	/*Todo evaluate log constants*/
 
-    /*Todo evaluate log constants*/
-
-    return false;
+	return false;
 }
 
 #define factorial_in_small_range(a) (mp_rat_compare_value((a)->op.num, 10, 1) <= 0)
 
 static bool eval_factorial(pcas_ast_t *e, unsigned short flags) {
+	pcas_ast_t *a = ast_ChildGet(e, 0);
 
-    pcas_ast_t *a = ast_ChildGet(e, 0);
+	if (a->type == NODE_NUMBER) {
+		if (flags & EVAL_BASIC_IDENTITIES) {
+			/*0! = 1*/
+			if (mp_rat_compare_zero(a->op.num) == 0) {
+				replace_node(e, ast_MakeNumber(num_FromInt(1)));
+				return true;
+			}
+		}
 
-    if(a->type == NODE_NUMBER) {
+		if (mp_rat_is_integer(a->op.num) && mp_rat_compare_zero(a->op.num) > 0) {
+			mp_rat accumulator;
+			mp_int i;
 
-        if(flags & EVAL_BASIC_IDENTITIES) {
-            /*0! = 1*/
-            if(mp_rat_compare_zero(a->op.num) == 0) {
-                replace_node(e, ast_MakeNumber(num_FromInt(1)));
-                return true;
-            }
-        }
+			if (flags & EVAL_FACTORIAL_FULL || (flags & EVAL_FACTORIAL_SMALL && factorial_in_small_range(a))) {
+				accumulator = num_FromInt(1);
+				i = mp_int_alloc();
+				mp_int_init_copy(i, &a->op.num->num);
 
-        if(mp_rat_is_integer(a->op.num) && mp_rat_compare_zero(a->op.num) > 0) {
-            mp_rat accumulator;
-            mp_int i;
+				while (mp_int_compare_zero(i) != 0) {
+					mp_rat_mul_int(accumulator, i, accumulator);
+					mp_int_sub_value(i, 1, i);
+				}
 
-            if(flags & EVAL_FACTORIAL_FULL
-            || (flags & EVAL_FACTORIAL_SMALL && factorial_in_small_range(a))) {
-                accumulator = num_FromInt(1);
-                i = mp_int_alloc();
-                mp_int_init_copy(i, &a->op.num->num);
+				replace_node(e, ast_MakeNumber(accumulator));
 
-                while(mp_int_compare_zero(i) != 0) {
-                    mp_rat_mul_int(accumulator, i, accumulator);
-                    mp_int_sub_value(i, 1, i);
-                }
+				mp_int_free(i);
 
-                replace_node(e, ast_MakeNumber(accumulator));
+				return true;
+			}
+		}
+	}
 
-                mp_int_free(i);
-
-                return true;
-            }
-
-        }
-
-    }
-
-    return false;
+	return false;
 }
 
 /*Simplifies expressions like 5 + 5 to 10*/
 static bool _eval(pcas_ast_t *e, unsigned short flags) {
+	bool changed = false;
+	pcas_ast_t *current;
 
-    bool changed = false;
-    pcas_ast_t *current;
-
-    /*Get a head start to evaluate the identity ln(A^B)=Bln(A)
+	/*Get a head start to evaluate the identity ln(A^B)=Bln(A)
     before child power node is evaluated*/
-    if(isoptype(e, OP_LOG))
-        changed |= eval_log(e, flags);
+	if (isoptype(e, OP_LOG))
+		changed |= eval_log(e, flags);
 
-    if(e->type != NODE_OPERATOR)
-        return false;
+	if (e->type != NODE_OPERATOR)
+		return false;
 
-    for(current = e->op.operator.base; current != NULL; current = current->next) {
-        changed |= eval(current, flags);
-    }
+	for (current = e->op.operator.base; current != NULL; current = current->next) {
+		changed |= eval(current, flags);
+	}
 
-    if(is_op_commutative(optype(e))) {
-        changed |= eval_commutative(e, flags);
-    } else {
+	if (is_op_commutative(optype(e))) {
+		changed |= eval_commutative(e, flags);
+	} else {
+		/*Simplify pow, root, log, factorial*/
+		switch (optype(e)) {
+			case OP_DIV: changed |= eval_div(e, flags); break;
+			case OP_POW: changed |= eval_pow(e, flags); break;
+			case OP_INT: changed |= eval_int(e, flags); break;
+			case OP_ABS: changed |= eval_abs(e, flags); break;
+			case OP_FACTORIAL: changed |= eval_factorial(e, flags); break;
+			default: break;
+		}
+	}
 
-        /*Simplify pow, root, log, factorial*/
-        switch(optype(e)) {
-            case OP_DIV: changed |= eval_div(e, flags); break;
-            case OP_POW: changed |= eval_pow(e, flags); break;
-            case OP_INT: changed |= eval_int(e, flags); break;
-            case OP_ABS: changed |= eval_abs(e, flags); break;
-            case OP_FACTORIAL: changed |= eval_factorial(e, flags); break;
-            default:
-                break;
-        }
-    }
-
-    return changed;
+	return changed;
 }
 
 bool eval(pcas_ast_t *e, unsigned short flags) {
-    bool changed;
-    work_Enter(e);
-    changed = _eval(e, flags);
-    work_Leave(e);
-    return changed;
+	bool changed;
+	work_Enter(e);
+	changed = _eval(e, flags);
+	work_Leave(e);
+	return changed;
 }
 
 static bool _substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
+	if (ast_Compare(e, from)) {
+		replace_node(e, ast_Copy(to));
+		return true;
+	}
 
-    if(ast_Compare(e, from)) {
-        replace_node(e, ast_Copy(to));
-        return true;
-    }
+	if (e->type == NODE_OPERATOR) {
+		pcas_ast_t *child;
+		bool changed = false;
 
-    if(e->type == NODE_OPERATOR) {
-        pcas_ast_t *child;
-        bool changed = false;
+		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+			changed |= substitute(child, from, to);
 
-        for(child = ast_ChildGet(e, 0); child != NULL; child = child->next)
-            changed |= substitute(child, from, to);
+		return changed;
+	}
 
-        return changed;
-    }
-
-    return false;
+	return false;
 }
 
 bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
-    bool changed;
-    work_Enter(e);
-    changed = _substitute(e, from, to);
-    work_Leave(e);
-    return changed;
+	bool changed;
+	work_Enter(e);
+	changed = _substitute(e, from, to);
+	work_Leave(e);
+	return changed;
 }

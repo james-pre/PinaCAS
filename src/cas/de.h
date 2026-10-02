@@ -8,23 +8,23 @@
 
 /*The order-th derivative of the unknown function at the point at equals value*/
 typedef struct {
-    unsigned order;
-    pcas_ast_t *at, *value;
+	unsigned order;
+	pcas_ast_t *at, *value;
 } pcas_condition_t;
 
 typedef struct {
-    /*Equals node as entered*/
-    pcas_ast_t *equation;
-    /*Independent variable and unknown function*/
-    pcas_ast_t *x, *y;
-    unsigned order;
-    bool linear;
-    /*When linear, the equation is a[order]y^(order) + ... + a[1]y' + a[0]y = g*/
-    pcas_ast_t *a[DE_MAX_ORDER + 1];
-    pcas_ast_t *g;
+	/*Equals node as entered*/
+	pcas_ast_t *equation;
+	/*Independent variable and unknown function*/
+	pcas_ast_t *x, *y;
+	unsigned order;
+	bool linear;
+	/*When linear, the equation is a[order]y^(order) + ... + a[1]y' + a[0]y = g*/
+	pcas_ast_t *a[DE_MAX_ORDER + 1];
+	pcas_ast_t *g;
 
-    pcas_condition_t conditions[DE_MAX_CONDITIONS];
-    unsigned condition_count;
+	pcas_condition_t conditions[DE_MAX_CONDITIONS];
+	unsigned condition_count;
 } pcas_de_t;
 
 /*Returns y with order primes*/

@@ -4,13 +4,12 @@
 #include "interface.h"
 
 int main(void) {
+	if (interface_Valid())
+		interface_Run();
+	else
+		gui_Run();
 
-    if(interface_Valid())
-        interface_Run();
-    else
-        gui_Run();
-
-    return 0;
+	return 0;
 }
 
 #else

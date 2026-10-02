@@ -4,9 +4,9 @@
 #define STACK_START 10
 
 typedef struct _Stack {
-    unsigned int _max;
-    unsigned int top;
-    void **items;
+	unsigned int _max;
+	unsigned int top;
+	void **items;
 } pcas_stack_t;
 
 void stack_Create(pcas_stack_t *s);
