@@ -275,6 +275,8 @@ static ts_box_t *operator_box(pcas_ast_t *e) {
         return ts_Append(row2(convert(a), ts_Text(" = ")), convert(b));
     case OP_PRIME:
         return row2(parenthesized(a, !is_atom(a)), ts_Text("'"));
+    case OP_AT:
+        return row2(parenthesized(a, !is_atom(a)), delimited(convert(b), '(', ')'));
     case OP_FACTORIAL:
         return row2(parenthesized(a, !is_atom(a)), ts_Text("!"));
     case OP_ABS:
@@ -443,4 +445,17 @@ void ts_Cleanup(ts_box_t *b) {
         free(b);
         b = next;
     }
+}
+
+bool ts_Equal(ts_box_t *a, ts_box_t *b) {
+    for(; a != NULL && b != NULL; a = a->next, b = b->next) {
+        if(a->type != b->type || a->left != b->left || a->right != b->right)
+            return false;
+        if((a->text == NULL) != (b->text == NULL) || (a->text != NULL && strcmp(a->text, b->text) != 0))
+            return false;
+        if(!ts_Equal(a->first, b->first))
+            return false;
+    }
+
+    return a == NULL && b == NULL;
 }

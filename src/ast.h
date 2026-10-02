@@ -38,6 +38,8 @@ typedef enum {
     OP_EQUALS,
     /*Derivative of the unknown function that is its child*/
     OP_PRIME,
+    /*1st child = function, 2nd child = point it is evaluated at*/
+    OP_AT,
 
     /*Unary*/
     OP_FACTORIAL,

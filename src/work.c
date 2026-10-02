@@ -80,11 +80,29 @@ static pcas_step_t *make_step(StepType type, const char *text, pcas_ast_t *befor
     return step;
 }
 
+/*True if a and b are drawn the same way*/
+static bool same_display(pcas_ast_t *a, pcas_ast_t *b) {
+    ts_box_t *box_a, *box_b;
+    bool same;
+
+    if(ast_Compare(a, b))
+        return true;
+
+    box_a = ts_FromAst(a);
+    box_b = ts_FromAst(b);
+    same = ts_Equal(box_a, box_b);
+
+    ts_Cleanup(box_a);
+    ts_Cleanup(box_b);
+
+    return same;
+}
+
 static void record_state(pcas_ast_t *e) {
     pcas_step_t *last = current->last;
     pcas_ast_t *snapshot = display_copy(e);
 
-    if(last != NULL && last->after != NULL && ast_Compare(last->after, snapshot)) {
+    if(last != NULL && last->type == STEP_STATE && same_display(last->after, snapshot)) {
         ast_Cleanup(snapshot);
         return;
     }

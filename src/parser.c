@@ -477,6 +477,54 @@ bool collapse_all(pcas_stack_t *operators, pcas_stack_t *expressions) {
     return NULL;                                            \
 }
 
+unsigned parse_list(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_ast_t **items, unsigned max, pcas_error_t *err) {
+    unsigned i = 0, start = 0, depth = 0, count = 0;
+
+    *err = E_SUCCESS;
+
+    while(true) {
+        unsigned consumed = 1;
+        bool end = i >= length;
+
+        if(!end) {
+            token_t tok = read_token(equation, i, length, lookup, &consumed);
+
+            if(tok.type == TOK_NUMBER)
+                num_Cleanup(tok.op.num);
+
+            if(tok.type == TOK_OPEN_PAR || is_tok_function(tok.type))
+                depth++;
+            else if(tok.type == TOK_CLOSE_PAR && depth > 0)
+                depth--;
+            else if(tok.type == TOK_COMMA && depth == 0)
+                end = true;
+        }
+
+        if(end) {
+            if(count == max) {
+                *err = E_PARSE_BAD_COMMA;
+            } else {
+                items[count] = parse(equation + start, i - start, lookup, err);
+                if(*err == E_SUCCESS)
+                    count++;
+            }
+
+            if(*err != E_SUCCESS) {
+                while(count > 0)
+                    ast_Cleanup(items[--count]);
+                return 0;
+            }
+
+            if(i >= length)
+                return count;
+
+            start = i + consumed;
+        }
+
+        i += consumed;
+    }
+}
+
 pcas_ast_t *parse(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_error_t *e) {
     tokenizer_t tokenizer = {0};
     pcas_stack_t operators, expressions;

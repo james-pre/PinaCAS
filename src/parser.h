@@ -68,4 +68,6 @@ extern struct Identifier ti_table[AMOUNT_TOKENS];
 extern struct Identifier str_table[AMOUNT_TOKENS];
 
 pcas_ast_t *parse(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_error_t *e);
+/*Parses up to max expressions separated by commas outside of parentheses into items. Returns how many were parsed, or 0 on error.*/
+unsigned parse_list(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_ast_t **items, unsigned max, pcas_error_t *err);
 uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, struct Identifier *lookup, pcas_error_t *err);

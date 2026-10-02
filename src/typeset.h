@@ -81,3 +81,6 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m);
 void ts_Draw(ts_box_t *b, int x, int baseline, const ts_metrics_t *m, const ts_renderer_t *r);
 
 void ts_Cleanup(ts_box_t *b);
+
+/*True if a and b are laid out the same way*/
+bool ts_Equal(ts_box_t *a, ts_box_t *b);
