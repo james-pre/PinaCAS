@@ -42,7 +42,7 @@ void draw_background(void) {
     gfx_Rectangle(1, 1, LCD_WIDTH - 2, LCD_HEIGHT - 2);
     gfx_HorizLine(1, LCD_HEIGHT - 21, LCD_WIDTH - 2);
 
-    draw_string_centered("PinaCAS v2.0 by James Prevett & Nathan Farlow", LCD_WIDTH / 2, LCD_HEIGHT - 14);
+    draw_string_centered("PinaCAS by James Prevett & Nathan Farlow", LCD_WIDTH / 2, LCD_HEIGHT - 14);
 
     draw_string_centered("Input", LCD_WIDTH / 4 + 20, 14);
     draw_string_centered("Output", LCD_WIDTH / 4 * 3 - 20, 14);
