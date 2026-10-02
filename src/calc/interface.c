@@ -585,8 +585,12 @@ static int run_op(const interface_op *op, arg_list *args) {
         bool valid = false;
 
         switch(param->flags) {
-        case P_VAR: valid = tok_valid(arg, args->arg_len[i + 1]); break;
-        case P_LETTER:   valid = letter_valid((char*)arg);              break;
+        case P_VAR:
+			valid = tok_valid(arg, args->arg_len[i + 1]);
+			break;
+        case P_LETTER:
+			valid = letter_valid((char*)arg);
+			break;
         }
 
         sprintf(buffer, "Not a valid %s %s", param->label, param->flags == P_LETTER ? "letter" : "variable");
