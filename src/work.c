@@ -140,10 +140,12 @@ void work_Text(const char *text) {
 }
 
 ts_box_t *work_Layout(pcas_step_t *step, bool continued) {
+	if (step->type == STEP_TEXT)
+		return NULL;
+
 	ts_box_t *row = ts_Row();
 
 	switch (step->type) {
-		case STEP_TEXT: return NULL;
 		case STEP_STATE:
 			if (continued)
 				ts_Append(row, ts_Text("= "));
