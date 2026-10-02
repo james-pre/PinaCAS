@@ -77,7 +77,7 @@ typedef enum {
 #define isoptype(e, op) ((e)->type == NODE_OPERATOR && optype(e) == (op))
 #define opbase(e)       e->op.operator.base
 
-#define is_ast_int(e, val) ((e)->type == NODE_NUMBER && mp_rat_compare_value((e)->op.num, val, 1) == 0)
+#define is_ast_int(e, val) ((e)->type == NODE_NUMBER && num_IsInt((e)->op.num, val))
 
 typedef struct _pcas_Node {
 
@@ -110,6 +110,8 @@ mp_rat num_FromString(const char *str);
 mp_rat num_FromInt(mp_small num);
 mp_rat num_FromFraction(mp_small num, mp_small den);
 mp_rat num_Copy(mp_rat other);
+/*Expects num to be reduced*/
+bool num_IsInt(mp_rat num, mp_small value);
 char *num_ToString(mp_rat num, mp_size precision);
 void num_Cleanup(mp_rat num);
 

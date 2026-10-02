@@ -10,8 +10,12 @@ mp_rat num_FromString(const char *str) {
 mp_rat num_FromInt(mp_small num) {
     mp_rat n = mp_rat_alloc();
     mp_rat_init(n);
-    mp_rat_set_value(n, num, 1);
+    mp_int_set_value(MP_NUMER_P(n), num);
     return n;
+}
+
+bool num_IsInt(mp_rat num, mp_small value) {
+    return mp_rat_is_integer(num) && mp_int_compare_value(MP_NUMER_P(num), value) == 0;
 }
 
 mp_rat num_FromFraction(mp_small num, mp_small den) {
