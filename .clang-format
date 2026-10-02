@@ -17,7 +17,7 @@ AlignAfterOpenBracket: BlockIndent
 BinPackArguments: false
 BinPackParameters: false
 AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
 BreakAfterReturnType: None
 PenaltyReturnTypeOnItsOwnLine: 1000
 

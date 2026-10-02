@@ -129,9 +129,8 @@ typedef enum {
 	NUM_CONTEXTS
 } Context;
 
-unsigned elements_in_context[NUM_CONTEXTS] = {
-	NUM_IO, NUM_FUNCTION, NUM_SIMPLIFY, NUM_EVALUATE, NUM_EXPAND, NUM_DERIVATIVE, NUM_INTEGRAL, NUM_DE, NUM_HELP
-};
+unsigned elements_in_context[NUM_CONTEXTS] =
+	{NUM_IO, NUM_FUNCTION, NUM_SIMPLIFY, NUM_EVALUATE, NUM_EXPAND, NUM_DERIVATIVE, NUM_INTEGRAL, NUM_DE, NUM_HELP};
 
 view_t **context_lookup[NUM_CONTEXTS] = {
 	io_context,

@@ -109,7 +109,11 @@ typedef struct _Tokenizer {
 #define is_num(byte) (((byte) >= 0x30 && (byte) <= 0x39) || (byte) == lookup[TOK_PERIOD].bytes[0])
 
 mp_rat read_num(
-	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const struct Identifier *lookup,
+	unsigned *consumed
 ) {
 	mp_rat num;
 
@@ -149,7 +153,11 @@ mp_rat read_num(
 }
 
 TokenType read_type(
-	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const struct Identifier *lookup,
+	unsigned *consumed
 ) {
 	unsigned identifier_index;
 
@@ -179,7 +187,11 @@ TokenType read_type(
 }
 
 Symbol read_symbol(
-	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const struct Identifier *lookup,
+	unsigned *consumed
 ) {
 	/*Symbol letter enum values are mapped to their ascii code (SYM_B == 'B')*/
 	if (equation[index] >= 'A' && equation[index] <= 'Z') {
@@ -197,7 +209,11 @@ Symbol read_symbol(
 }
 
 token_t read_token(
-	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const struct Identifier *lookup,
+	unsigned *consumed
 ) {
 	token_t tok;
 
@@ -221,7 +237,11 @@ token_t read_token(
 }
 
 pcas_error_t _tokenize(
-	token_t *tokens, const uint8_t *equation, unsigned length, unsigned *tok_amount, const struct Identifier *lookup
+	token_t *tokens,
+	const uint8_t *equation,
+	unsigned length,
+	unsigned *tok_amount,
+	const struct Identifier *lookup
 ) {
 	unsigned token_index = 0;
 	unsigned i = 0;

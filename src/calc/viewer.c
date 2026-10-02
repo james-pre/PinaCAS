@@ -62,9 +62,8 @@ static int integral_width(int height) {
 	return 9;
 }
 
-static const ts_metrics_t metrics = {
-	text_width, 7, 1, 3, 1, 1, 2, 3, 3, delimiter_width, radical_width, integral_width
-};
+static const ts_metrics_t metrics =
+	{text_width, 7, 1, 3, 1, 1, 2, 3, 3, delimiter_width, radical_width, integral_width};
 
 static void draw_glyph(int x, int y, const glyph_t *g) {
 	int row, column;
