@@ -487,7 +487,7 @@ bool collapse_all(pcas_stack_t *operators, pcas_stack_t *expressions) {
 unsigned parse_list(
 	const uint8_t *equation,
 	unsigned length,
-	struct Identifier *lookup,
+	const struct Identifier *lookup,
 	pcas_ast_t **items,
 	unsigned max,
 	pcas_error_t *err
