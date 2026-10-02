@@ -38,6 +38,7 @@ TestType resolve_type(char *type) {
     if(!strcmp(type, "factor"))     return TEST_FACTOR;
     if(!strcmp(type, "expand"))     return TEST_EXPAND;
     if(!strcmp(type, "deriv"))      return TEST_DERIV;
+    if(!strcmp(type, "integ"))      return TEST_INTEGRAL;
 
     return TEST_INVALID;
 }
@@ -265,6 +266,24 @@ bool test_Run(test_t *t) {
 
         break;
     }
+    case TEST_INTEGRAL:
+        if(c == NULL) {
+            printf("Test failed on line %u. Empty third argument.\n", t->line);
+            break;
+        }
+
+        actual = a;
+        expected = c;
+
+        simplify(actual, SIMP_ALL);
+        integral(actual, b);
+        simplify(actual, SIMP_ALL);
+
+        /*We do this to change -1 * 23 to -23 to be able to compare*/
+        simplify(expected, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
+
+        passed = check(t, actual, expected);
+        break;
     default:
         break;
     }

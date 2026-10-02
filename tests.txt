@@ -347,3 +347,40 @@ deriv; 18X/9 _ 8/2; X; 2
 
 deriv; (20 * 2)/X * 3*5X; X; 0
 deriv; 5 + 3X + X^2 _ 13/2X/X + sin(X)*3; X; 3 + 2X + 3cos(X)
+
+#Simplification that used to loop forever
+simplify; -1/3+A; A_1/3
+simplify; X(-2/3+A); AX_2X/3
+
+#Negative denominators
+simplify; X/(-2); -X/2
+simplify; A/(-1); -A
+simplify; (A+B)/(-3); -A/3_B/3
+simplify; sin(X+1)/(-1); -sin(X+1)
+
+#Integrals
+integ; 5; X; 5X
+integ; 3X^2+2X; X; X^3+X^2
+integ; X(X+1); X; X^2/2+X^3/3
+integ; (X+1)^3; X; (X+1)^4/4
+integ; sqrt(X); X; 2X^(3/2)/3
+integ; sin(3X+1)+5/X; X; 5ln(abs(X))_cos(3X+1)/3
+integ; e^(2X); X; e^(2X)/2
+integ; 2^X; X; 2^X/ln(2)
+integ; ln(X); X; Xln(X)_X
+integ; tan(X); X; -ln(abs(cos(X)))
+integ; cosh(X); X; sinh(X)
+integ; 1/cos(X)^2; X; tan(X)
+integ; 1/(1+X^2); X; atan(X)
+integ; 1/sqrt(1_X^2); X; asin(X)
+integ; 2Xcos(X^2); X; sin(X^2)
+integ; 2X/(X^2+1); X; ln(abs(X^2+1))
+integ; X/sqrt(1_X^2); X; -sqrt(1_X^2)
+integ; Xe^X; X; Xe^X_e^X
+integ; X^2e^X; X; X^2e^X+2e^X_2Xe^X
+integ; Xsin(2X); X; sin(2X)/4_Xcos(2X)/2
+integ; X^2ln(X); X; ln(X)X^3/3_X^3/9
+integ; asin(X); X; Xasin(X)+sqrt(1_X^2)
+integ; Xe^X+3X^2; X; X^3+Xe^X_e^X
+integ; e^(X^2); X; integ(e^(X^2),X)
+deriv; integ(e^(X^2),X); X; e^(X^2)

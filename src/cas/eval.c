@@ -243,6 +243,13 @@ static bool eval_div(pcas_ast_t *e, unsigned short flags) {
             replace_node(e, num);
             return true;
         }
+
+        /*Move the sign of a negative denominator to the numerator*/
+        if(den->type == NODE_NUMBER && mp_rat_compare_zero(den->op.num) < 0) {
+            mp_rat_neg(den->op.num, den->op.num);
+            replace_node(num, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(num)));
+            return true;
+        }
     }
 
     if(!(flags & EVAL_DIVISION))

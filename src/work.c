@@ -53,6 +53,7 @@ static pcas_ast_t *display_copy(pcas_ast_t *e) {
     copy = ast_Copy(e);
 
     paused++;
+    simplify(copy, SIMP_COMMUTATIVE);
     simplify_canonical_form(copy, CANONICAL_ALL & ~CANONICAL_RATIONALIZE);
     paused--;
 

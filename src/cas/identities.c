@@ -218,8 +218,14 @@ bool divide_numerical_constants(pcas_ast_t *id, pcas_ast_t *e) {
 
     for(child = ast_ChildGet(id, 0); child != NULL; child = child->next) {
         if(child->type == NODE_NUMBER) {
+            bool negates_e = is_ast_int(child, -1) && !is_negative_for_sure(e);
+
             replace_node(e, ast_MakeBinary(OP_DIV, ast_Copy(e), ast_Copy(child)));
             replace_node(id, ast_MakeBinary(OP_DIV, ast_Copy(id), ast_Copy(child)));
+
+            /*e has no negative coefficient to cancel, so leave the division to fail the match*/
+            if(negates_e)
+                return true;
 
             simplify(e, SIMP_COMMUTATIVE | SIMP_EVAL);
             simplify(id, SIMP_COMMUTATIVE | SIMP_EVAL);

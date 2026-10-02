@@ -360,7 +360,7 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
 
     Sorting for addition and multiplication is O(n^2) by insertion sort
 */
-bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
+static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
     bool changed = false, intermediate_change;
     unsigned i;
 
@@ -509,12 +509,20 @@ bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
         for(i = 0; i < ast_ChildLength(e); i++) {
             pcas_ast_t *child = ast_ChildGet(e, i);
 
-            intermediate_change |= simplify_canonical_form(child, flags);
+            intermediate_change |= _simplify_canonical_form(child, flags);
             changed |= intermediate_change;
         }
 
     } while(intermediate_change);
 
+    return changed;
+}
+
+bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
+    bool changed;
+    work_Pause();
+    changed = _simplify_canonical_form(e, flags);
+    work_Resume();
     return changed;
 }
 
