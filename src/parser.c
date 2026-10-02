@@ -4,7 +4,7 @@
 
 /*http://tibasicdev.wikidot.com/one-byte-tokens*/
 /* clang-format off */
-struct Identifier ti_table[AMOUNT_TOKENS] = {
+const struct Identifier ti_table[AMOUNT_TOKENS] = {
     {0, {0}}, {0, {0}},         /*TOK_NUMBER, TOK_SYMBOL*/
 
     {1, {0x70}}, {1, {0x71}},   /*TOK_PLUS, TOK_MINUS*/
@@ -45,7 +45,7 @@ struct Identifier ti_table[AMOUNT_TOKENS] = {
     {1, {0xAC}}, {1, {0x5B}}    /*TOK_PI, TOK_THETA*/
 };
 
-struct Identifier str_table[AMOUNT_TOKENS] = {
+const struct Identifier str_table[AMOUNT_TOKENS] = {
     {0, {0}}, {0, {0}},             /*TOK_NUMBER, TOK_SYMBOL*/
 
     {1, "+"}, {1, "_"},             /*TOK_PLUS, TOK_MINUS*/
@@ -109,7 +109,7 @@ typedef struct _Tokenizer {
 #define is_num(byte) (((byte) >= 0x30 && (byte) <= 0x39) || (byte) == lookup[TOK_PERIOD].bytes[0])
 
 mp_rat
-read_num(const uint8_t *equation, unsigned index, unsigned length, struct Identifier *lookup, unsigned *consumed) {
+read_num(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
 	mp_rat num;
 
 	unsigned size = 0;
@@ -148,7 +148,7 @@ read_num(const uint8_t *equation, unsigned index, unsigned length, struct Identi
 }
 
 TokenType
-read_type(const uint8_t *equation, unsigned index, unsigned length, struct Identifier *lookup, unsigned *consumed) {
+read_type(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
 	unsigned identifier_index;
 
 	for (identifier_index = TOK_PLUS; identifier_index < AMOUNT_TOKENS; identifier_index++) {
@@ -177,7 +177,7 @@ read_type(const uint8_t *equation, unsigned index, unsigned length, struct Ident
 }
 
 Symbol
-read_symbol(const uint8_t *equation, unsigned index, unsigned length, struct Identifier *lookup, unsigned *consumed) {
+read_symbol(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
 	/*Symbol letter enum values are mapped to their ascii code (SYM_B == 'B')*/
 	if (equation[index] >= 'A' && equation[index] <= 'Z') {
 		*consumed = 1;
@@ -194,7 +194,7 @@ read_symbol(const uint8_t *equation, unsigned index, unsigned length, struct Ide
 }
 
 token_t
-read_token(const uint8_t *equation, unsigned index, unsigned length, struct Identifier *lookup, unsigned *consumed) {
+read_token(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
 	token_t tok;
 
 	if (is_num(equation[index])) {
@@ -217,7 +217,7 @@ read_token(const uint8_t *equation, unsigned index, unsigned length, struct Iden
 }
 
 pcas_error_t
-_tokenize(token_t *tokens, const uint8_t *equation, unsigned length, unsigned *tok_amount, struct Identifier *lookup) {
+_tokenize(token_t *tokens, const uint8_t *equation, unsigned length, unsigned *tok_amount, const struct Identifier *lookup) {
 	unsigned token_index = 0;
 	unsigned i = 0;
 
@@ -246,7 +246,7 @@ _tokenize(token_t *tokens, const uint8_t *equation, unsigned length, unsigned *t
 	return E_SUCCESS;
 }
 
-pcas_error_t tokenize(tokenizer_t *t, const uint8_t *equation, unsigned length, struct Identifier *lookup) {
+pcas_error_t tokenize(tokenizer_t *t, const uint8_t *equation, unsigned length, const struct Identifier *lookup) {
 	pcas_error_t err;
 
 	/*Determine the amount of tokens to malloc()*/
@@ -539,7 +539,7 @@ unsigned parse_list(
 	}
 }
 
-pcas_ast_t *parse(const uint8_t *equation, unsigned length, struct Identifier *lookup, pcas_error_t *e) {
+pcas_ast_t *parse(const uint8_t *equation, unsigned length, const struct Identifier *lookup, pcas_error_t *e) {
 	tokenizer_t tokenizer = {0};
 	pcas_stack_t operators, expressions;
 	pcas_ast_t *root;
