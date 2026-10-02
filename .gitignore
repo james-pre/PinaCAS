@@ -1,7 +1,13 @@
 obj*/
 bin*/
+tmp
 
-.idea/
+.*
+!.gitignore
+!.gitmodules
+!.vscode
+!.github
+
 *.code-workspace
 
 cmake-build-*/
