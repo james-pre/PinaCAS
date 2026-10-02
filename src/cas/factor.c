@@ -151,6 +151,63 @@ pcas_ast_t *gcd(pcas_ast_t *a, pcas_ast_t *b) {
     return ast_MakeNumber(num_FromInt(1));
 }
 
+/*Collects the non-numeric factors of e, with divisors in den*/
+static void collect_symbolic_factors(pcas_ast_t *e, pcas_ast_t *num, pcas_ast_t *den) {
+    pcas_ast_t *child;
+
+    if(isoptype(e, OP_MULT)) {
+        for(child = opbase(e); child != NULL; child = child->next)
+            collect_symbolic_factors(child, num, den);
+    } else if(isoptype(e, OP_DIV)) {
+        collect_symbolic_factors(opbase(e), num, den);
+        collect_symbolic_factors(opbase(e)->next, den, num);
+    } else if(e->type != NODE_NUMBER) {
+        ast_ChildAppend(num, ast_Copy(e));
+    }
+}
+
+/*Takes ownership of neither. True if a and b have the same children in any order.*/
+static bool same_children(pcas_ast_t *a, pcas_ast_t *b) {
+    pcas_ast_t *remaining = ast_Copy(b);
+    pcas_ast_t *child;
+    bool same = ast_ChildLength(a) == ast_ChildLength(b);
+
+    for(child = opbase(a); child != NULL && same; child = child->next) {
+        unsigned j;
+
+        same = false;
+        for(j = 0; j < ast_ChildLength(remaining); j++) {
+            if(ast_Compare(child, ast_ChildGet(remaining, j))) {
+                ast_Cleanup(ast_ChildRemoveIndex(remaining, j));
+                same = true;
+                break;
+            }
+        }
+    }
+
+    ast_Cleanup(remaining);
+    return same;
+}
+
+/*True if a and b differ only by numeric factors, so they can be like terms*/
+static bool same_symbolic_part(pcas_ast_t *a, pcas_ast_t *b) {
+    pcas_ast_t *a_num = ast_MakeOperator(OP_MULT), *a_den = ast_MakeOperator(OP_MULT);
+    pcas_ast_t *b_num = ast_MakeOperator(OP_MULT), *b_den = ast_MakeOperator(OP_MULT);
+    bool same;
+
+    collect_symbolic_factors(a, a_num, a_den);
+    collect_symbolic_factors(b, b_num, b_den);
+
+    same = same_children(a_num, b_num) && same_children(a_den, b_den);
+
+    ast_Cleanup(a_num);
+    ast_Cleanup(a_den);
+    ast_Cleanup(b_num);
+    ast_Cleanup(b_den);
+
+    return same;
+}
+
 bool factor_addition(pcas_ast_t *e, unsigned char flags) {
     pcas_ast_t *child;
     bool changed = false;
@@ -170,6 +227,9 @@ bool factor_addition(pcas_ast_t *e, unsigned char flags) {
 
             for(j = i + 1; j < ast_ChildLength(e); j++) {
                 pcas_ast_t *b = ast_ChildGet(e, j);
+
+                if(!(flags & FAC_SIMPLE_ADDITION_NONEVALUATEABLE) && !same_symbolic_part(a, b))
+                    continue;
 
                 g = gcd(a, b);
 

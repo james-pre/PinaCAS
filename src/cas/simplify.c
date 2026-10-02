@@ -318,6 +318,105 @@ static unsigned function_rank(pcas_ast_t *e) {
     return rank;
 }
 
+static pcas_ast_t *factors_or_self(pcas_ast_t *e) {
+    return isoptype(e, OP_MULT) ? ast_Copy(e) : ast_MakeUnary(OP_MULT, ast_Copy(e));
+}
+
+/*Takes ownership of product. Returns its only factor, 1 if it has none, or product itself.*/
+static pcas_ast_t *unwrap_product(pcas_ast_t *product) {
+    pcas_ast_t *only;
+
+    switch(ast_ChildLength(product)) {
+    case 0:
+        ast_Cleanup(product);
+        return ast_MakeNumber(num_FromInt(1));
+    case 1:
+        only = ast_ChildRemoveIndex(product, 0);
+        ast_Cleanup(product);
+        return only;
+    default:
+        return product;
+    }
+}
+
+/*Splits e into a base and a numeric exponent, which is 1 unless e is a power of a number*/
+static pcas_ast_t *power_base(pcas_ast_t *e, mp_rat *exponent) {
+    if(isoptype(e, OP_POW) && opbase(e)->next->type == NODE_NUMBER) {
+        *exponent = num_Copy(opbase(e)->next->op.num);
+        return opbase(e);
+    }
+
+    *exponent = num_FromInt(1);
+    return e;
+}
+
+/*Replaces the factor at index i of product with its base raised to exponent, or removes it if exponent is 0*/
+static void set_power(pcas_ast_t *product, unsigned i, pcas_ast_t *base, mp_rat exponent) {
+    pcas_ast_t *replacement = NULL;
+
+    if(num_IsInt(exponent, 1))
+        replacement = ast_Copy(base);
+    else if(mp_rat_compare_zero(exponent) != 0)
+        replacement = ast_MakeBinary(OP_POW, ast_Copy(base), ast_MakeNumber(num_Copy(exponent)));
+
+    ast_Cleanup(ast_ChildRemoveIndex(product, i));
+    if(replacement != NULL)
+        ast_ChildInsert(product, replacement, i);
+}
+
+/*Divides the factors that a and b have in common out of both, where X^2 and X share X. Returns false and sets nothing if they share none.*/
+static bool remove_common_factors(pcas_ast_t *a, pcas_ast_t *b, pcas_ast_t **rest_a, pcas_ast_t **rest_b) {
+    pcas_ast_t *fa = factors_or_self(a), *fb = factors_or_self(b);
+    bool removed = false;
+    unsigned i, j;
+
+    for(i = 0; i < ast_ChildLength(fa); i++) {
+        mp_rat exponent_a;
+        pcas_ast_t *base_a = power_base(ast_ChildGet(fa, i), &exponent_a);
+        bool factor_gone = false;
+
+        for(j = 0; j < ast_ChildLength(fb); j++) {
+            mp_rat exponent_b;
+            pcas_ast_t *base_b = power_base(ast_ChildGet(fb, j), &exponent_b);
+
+            if(ast_Compare(base_a, base_b) && mp_rat_compare_zero(exponent_a) > 0 && mp_rat_compare_zero(exponent_b) > 0) {
+                mp_rat common = num_Copy(mp_rat_compare(exponent_a, exponent_b) < 0 ? exponent_a : exponent_b);
+                pcas_ast_t *base = ast_Copy(base_a);
+
+                mp_rat_sub(exponent_a, common, exponent_a);
+                mp_rat_sub(exponent_b, common, exponent_b);
+                factor_gone = mp_rat_compare_zero(exponent_a) == 0;
+
+                set_power(fb, j, base, exponent_b);
+                set_power(fa, i, base, exponent_a);
+
+                num_Cleanup(common);
+                num_Cleanup(exponent_b);
+                ast_Cleanup(base);
+                removed = true;
+                break;
+            }
+
+            num_Cleanup(exponent_b);
+        }
+
+        num_Cleanup(exponent_a);
+
+        if(factor_gone)
+            i--;
+    }
+
+    if(!removed) {
+        ast_Cleanup(fa);
+        ast_Cleanup(fb);
+        return false;
+    }
+
+    *rest_a = unwrap_product(fa);
+    *rest_b = unwrap_product(fb);
+    return true;
+}
+
 /*returns negative if a < b, 0 if a=b, positive if a > b in terms of sorting order*/
 int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
     pcas_ast_t *temp;
@@ -336,28 +435,16 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
     }
 
     if(isoptype(a, OP_MULT)) {
-        pcas_ast_t *g = gcd(a, b);
+        pcas_ast_t *rest_a, *rest_b;
 
-        if(!is_ast_int(g, 1)) {
-            pcas_ast_t *newa, *newb;
-            int val;
+        if(remove_common_factors(a, b, &rest_a, &rest_b)) {
+            int val = compare(rest_a, rest_b, add);
 
-            newa = ast_MakeBinary(OP_DIV, ast_Copy(a), ast_Copy(g));
-            newb = ast_MakeBinary(OP_DIV, ast_Copy(b), ast_Copy(g));
-
-            simplify(newa, SIMP_NORMALIZE | SIMP_RATIONAL | SIMP_EVAL);
-            simplify(newb, SIMP_NORMALIZE | SIMP_RATIONAL | SIMP_EVAL);
-
-            val = compare(newa, newb, add);
-
-            ast_Cleanup(g);
-            ast_Cleanup(newa);
-            ast_Cleanup(newb);
+            ast_Cleanup(rest_a);
+            ast_Cleanup(rest_b);
 
             return multiplier * val;
         }
-
-        ast_Cleanup(g);
     }
 
     /*Compare power bases to sort alphabetically when multiplying, and by degree when adding*/
