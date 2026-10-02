@@ -323,9 +323,18 @@ static bool eval_div(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-#define power_in_small_range(a, b)                                                                                     \
-	(mp_rat_compare_value((a)->op.num, -1, 1) == 0 ||                                                                  \
-	 (mp_rat_compare_value((a)->op.num, 10, 1) <= 0 && mp_rat_compare_value((b)->op.num, 10, 1) <= 0))
+/*True if a^b is -1 to some power or has at most 64 bits*/
+static bool power_in_small_range(pcas_ast_t *a, pcas_ast_t *b) {
+	mp_small exponent;
+
+	if (mp_rat_compare_value(a->op.num, -1, 1) == 0)
+		return true;
+
+	if (mp_int_to_int(&b->op.num->num, &exponent) != MP_OK || exponent > 64)
+		return false;
+
+	return (mp_small)mp_int_count_bits(&a->op.num->num) * exponent <= 64;
+}
 
 static bool eval_pow(pcas_ast_t *e, unsigned short flags) {
 	/*a^b*/
