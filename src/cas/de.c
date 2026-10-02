@@ -400,6 +400,12 @@ static bool numerator_vanishes(pcas_ast_t *e, unsigned short flags) {
 
 	expand(numerator, EXP_ALL);
 	simplify(numerator, SIMP_BASIC);
+
+	if (!is_ast_int(numerator, 0)) {
+		simplify_canonical_form(numerator, CANONICAL_COMBINE_POWERS);
+		simplify(numerator, SIMP_BASIC);
+	}
+
 	zero = is_ast_int(numerator, 0);
 
 	ast_Cleanup(copy);
@@ -494,6 +500,17 @@ static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **der
 	return holds;
 }
 
+/*Returns d/dx(e) as an unevaluated derivative node*/
+static pcas_ast_t *derivative_node(pcas_de_t *de, pcas_ast_t *e) {
+	pcas_ast_t *node = ast_MakeOperator(OP_DERIV);
+
+	ast_ChildAppend(node, e);
+	ast_ChildAppend(node, ast_Copy(de->x));
+	ast_ChildAppend(node, ast_Copy(de->x));
+
+	return node;
+}
+
 pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
 	pcas_ast_t *f = solution, *left, *right, *remainder;
@@ -519,11 +536,7 @@ pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 		simplify(d, SIMP_BASIC);
 		work_Resume();
 
-		chain = ast_MakeOperator(OP_DERIV);
-		ast_ChildAppend(chain, ast_Copy(derivatives[k - 1]));
-		ast_ChildAppend(chain, ast_Copy(de->x));
-		ast_ChildAppend(chain, ast_Copy(de->x));
-		chain = ast_MakeBinary(OP_EQUALS, chain, ast_Copy(d));
+		chain = ast_MakeBinary(OP_EQUALS, derivative_node(de, ast_Copy(derivatives[k - 1])), ast_Copy(d));
 
 		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, prime, chain);
 
@@ -943,6 +956,18 @@ static bool isolate(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_
 	return true;
 }
 
+/*Returns e with the point of the initial condition substituted*/
+static pcas_ast_t *at_condition(pcas_de_t *de, pcas_ast_t *e, pcas_condition_t *c) {
+	pcas_ast_t *copy = ast_Copy(e);
+
+	work_Pause();
+	substitute(copy, de->y, c->value);
+	substitute(copy, de->x, c->at);
+	work_Resume();
+
+	return copy;
+}
+
 /*Finds the constant in lhs = antiderivative + constant from the initial condition and substitutes it into rhs*/
 static void apply_condition(
 	pcas_de_t *de,
@@ -952,28 +977,19 @@ static void apply_condition(
 	pcas_ast_t **rhs,
 	pcas_ast_t *constant
 ) {
-	pcas_ast_t *at, *left, *right, *value;
-
-	at = ast_MakeBinary(OP_AT, ast_Copy(de->y), ast_Copy(c->at));
+	pcas_ast_t *at = ast_MakeBinary(OP_AT, ast_Copy(de->y), ast_Copy(c->at));
 	work_Step(STEP_EQUATION, "Initial condition", at, c->value);
 	ast_Cleanup(at);
 
-	left = ast_Copy(lhs);
-	right = ast_Copy(*rhs);
-
-	work_Pause();
-	substitute(left, de->y, c->value);
-	substitute(right, de->x, c->at);
-	work_Resume();
-
+	pcas_ast_t *left = at_condition(de, lhs, c);
+	pcas_ast_t *right = at_condition(de, *rhs, c);
 	work_Step(STEP_EQUATION, NULL, left, right);
 	ast_Cleanup(right);
 
-	right = ast_Copy(antiderivative);
+	right = at_condition(de, antiderivative, c);
 
 	work_Pause();
-	substitute(right, de->x, c->at);
-	value = difference(left, right);
+	pcas_ast_t *value = difference(left, right);
 	simplify(value, SIMP_ALL);
 	work_Resume();
 
@@ -1012,17 +1028,86 @@ static bool is_equilibrium(pcas_de_t *de, pcas_ast_t *h, pcas_condition_t *c) {
 	return equilibrium;
 }
 
-static pcas_error_t solve_separable(pcas_de_t *de, pcas_ast_t **solution) {
-	pcas_condition_t *c = de->condition_count > 0 ? &de->conditions[0] : NULL;
-	pcas_ast_t *F, *g, *h, *one, *prime, *equation, *lhs, *antiderivative, *rhs, *constant;
-	bool separable, explicit;
+static bool is_monomial(pcas_ast_t *e) {
+	return e->type != NODE_OPERATOR || isoptype(e, OP_POW);
+}
+
+/*True if e is one sum multiplied or divided by numbers, symbols and powers*/
+static bool is_sum_times_monomials(pcas_ast_t *e) {
+	pcas_ast_t *child, *numerator = e;
+	unsigned sums = 0;
+
+	if (isoptype(e, OP_DIV)) {
+		if (!is_monomial(opbase(e)->next))
+			return false;
+		numerator = opbase(e);
+	}
+
+	if (isoptype(numerator, OP_ADD))
+		return numerator != e;
+
+	if (!isoptype(numerator, OP_MULT))
+		return false;
+
+	for (child = opbase(numerator); child != NULL; child = child->next) {
+		if (isoptype(child, OP_ADD))
+			sums++;
+		else if (!is_monomial(child))
+			return false;
+	}
+
+	return sums == 1;
+}
+
+static void distribute_over_monomials(pcas_ast_t *e) {
+	if (!is_sum_times_monomials(e))
+		return;
 
 	work_Pause();
-	F = solve_for_prime(de);
-	g = ast_MakeOperator(OP_MULT);
-	h = ast_MakeOperator(OP_MULT);
-	one = integer(1);
-	separable = F != NULL && separate(de, F, one, g, h);
+	expand(e, EXP_ALL);
+	simplify(e, SIMP_BASIC);
+	work_Resume();
+}
+
+/*Records lhs = antiderivative + C, finds C from the initial condition and solves for y. Takes ownership of lhs and antiderivative.*/
+static void finish(pcas_de_t *de, pcas_ast_t *lhs, pcas_ast_t *antiderivative, pcas_ast_t **solution) {
+	pcas_condition_t *c = de->condition_count > 0 ? &de->conditions[0] : NULL;
+	pcas_ast_t *constant = ast_MakeSymbol(constant_symbol(de->equation)), *rhs;
+	bool explicit;
+
+	work_Pause();
+	simplify(lhs, SIMP_BASIC);
+	simplify(antiderivative, SIMP_BASIC);
+	rhs = ast_MakeBinary(OP_ADD, ast_Copy(antiderivative), ast_Copy(constant));
+	simplify(rhs, SIMP_COMMUTATIVE);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, lhs, rhs);
+
+	if (c != NULL)
+		apply_condition(de, c, lhs, antiderivative, &rhs, constant);
+
+	explicit = isolate(de, &lhs, &rhs, c == NULL ? constant : NULL, c);
+
+	if (explicit)
+		distribute_over_monomials(rhs);
+
+	work_Step(STEP_EQUATION, explicit ? "Solution" : "Implicit solution", lhs, rhs);
+
+	*solution = ast_MakeBinary(OP_EQUALS, lhs, rhs);
+
+	ast_Cleanup(antiderivative);
+	ast_Cleanup(constant);
+}
+
+static pcas_error_t solve_separable(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_condition_t *c = de->condition_count > 0 ? &de->conditions[0] : NULL;
+	pcas_ast_t *prime, *equation, *lhs, *antiderivative;
+
+	work_Pause();
+	pcas_ast_t *F = solve_for_prime(de), *g = ast_MakeOperator(OP_MULT), *h = ast_MakeOperator(OP_MULT),
+			   *one = integer(1);
+	bool separable = F != NULL && separate(de, F, one, g, h);
 	simplify(g, SIMP_BASIC);
 	simplify(h, SIMP_BASIC);
 	work_Resume();
@@ -1068,31 +1153,91 @@ static pcas_error_t solve_separable(pcas_de_t *de, pcas_ast_t **solution) {
 		return E_DE_INTEGRAL;
 	}
 
-	lhs = ast_Copy(opbase(equation));
-	antiderivative = ast_Copy(opbase(equation)->next);
+	finish(de, ast_Copy(opbase(equation)), ast_Copy(opbase(equation)->next), solution);
 	ast_Cleanup(equation);
 
-	constant = ast_MakeSymbol(constant_symbol(de->equation));
+	return E_SUCCESS;
+}
+
+/*Replaces each |u| in e with u*/
+static void drop_absolute_values(pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (e->type != NODE_OPERATOR)
+		return;
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		drop_absolute_values(child);
+
+	if (isoptype(e, OP_ABS))
+		replace_node(e, ast_Copy(opbase(e)));
+}
+
+/*Solves y' + Py = Q by multiplying by the integrating factor e^(integral of P)*/
+static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_ast_t *P, *Q, *left, *G, *mu, *product, *right;
 
 	work_Pause();
-	simplify(lhs, SIMP_BASIC);
-	simplify(antiderivative, SIMP_BASIC);
-	rhs = ast_MakeBinary(OP_ADD, ast_Copy(antiderivative), ast_Copy(constant));
-	simplify(rhs, SIMP_COMMUTATIVE);
+	P = ast_MakeBinary(OP_DIV, ast_Copy(de->a[0]), ast_Copy(de->a[1]));
+	simplify(P, SIMP_BASIC);
+	factor_cancel(P);
+	Q = ast_MakeBinary(OP_DIV, ast_Copy(de->g), ast_Copy(de->a[1]));
+	simplify(Q, SIMP_BASIC);
+	factor_cancel(Q);
 	work_Resume();
 
-	work_Step(STEP_EQUATION, NULL, lhs, rhs);
+	de->method = "Linear";
 
-	if (c != NULL)
-		apply_condition(de, c, lhs, antiderivative, &rhs, constant);
+	if (!is_ast_int(de->a[1], 1)) {
+		left = ast_MakeBinary(OP_ADD, de_Derivative(de->y, 1), ast_MakeBinary(OP_MULT, ast_Copy(P), ast_Copy(de->y)));
+		work_Step(STEP_EQUATION, "Standard form", left, Q);
+		ast_Cleanup(left);
+	}
 
-	explicit = isolate(de, &lhs, &rhs, c == NULL ? constant : NULL, c);
-	work_Step(STEP_EQUATION, explicit ? "Solution" : "Implicit solution", lhs, rhs);
+	work_Text("Integrating factor");
 
-	*solution = ast_MakeBinary(OP_EQUALS, lhs, rhs);
+	G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(de->x));
+	eval_integrals(G);
 
-	ast_Cleanup(antiderivative);
-	ast_Cleanup(constant);
+	if (contains_integral(G)) {
+		ast_Cleanup(G);
+		ast_Cleanup(Q);
+		return E_DE_INTEGRAL;
+	}
+
+	work_Pause();
+	simplify(G, SIMP_BASIC);
+	left = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
+	drop_absolute_values(G);
+	mu = exponential(opbase(left), G);
+	simplify(mu, SIMP_BASIC);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, left, mu);
+	ast_Cleanup(left);
+
+	work_Pause();
+	product = ast_MakeBinary(OP_MULT, ast_Copy(mu), ast_Copy(de->y));
+	simplify(product, SIMP_BASIC);
+	right = ast_MakeBinary(OP_MULT, mu, Q);
+	simplify(right, SIMP_BASIC);
+	factor_cancel(right);
+	work_Resume();
+
+	left = derivative_node(de, ast_Copy(product));
+	work_Step(STEP_EQUATION, "Multiply by the integrating factor", left, right);
+	ast_Cleanup(left);
+
+	right = ast_MakeBinary(OP_INTEGRAL, right, ast_Copy(de->x));
+	eval_integrals(right);
+
+	if (contains_integral(right)) {
+		ast_Cleanup(product);
+		ast_Cleanup(right);
+		return E_DE_INTEGRAL;
+	}
+
+	finish(de, product, right, solution);
 
 	return E_SUCCESS;
 }
@@ -1110,8 +1255,11 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 			return E_DE_BAD_CONDITION;
 	}
 
-	if (de->order == 1)
+	if (de->order == 1) {
+		if (de->linear && !is_ast_int(de->a[0], 0) && !is_ast_int(de->g, 0))
+			return solve_linear_first(de, solution);
 		return solve_separable(de, solution);
+	}
 
 	return E_DE_UNSOLVED;
 }

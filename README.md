@@ -8,11 +8,11 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 
 ## Changes from PineappleCAS
 
-- Indefinite integration: linearity, a table of elementary integrals, u-substitution, and integration by parts
+- Indefinite integration: linearity, a table of elementary integrals, polynomial division, u-substitution, and integration by parts
 - Step-by-step work for derivatives and integrals, shown in a scrollable viewer with fractions, exponents, roots, and integral signs drawn as in print
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
 - Checking that a function solves a differential equation and its initial conditions
-- Solving separable first order equations and initial value problems, solved for the function when possible
+- Solving separable and linear first order equations and initial value problems, solved for the function when possible
 - Integral and Solve DE functions in the GUI, and `INTEG` and `DE` commands in the TI-Basic interface
 - Much faster simplification, especially when showing work
 - Builds with the LLVM-based CE C toolchain, with imath as a git submodule
@@ -25,7 +25,7 @@ Type the equation into a Y= variable or string. Write derivatives of the unknown
 
 Add initial conditions after the equation, separated by commas: y'' + 16y = 0, y(0) = 2, y'(0) = -2 is `Y''+16Y=0,Y(0)=2,Y'(0)=-2`.
 
-Solve DE classifies the equation and solves it when it can, writing the solution to the output variable. For now it solves separable first order equations. An initial condition determines the constant, and the solution is solved for the function when each inverse step is unambiguous, so `Y'=X²e^(6Y),Y(8)=0` gives `-ln(1025-2X³)/6`. Otherwise the implicit solution is written as an equation, like `Y²=X²+C`. Equations it cannot solve yet are classified, and linear ones are written in standard form.
+Solve DE classifies the equation and solves it when it can, writing the solution to the output variable. For now it solves first order equations that are separable or linear. Linear equations with a nonzero right side are solved with an integrating factor, and the rest by separating variables. An initial condition determines the constant, and the solution is solved for the function when each inverse step is unambiguous, so `Y'=X²e^(6Y),Y(8)=0` gives `-ln(1025-2X³)/6`. Otherwise the implicit solution is written as an equation, like `Y²=X²+C`. Equations it cannot solve yet are classified, and linear ones are written in standard form.
 
 To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X)` or just `2cos(4X)-1/2sin(4X)`. On the Solve DE page, check "Verify solution" and choose that variable under "Solution in". PinaCAS differentiates the solution, substitutes it into both sides of the equation, and checks each initial condition.
 
