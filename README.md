@@ -8,11 +8,16 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 
 ## Changes from PineappleCAS
 - Indefinite integration: linearity, a table of elementary integrals, u-substitution, and integration by parts
-- Step-by-step work for derivatives and integrals
+- Step-by-step work for derivatives and integrals, shown in a scrollable viewer with fractions, exponents, roots, and integral signs drawn as in print
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
+- Integral and Solve DE functions in the GUI, and `INTEG` and `DE` commands in the TI-Basic interface
+- Much faster simplification, especially when showing work
 - Builds with the LLVM-based CE C toolchain, with imath as a git submodule
 
-The program is still called PCAS on the calculator, and the TI-Basic interface is unchanged.
+The program is still called PCAS on the calculator, and the existing TI-Basic commands are unchanged.
+
+## Entering differential equations
+Type the equation into a Y= variable or string. Write derivatives of the unknown function with primes from the ANGLE menu (2nd, APPS), and the equals sign from the TEST menu (2nd, MATH). For example, y'' + 16y = 0 is `Y''+16Y=0`. Choose the independent variable with "Respect to", which is X by default. Any letter can be the unknown function, so x'' + w²x = F cos(gt) is `X''+W²X=Fcos(GT)` with respect to T.
 
 <hr>
 
@@ -155,6 +160,30 @@ Boolean options from left to right:
 ```
 :"Take the derivative of Y1 with respect to X and put the result in Y2."
 :"DERIV,Y1,Y2,X"
+:Asm(prgmPCAS)
+```
+
+## Integral
+**Usage:** INTEG,[Input],[Output],[Variable respect to]
+
+**Description:** Finds an antiderivative of input with respect to [Variable respect to] and writes the result to output. Parts that cannot be integrated are left as fnInt( with two arguments.
+
+**Example program:**
+```
+:"Integrate Y1 with respect to X and put the result in Y2."
+:"INTEG,Y1,Y2,X"
+:Asm(prgmPCAS)
+```
+
+## Differential equation
+**Usage:** DE,[Input],[Output],[Variable respect to]
+
+**Description:** Classifies the differential equation in input, with [Variable respect to] as the independent variable. If it is linear, its standard form is written to output.
+
+**Example program:**
+```
+:"Write the standard form of the differential equation in Y1 to Y2."
+:"DE,Y1,Y2,X"
 :Asm(prgmPCAS)
 ```
 
