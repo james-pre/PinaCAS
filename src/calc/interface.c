@@ -264,11 +264,11 @@ void write_to_tok(uint8_t *tok, pcas_ast_t *expression, pcas_error_t *err) {
     Boolean 5 = Evaluate trig constants
     Boolean 6 = Evaluate inverse trig constants
 */
-void interface_Simplify(arg_list *args) {
+void interface_Simplify(arg_list *args, unsigned flags) {
     pcas_ast_t *expression;
     pcas_error_t err;
 
-    unsigned short flags = SIMP_ALL;
+    unsigned short simplify_flags = SIMP_ALL;
 
     uint8_t *input, *output;
     unsigned input_len, output_len;
@@ -293,7 +293,7 @@ void interface_Simplify(arg_list *args) {
 
         unsigned i = 0;
 
-        flags ^= SIMP_ID_ALL;
+        simplify_flags ^= SIMP_ID_ALL;
 
         options = args->args[3];
         option_len = args->arg_len[3];
@@ -303,19 +303,19 @@ void interface_Simplify(arg_list *args) {
         for(i = 0; i < 6; i++)
             interface_assert(options[i] == '0' || options[i] == '1', "Boolean option must be 0 or 1");
 
-        if(options[0] == '1') flags |= SIMP_ID_GENERAL;
-        if(options[1] == '1') flags |= SIMP_ID_TRIG;
-        if(options[2] == '1') flags |= SIMP_ID_HYPERBOLIC;
-        if(options[3] == '1') flags |= SIMP_ID_COMPLEX;
-        if(options[4] == '1') flags |= SIMP_ID_TRIG_CONSTANTS;
-        if(options[5] == '1') flags |= SIMP_ID_TRIG_INV_CONSTANTS;
+        if(options[0] == '1') simplify_flags |= SIMP_ID_GENERAL;
+        if(options[1] == '1') simplify_flags |= SIMP_ID_TRIG;
+        if(options[2] == '1') simplify_flags |= SIMP_ID_HYPERBOLIC;
+        if(options[3] == '1') simplify_flags |= SIMP_ID_COMPLEX;
+        if(options[4] == '1') simplify_flags |= SIMP_ID_TRIG_CONSTANTS;
+        if(options[5] == '1') simplify_flags |= SIMP_ID_TRIG_INV_CONSTANTS;
     }
 
     expression = parse_from_tok(input, &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
 
-    simplify(expression, flags);
+    simplify(expression, simplify_flags);
     simplify_canonical_form(expression, CANONICAL_ALL);
 
     write_to_tok(output, expression, &err);
@@ -330,7 +330,7 @@ void interface_Simplify(arg_list *args) {
 /*
     Syntax: EVAL,Y1,Y2
 */
-void interface_Eval(arg_list *args) {
+void interface_Eval(arg_list *args, unsigned flags) {
     pcas_ast_t *expression;
     pcas_error_t err;
 
@@ -372,7 +372,7 @@ void interface_Eval(arg_list *args) {
 /*
     Syntax: SUB,Y1,Y2,Str1,Str2
 */
-void interface_Substitute(arg_list *args) {
+void interface_Substitute(arg_list *args, unsigned flags) {
     pcas_ast_t *expression, *sub_from_expr, *sub_to_expr;
     pcas_error_t err;
 
@@ -433,11 +433,11 @@ void interface_Substitute(arg_list *args) {
     Boolean 1 = expand multiplication (A+X)(B+2)
     Boolean 2 = expand powers (1+A)^6
 */
-void interface_Expand(arg_list *args) {
+void interface_Expand(arg_list *args, unsigned flags) {
     pcas_ast_t *expression;
     pcas_error_t err;
 
-    unsigned short flags = 0;
+    unsigned short expand_flags = 0;
 
     uint8_t *input, *output;
     unsigned input_len, output_len;
@@ -470,10 +470,10 @@ void interface_Expand(arg_list *args) {
         for(i = 0; i < 2; i++)
             interface_assert(options[i] == '0' || options[i] == '1', "Boolean option must be 0 or 1");
 
-        if(options[0] == '1') flags |= EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION;
-        if(options[1] == '1') flags |= EXP_EXPAND_POWERS;
+        if(options[0] == '1') expand_flags |= EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION;
+        if(options[1] == '1') expand_flags |= EXP_EXPAND_POWERS;
     } else {
-        flags = EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION | EXP_EXPAND_POWERS;
+        expand_flags = EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION | EXP_EXPAND_POWERS;
     }
 
     expression = parse_from_tok(input, &err);
@@ -481,8 +481,8 @@ void interface_Expand(arg_list *args) {
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
 
     simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
-    expand(expression, flags);
-    simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | ((flags & EXP_DISTRIB_MULTIPLICATION) ? SIMP_LIKE_TERMS : 0) | SIMP_EVAL);
+    expand(expression, expand_flags);
+    simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | ((expand_flags & EXP_DISTRIB_MULTIPLICATION) ? SIMP_LIKE_TERMS : 0) | SIMP_EVAL);
     simplify_canonical_form(expression, CANONICAL_ALL ^ CANONICAL_COMBINE_POWERS);
 
     write_to_tok(output, expression, &err);
@@ -574,7 +574,7 @@ static void cleanup_items(pcas_ast_t **items, unsigned count) {
         ast_Cleanup(items[--count]);
 }
 
-void interface_Calculus(arg_list *args, Calculus kind) {
+void interface_Calculus(arg_list *args, unsigned flags) {
     pcas_ast_t *items[MAX_ITEMS], *respect_to_expr;
     pcas_error_t err;
     unsigned count;
@@ -595,7 +595,7 @@ void interface_Calculus(arg_list *args, Calculus kind) {
     respect_to_expr = parse_respect_to(args->args[3], args->arg_len[3], &err);
     interface_assert(err == E_SUCCESS && respect_to_expr != NULL, NULL);
 
-    err = calculus_Run(kind, items, count, respect_to_expr, NULL);
+    err = calculus_Run((Calculus)flags, items, count, respect_to_expr, NULL);
 
     if(err == E_SUCCESS)
         write_to_tok(args->args[2], items[0], &err);
@@ -613,7 +613,7 @@ void interface_Calculus(arg_list *args, Calculus kind) {
 
     Checks whether the solution in the 3rd argument satisfies the differential equation and initial conditions in the 2nd. Writes 1 to Ans if it does and 0 if not.
 */
-void interface_Verify(arg_list *args) {
+void interface_Verify(arg_list *args, unsigned flags) {
     pcas_ast_t *items[MAX_ITEMS], *solution, *respect_to_expr;
     pcas_error_t err;
     unsigned count;
@@ -644,17 +644,34 @@ void interface_Verify(arg_list *args) {
     write_ans(err == E_SUCCESS && satisfied);
 }
 
-bool interface_arg_equals(uint8_t *arg, unsigned arg_len, char *str2) {
+typedef struct interface_op {
+	const char* name;
+	/*Called with the flags of the operation*/
+	void (*func)(arg_list *args, unsigned flags);
+	unsigned flags;
+} interface_op;
+
+static const struct interface_op ops[] = {
+	{"SIMP", interface_Simplify},
+	{"EVAL", interface_Eval},
+	{"SUB", interface_Substitute},
+	{"EXP", interface_Expand},
+	{"DERIV", interface_Calculus, CALCULUS_DERIVATIVE},
+	{"INTEG", interface_Calculus, CALCULUS_INTEGRAL},
+	{"DE", interface_Calculus, CALCULUS_DE},
+	{"VERIFY", interface_Verify}
+};
+
+/*Returns the operation named by the first argument, or NULL if there is none*/
+static const interface_op *find_op(arg_list *args) {
     unsigned i;
 
-    if(arg_len != strlen(str2))
-        return false;
+    for(i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
+        if(strlen(ops[i].name) == args->arg_len[0] && !strncmp(ops[i].name, (char*)args->args[0], args->arg_len[0]))
+            return &ops[i];
+    }
 
-    for(i = 0; i < arg_len; i++)
-        if(arg[i] != (uint8_t)str2[i])
-            return false;
-
-    return true;
+    return NULL;
 }
 
 void interface_Run(void) {
@@ -667,23 +684,10 @@ void interface_Run(void) {
 
     if(parse_args(ans, ans_len, &args)) {
 
-        if(interface_arg_equals(args.args[0], args.arg_len[0], "SIMP")) {
-            interface_Simplify(&args);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "EVAL")) {
-            interface_Eval(&args);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "SUB")) {
-            interface_Substitute(&args);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "EXP")) {
-            interface_Expand(&args);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "DERIV")) {
-            interface_Calculus(&args, CALCULUS_DERIVATIVE);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "INTEG")) {
-            interface_Calculus(&args, CALCULUS_INTEGRAL);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "DE")) {
-            interface_Calculus(&args, CALCULUS_DE);
-        } else if(interface_arg_equals(args.args[0], args.arg_len[0], "VERIFY")) {
-            interface_Verify(&args);
-        }
+        const interface_op *op = find_op(&args);
+
+        if(op != NULL)
+            op->func(&args, op->flags);
 
         id_UnloadAll();
 
@@ -706,14 +710,7 @@ bool interface_Valid(void) {
     ans = read_ans(&ans_len);
 
     if(parse_args(ans, ans_len, &args)) {
-        valid = interface_arg_equals(args.args[0], args.arg_len[0], "SIMP")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "EVAL")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "SUB")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "EXP")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "DERIV")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "INTEG")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "DE")
-                || interface_arg_equals(args.args[0], args.arg_len[0], "VERIFY");
+        valid = find_op(&args) != NULL;
 
         cleanup_args(&args);
     }
