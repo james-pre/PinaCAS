@@ -208,6 +208,8 @@ bool has_imaginary_node(pcas_ast_t *e);
 bool contains_symbol(pcas_ast_t *e, Symbol symbol);
 /*Returns a symbol that does not appear in e, or SYM_INVALID if every candidate does*/
 Symbol fresh_symbol(pcas_ast_t *e);
+/*Returns C, or K, or another symbol that does not appear in e, to name an arbitrary constant*/
+Symbol constant_symbol(pcas_ast_t *e);
 
 /*Returns true if the node is being multiplied by at least one negative or is already a negative number node.
 The node must be completely simplified for this to work, because it does not detect

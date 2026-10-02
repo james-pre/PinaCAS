@@ -678,7 +678,7 @@ bool eval_integrals(pcas_ast_t *e) {
 	return integrate_all(e, MAX_METHOD_DEPTH);
 }
 
-static bool contains_integral(pcas_ast_t *e) {
+bool contains_integral(pcas_ast_t *e) {
 	pcas_ast_t *child;
 
 	if (isoptype(e, OP_INTEGRAL))
@@ -703,8 +703,7 @@ static void antiderivative(pcas_ast_t *e, pcas_ast_t *respect_to, bool constant)
 	eval_integrals(node);
 
 	if (constant && !contains_integral(node)) {
-		Symbol c = !contains_symbol(node, SYM_C) ? SYM_C : !contains_symbol(node, SYM_K) ? SYM_K : fresh_symbol(node);
-		node = add(node, ast_MakeSymbol(c));
+		node = add(node, ast_MakeSymbol(constant_symbol(node)));
 		work_Pause();
 		simplify(node, SIMP_COMMUTATIVE);
 		work_Resume();

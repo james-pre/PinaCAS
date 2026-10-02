@@ -234,6 +234,10 @@ Symbol fresh_symbol(pcas_ast_t *e) {
 	return SYM_INVALID;
 }
 
+Symbol constant_symbol(pcas_ast_t *e) {
+	return !contains_symbol(e, SYM_C) ? SYM_C : !contains_symbol(e, SYM_K) ? SYM_K : fresh_symbol(e);
+}
+
 /*Expects everything to be completely simplified*/
 bool is_negative_for_sure(pcas_ast_t *a) {
 	if (a->type == NODE_NUMBER && mp_rat_compare_zero(a->op.num) < 0)
