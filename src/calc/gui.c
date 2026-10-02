@@ -14,6 +14,7 @@
 #include "../cas/cas.h"
 #include "../cas/identities.h"
 #include "../cas/derivative.h"
+#include "../version.h"
 
 #include "interface.h"
 #include "viewer.h"
@@ -43,7 +44,7 @@ void draw_background(void) {
 	gfx_Rectangle(1, 1, LCD_WIDTH - 2, LCD_HEIGHT - 2);
 	gfx_HorizLine(1, LCD_HEIGHT - 21, LCD_WIDTH - 2);
 
-	draw_string_centered("PinaCAS by James Prevett & Nathan Farlow", LCD_WIDTH / 2, LCD_HEIGHT - 14);
+	draw_string_centered("PinaCAS v" PCAS_VERSION " by James Prevett", LCD_WIDTH / 2, LCD_HEIGHT - 14);
 
 	draw_string_centered("Input", LCD_WIDTH / 4 + 20, 14);
 	draw_string_centered("Output", LCD_WIDTH / 4 * 3 - 20, 14);
@@ -93,7 +94,7 @@ char *dropdown_entries[NUM_DROPDOWN_ENTRIES] = {"Y1",   "Y2",   "Y3",   "Y4",   
 #define NUM_DERIVATIVE 3
 #define NUM_INTEGRAL 3
 #define NUM_DE 5
-#define NUM_HELP 0
+#define NUM_ABOUT 0
 
 view_t *io_context[NUM_IO];
 view_t *function_context[NUM_FUNCTION];
@@ -103,7 +104,7 @@ view_t *expand_context[NUM_EXPAND];
 view_t *derivative_context[NUM_DERIVATIVE];
 view_t *integral_context[NUM_INTEGRAL];
 view_t *de_context[NUM_DE];
-view_t *help_context[1];
+view_t *about_context[1];
 
 view_t *from_drop, *to_drop;
 
@@ -125,12 +126,12 @@ typedef enum {
 	CONTEXT_DERIVATIVE,
 	CONTEXT_INTEGRAL,
 	CONTEXT_DE,
-	CONTEXT_HELP,
+	CONTEXT_ABOUT,
 	NUM_CONTEXTS
 } Context;
 
 unsigned elements_in_context[NUM_CONTEXTS] =
-	{NUM_IO, NUM_FUNCTION, NUM_SIMPLIFY, NUM_EVALUATE, NUM_EXPAND, NUM_DERIVATIVE, NUM_INTEGRAL, NUM_DE, NUM_HELP};
+	{NUM_IO, NUM_FUNCTION, NUM_SIMPLIFY, NUM_EVALUATE, NUM_EXPAND, NUM_DERIVATIVE, NUM_INTEGRAL, NUM_DE, NUM_ABOUT};
 
 view_t **context_lookup[NUM_CONTEXTS] = {
 	io_context,
@@ -141,7 +142,7 @@ view_t **context_lookup[NUM_CONTEXTS] = {
 	derivative_context,
 	integral_context,
 	de_context,
-	help_context
+	about_context
 };
 
 Context current_context = CONTEXT_FUNCTION;
@@ -267,18 +268,23 @@ void draw_context(Context c) {
 	if (c == CONTEXT_EVALUATE) {
 		gfx_PrintStringXY("From: ", 124 + 25, 96 + 12 + 10 - TEXT_HEIGHT / 2);
 		gfx_PrintStringXY("To: ", 124 + 25, 96 + 12 + 24 + 10 - TEXT_HEIGHT / 2);
-	} else if (c == CONTEXT_HELP) {
-		gfx_PrintStringXY("View https://github.com/", 115, 80 + 10 * 0);
-		gfx_PrintStringXY("james-pre/PinaCAS", 115, 80 + 10 * 1);
-		gfx_PrintStringXY("for usage instructions.", 115, 80 + 10 * 2);
+	} else if (c == CONTEXT_ABOUT) {
+		const char *title = "PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE;
+		int line = 0;
 
-		gfx_PrintStringXY("PinaCAS is a fork of", 115, 80 + 10 * 4);
-		gfx_PrintStringXY("PineappleCAS by Nathan", 115, 80 + 10 * 5);
-		gfx_PrintStringXY("Farlow. It uses the imath", 115, 80 + 10 * 6);
-		gfx_PrintStringXY("library by Michael J.", 115, 80 + 10 * 7);
-		gfx_PrintStringXY("Fromberger. Thanks Adriweb", 115, 80 + 10 * 8);
-		gfx_PrintStringXY("and Mateo for help and", 115, 80 + 10 * 9);
-		gfx_PrintStringXY("contributions.", 115, 80 + 10 * 10);
+		if (gfx_GetStringWidth(title) <= 190) {
+			gfx_PrintStringXY(title, 115, 80);
+		} else {
+			gfx_PrintStringXY("PinaCAS v" PCAS_VERSION, 115, 80);
+			gfx_PrintStringXY(PCAS_BUILD_DATE, 115, 80 + 10 * ++line);
+		}
+
+		gfx_PrintStringXY("github.com/james-pre/PinaCAS", 115, 80 + 10 * (line + 1));
+
+		gfx_PrintStringXY("Credits:", 115, 80 + 10 * (line + 3));
+		gfx_PrintStringXY("James Prevett", 115, 80 + 10 * (line + 4));
+		gfx_PrintStringXY("Nathan Farlow (PineappleCAS)", 115, 80 + 10 * (line + 5));
+		gfx_PrintStringXY("Michael Fromberger (imath)", 115, 80 + 10 * (line + 6));
 	} else if (c == CONTEXT_DERIVATIVE || c == CONTEXT_INTEGRAL || c == CONTEXT_DE) {
 		gfx_PrintStringXY("Respect to: ", 124, 80);
 	}
@@ -492,7 +498,7 @@ void gui_Init(void) {
 	function_context[3] = view_create_label(26, 128, "Derivative");
 	function_context[4] = view_create_label(26, 144, "Integral");
 	function_context[5] = view_create_label(26, 160, "Solve DE");
-	function_context[6] = view_create_label(26, 176, "Help");
+	function_context[6] = view_create_label(26, 176, "About");
 
 	simplify_context[0] = view_create_checkbox(124, 80 + 12 * 0, "Basic identities", true);
 	simplify_context[1] = view_create_checkbox(124, 80 + 12 * 1, "Trig identities", true);
