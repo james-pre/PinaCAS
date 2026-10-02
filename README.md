@@ -22,16 +22,20 @@ Type the equation into a Y= variable or string. Write derivatives of the unknown
 <hr>
 
 ## Screenshots
-These are from PineappleCAS.
+![Main screen](img/gui.png "GUI")
+![Integration by substitution](img/integral-substitution.png "Integration by substitution, showing work")
+![Integration by parts](img/integral-parts.png "Integration by parts, showing work")
+![Derivative](img/derivative.png "Derivative, showing work")
+![Differential equation](img/de.png "Classifying a differential equation")
 
-![Main screen](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/simplify.png "GUI")
-![Complex example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/i^i.png "Complex simplification")
-![Trig example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/trig.png "Trig identity simplification")
-![Derivative example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/deriv.png "Derivative with respect to X")
-![Exponent example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/eval_exponent.png "Large exponent")
-![Factorial example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/eval_factorial.png "Large factorial")
-![Expand example](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/expand.png "Expand expression")
-![Basic interface](https://raw.githubusercontent.com/nathanfarlow/PineappleCAS/master/img/interface.png "Basic interface")
+These are from PineappleCAS, and show the simplifier and the TI-Basic interface.
+
+![Complex example](img/i^i.png "Complex simplification")
+![Trig example](img/trig.png "Trig identity simplification")
+![Exponent example](img/eval_exponent.png "Large exponent")
+![Factorial example](img/eval_factorial.png "Large factorial")
+![Expand example](img/expand.png "Expand expression")
+![Basic interface](img/interface.png "Basic interface")
 
 # Installation
 * Download the latest release from the releases and send PCAS.8xp to your calculator's **archive memory**. It is very important that the program is archived to prevent Error: Memory when running the program.
