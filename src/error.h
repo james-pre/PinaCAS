@@ -23,6 +23,8 @@ typedef enum {
     E_DE_NO_DERIVATIVE,
     E_DE_BAD_FUNCTION,
     E_DE_ORDER,
+    E_DE_BAD_CONDITION,
+    E_DE_IMPLICIT,
 
     AMOUNT_ERRORS
 } pcas_error_t;

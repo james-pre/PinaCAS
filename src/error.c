@@ -19,4 +19,6 @@ const char *error_text[AMOUNT_ERRORS] = {
     "No derivative in equation",
     "Primes must follow one function",
     "Order too high",
+    "Bad initial condition",
+    "Solution must be explicit",
 };
