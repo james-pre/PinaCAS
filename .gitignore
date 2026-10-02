@@ -2,7 +2,6 @@ obj*/
 bin*/
 
 .idea/
-.vscode/
 *.code-workspace
 
 cmake-build-*/
