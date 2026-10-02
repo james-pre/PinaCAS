@@ -88,7 +88,7 @@ static bool only_units(pcas_ast_t *e) {
 }
 
 /*Returns length of buffer. Writes to buffer is buffer != NULL*/
-static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct Identifier *lookup, pcas_error_t *err) {
+static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, const struct Identifier *lookup, pcas_error_t *err) {
 	switch (e->type) {
 		case NODE_NUMBER: {
 			char *buffer;
@@ -380,7 +380,7 @@ static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct 
 	return index;
 }
 
-uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, struct Identifier *lookup, pcas_error_t *err) {
+uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, const struct Identifier *lookup, pcas_error_t *err) {
 	uint8_t *data;
 
 	*err = E_SUCCESS;
