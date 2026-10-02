@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.h"
+#include "typeset.h"
 
 typedef enum {
     /*after is a snapshot of the whole expression being worked on*/
@@ -47,3 +48,6 @@ void work_Leave(pcas_ast_t *e);
 /*Records a step. Copies before and after.*/
 void work_Step(StepType type, const char *text, pcas_ast_t *before, pcas_ast_t *after);
 void work_Text(const char *text);
+
+/*Lays out the math of a step, or returns NULL if it has none. A continued state follows another state, so it starts with =.*/
+ts_box_t *work_Layout(pcas_step_t *step, bool continued);

@@ -120,3 +120,22 @@ void work_Step(StepType type, const char *text, pcas_ast_t *before, pcas_ast_t *
 void work_Text(const char *text) {
     work_Step(STEP_TEXT, text, NULL, NULL);
 }
+
+ts_box_t *work_Layout(pcas_step_t *step, bool continued) {
+    ts_box_t *row = ts_Row();
+
+    switch(step->type) {
+    case STEP_TEXT:
+        return NULL;
+    case STEP_STATE:
+        if(continued)
+            ts_Append(row, ts_Text("= "));
+        break;
+    default:
+        ts_Append(row, ts_FromAst(step->before));
+        ts_Append(row, ts_Text(" = "));
+        break;
+    }
+
+    return ts_Append(row, ts_FromAst(step->after));
+}

@@ -16,6 +16,8 @@
 #include "../cas/derivative.h"
 
 #include "interface.h"
+#include "viewer.h"
+#include "../work.h"
 
 void draw_string_centered(char *text, int x, int y) {
     unsigned len;
@@ -94,11 +96,13 @@ char *dropdown_entries[NUM_DROPDOWN_ENTRIES] = {
 };
 
 #define NUM_IO 2
-#define NUM_FUNCTION 5
+#define NUM_FUNCTION 7
 #define NUM_SIMPLIFY 7
 #define NUM_EVALUATE 5
 #define NUM_EXPAND 3
-#define NUM_DERIVATIVE 2
+#define NUM_DERIVATIVE 3
+#define NUM_INTEGRAL 3
+#define NUM_DE 3
 #define NUM_HELP 0
 
 view_t *io_context[NUM_IO];
@@ -107,6 +111,8 @@ view_t *simplify_context[NUM_SIMPLIFY];
 view_t *evaluate_context[NUM_EVALUATE];
 view_t *expand_context[NUM_EXPAND];
 view_t *derivative_context[NUM_DERIVATIVE];
+view_t *integral_context[NUM_INTEGRAL];
+view_t *de_context[NUM_DE];
 view_t *help_context[1];
 
 view_t *from_drop, *to_drop;
@@ -115,6 +121,8 @@ view_t *button_simplify;
 view_t *button_evaluate;
 view_t *button_expand;
 view_t *button_derivative;
+view_t *button_integral;
+view_t *button_de;
 
 view_t *console_button;
 
@@ -125,6 +133,8 @@ typedef enum {
     CONTEXT_EVALUATE,
     CONTEXT_EXPAND,
     CONTEXT_DERIVATIVE,
+    CONTEXT_INTEGRAL,
+    CONTEXT_DE,
     CONTEXT_HELP,
     NUM_CONTEXTS
 } Context;
@@ -136,13 +146,15 @@ unsigned elements_in_context[NUM_CONTEXTS] = {
     NUM_EVALUATE,
     NUM_EXPAND,
     NUM_DERIVATIVE,
+    NUM_INTEGRAL,
+    NUM_DE,
     NUM_HELP
 };
 
 view_t **context_lookup[NUM_CONTEXTS] = {
     io_context, function_context, simplify_context,
     evaluate_context, expand_context, derivative_context,
-    help_context
+    integral_context, de_context, help_context
 };
 
 Context current_context = CONTEXT_FUNCTION;
@@ -283,7 +295,7 @@ void draw_context(Context c) {
         gfx_PrintStringXY("Fromberger. Thanks Adriweb", 115, 80 + 10 * 8);
         gfx_PrintStringXY("and Mateo for help and", 115, 80 + 10 * 9);
         gfx_PrintStringXY("contributions.", 115, 80 + 10 * 10);
-    } else if(c == CONTEXT_DERIVATIVE) {
+    } else if(c == CONTEXT_DERIVATIVE || c == CONTEXT_INTEGRAL || c == CONTEXT_DE) {
         gfx_PrintStringXY("Respect to: ", 124, 80);
     }
 
@@ -316,10 +328,24 @@ void console_write(char *text) {
     console_index++;
 }
 
+/*Returns to the main screen*/
+void close_console(void) {
+    draw_background();
+    draw_context(CONTEXT_IO);
+    draw_context(CONTEXT_FUNCTION);
+    draw_context(current_context);
+
+    console_button->active = false;
+    console_drawn = false;
+    console_index = 0;
+}
+
 void execute_simplify(void);
 void execute_evaluate(void);
 void execute_expand(void);
 void execute_derivative(void);
+void execute_integral(void);
+void execute_de(void);
 
 /*the key lookup tables for os_GetCSC()*/
 const char alpha_table[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x00, 0x57, 0x52, 0x4D, 0x48, 0x00, 0x00, 0x00, 0x40, 0x56, 0x51, 0x4C, 0x47, 0x00, 0x00, 0x00, 0x5A, 0x55, 0x50, 0x4B, 0x46, 0x43, 0x00, 0x00, 0x59, 0x54, 0x4F, 0x4A, 0x45, 0x42, 0x58, 0x00, 0x58, 0x53, 0x4E, 0x49, 0x44, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -327,16 +353,8 @@ const char alpha_table[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 void handle_input(uint8_t key) {
 
     if(console_drawn) {
-        if(console_button->active && key == sk_Enter) {
-            draw_background();
-            draw_context(CONTEXT_IO);
-            draw_context(CONTEXT_FUNCTION);
-            draw_context(current_context);
-
-            console_button->active = false;
-            console_drawn = false;
-            console_index = 0;
-        }
+        if(console_button->active && key == sk_Enter)
+            close_console();
         return;
     }
 
@@ -447,6 +465,8 @@ void handle_input(uint8_t key) {
                 else if(v == button_evaluate)   execute_evaluate();
                 else if(v == button_expand)     execute_expand();
                 else if(v == button_derivative) execute_derivative();
+                else if(v == button_integral)   execute_integral();
+                else if(v == button_de)         execute_de();
                 break;
             default:
                 break;
@@ -477,7 +497,9 @@ void gui_Init(void) {
     function_context[1] = view_create_label(26, 96, "Evaluate");
     function_context[2] = view_create_label(26, 112, "Expand");
     function_context[3] = view_create_label(26, 128, "Derivative");
-    function_context[4] = view_create_label(26, 144, "Help");
+    function_context[4] = view_create_label(26, 144, "Integral");
+    function_context[5] = view_create_label(26, 160, "Solve DE");
+    function_context[6] = view_create_label(26, 176, "Help");
 
     simplify_context[0] = view_create_checkbox(124, 80 + 12 * 0, "Basic identities", true);
     simplify_context[1] = view_create_checkbox(124, 80 + 12 * 1, "Trig identities", true);
@@ -498,7 +520,16 @@ void gui_Init(void) {
     expand_context[2] = button_expand = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Expand");
 
     derivative_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
-    derivative_context[1] = button_derivative = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Differentiate");
+    derivative_context[1] = view_create_checkbox(124, 104, "Show work", true);
+    derivative_context[2] = button_derivative = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Differentiate");
+
+    integral_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
+    integral_context[1] = view_create_checkbox(124, 104, "Show work", true);
+    integral_context[2] = button_integral = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Integrate");
+
+    de_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
+    de_context[1] = view_create_checkbox(124, 104, "Show work", true);
+    de_context[2] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
 
     console_button = view_create_button(LCD_WIDTH / 2, LCD_HEIGHT - LCD_HEIGHT / 6 - 20, "Close");
 
@@ -876,67 +907,137 @@ void execute_expand(void) {
     view_draw(console_button);
 }
 
-void execute_derivative(void) {
-    char buffer[50];
+pcas_ast_t *parse_respect_to(view_t *charselect, pcas_error_t *err) {
+    char *theta = "theta";
 
-    pcas_ast_t *expression;
+    /*We treat the @ character as theta partially out of laziness*/
+    if(charselect->character == '@')
+        return parse((uint8_t*)theta, strlen(theta), str_table, err);
+
+    return parse((uint8_t*)&charselect->character, 1, str_table, err);
+}
+
+typedef enum {
+    CALCULUS_DERIVATIVE,
+    CALCULUS_INTEGRAL,
+    CALCULUS_DE
+} Calculus;
+
+/*Replaces expression with what to output for the differential equation, and reports its classification*/
+pcas_error_t classify(pcas_ast_t *expression, pcas_ast_t *respect_to) {
+    char buffer[50];
+    pcas_de_t de;
     pcas_error_t err;
 
+    err = de_Load(&de, expression, respect_to);
+
+    if(err == E_SUCCESS) {
+        sprintf(buffer, "Order %u, %s.", de.order, de.linear ? "linear" : "nonlinear");
+        console_write(buffer);
+
+        if(de.linear)
+            replace_node(expression, ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g)));
+
+        simplify_canonical_form(expression, CANONICAL_ALL);
+    }
+
+    de_Cleanup(&de);
+
+    return err;
+}
+
+/*Runs a calculus function on the input with the options in context, then shows the work or the result*/
+void execute_calculus(Calculus kind, view_t **context, const char *title) {
+    char buffer[50];
+
+    pcas_ast_t *expression, *respect_to;
+    pcas_error_t err;
+    pcas_work_t work;
+    bool show_work = context[1]->checked;
+
     compile_derivative();
-    
+
     console_write("Parsing input...");
 
     expression = parse_from_dropdown_index(from_drop->index, &err);
 
-    if(err == E_SUCCESS) {
-
-        if(expression != NULL) {
-            pcas_ast_t *respect_to;
-            char *theta = "theta";
-
-            /*We treat the @ character as theta partially out of laziness*/
-            if(derivative_context[0]->character == '@') {
-                respect_to = parse((uint8_t*)theta, strlen(theta), str_table, &err);
-            } else {
-                respect_to = parse((uint8_t*)&derivative_context[0]->character, 1, str_table, &err);
-            }
-
-            console_write("Differentiating...");
-
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
-
-            /*Automatically takes care of embedded derivatives*/
-            derivative(expression, respect_to, respect_to);
-
-            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
-            simplify_canonical_form(expression, CANONICAL_ALL);
-
-            console_write("Exporting...");
-
-            write_to_dropdown_index(to_drop->index, expression, &err);
-
-            ast_Cleanup(expression);
-
-            if(err == E_SUCCESS) {
-                console_write("Success.");
-            } else {
-                sprintf(buffer, "Failed. %s.", error_text[err]);
-                console_write(buffer);
-            }
-
-        } else {
-            console_write("Failed. Empty input.");
-        }
-
-    } else {
+    if(err == E_SUCCESS && expression == NULL) {
+        console_write("Failed. Empty input.");
+    } else if(err != E_SUCCESS) {
         sprintf(buffer, "Failed. %s.", error_text[err]);
         console_write(buffer);
         if(from_drop->index == 20)
             console_write("Make sure Ans is a string.");
+    } else {
+        respect_to = parse_respect_to(context[0], &err);
+
+        if(show_work)
+            work_Start(&work);
+
+        switch(kind) {
+        case CALCULUS_DERIVATIVE:
+            console_write("Differentiating...");
+            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
+            derivative(expression, respect_to, respect_to);
+            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+            simplify_canonical_form(expression, CANONICAL_ALL);
+            break;
+        case CALCULUS_INTEGRAL:
+            console_write("Integrating...");
+            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
+            integral(expression, respect_to);
+            simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+            simplify_canonical_form(expression, CANONICAL_ALL);
+            break;
+        case CALCULUS_DE:
+            console_write("Solving...");
+            err = classify(expression, respect_to);
+            break;
+        }
+
+        if(show_work)
+            work_Stop();
+
+        if(err == E_SUCCESS) {
+            console_write("Exporting...");
+            write_to_dropdown_index(to_drop->index, expression, &err);
+        }
+
+        ast_Cleanup(expression);
+        ast_Cleanup(respect_to);
+
+        if(err == E_SUCCESS && show_work) {
+            viewer_Show(&work, title);
+            work_Cleanup(&work);
+            close_console();
+            return;
+        }
+
+        if(show_work)
+            work_Cleanup(&work);
+
+        if(err == E_SUCCESS) {
+            console_write("Success.");
+        } else {
+            sprintf(buffer, "Failed. %s.", error_text[err]);
+            console_write(buffer);
+        }
     }
 
     console_button->active = true;
     view_draw(console_button);
+}
+
+void execute_derivative(void) {
+    execute_calculus(CALCULUS_DERIVATIVE, derivative_context, "Derivative");
+}
+
+void execute_integral(void) {
+    execute_calculus(CALCULUS_INTEGRAL, integral_context, "Integral");
+}
+
+void execute_de(void) {
+    execute_calculus(CALCULUS_DE, de_context, "Differential equation");
 }
 
 #else

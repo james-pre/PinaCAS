@@ -23,6 +23,7 @@
 #include "../work.h"
 
 #include "tests.h"
+#include "render.h"
 
 void display_help(void) {
     printf("Usage: ./pinacas [--work] [operation] [args]\n");
@@ -468,35 +469,23 @@ static void print_ast(pcas_ast_t *e) {
 }
 
 static void print_work(pcas_work_t *w) {
-    pcas_step_t *step;
-    bool first = true;
+    pcas_step_t *step, *previous = NULL;
 
-    printf("Work:\n");
+    printf("Work:\n\n");
 
-    for(step = w->first; step != NULL; step = step->next) {
-        printf(step->type == STEP_STATE && !first ? "  = " : "    ");
-
-        switch(step->type) {
-        case STEP_STATE:
-            print_ast(step->after);
-            break;
-        case STEP_TEXT:
-            break;
-        default:
-            print_ast(step->before);
-            printf(" = ");
-            print_ast(step->after);
-            break;
-        }
+    for(step = w->first; step != NULL; previous = step, step = step->next) {
+        ts_box_t *line = work_Layout(step, previous != NULL && previous->type == STEP_STATE);
 
         if(step->text != NULL)
-            printf(step->type == STEP_TEXT ? "%s" : "\t[%s]", step->text);
+            printf("[%s]\n", step->text);
+
+        if(line != NULL) {
+            render_Print(line);
+            ts_Cleanup(line);
+        }
 
         printf("\n");
-        first = false;
     }
-
-    printf("\n");
 }
 
 int run_integral(int argc, char **argv) {
