@@ -164,3 +164,8 @@ Remember that you can definitely use strings as input and output as well. You ca
 :Disp "FAIL :("
 :End
 ```
+
+## Licensing
+
+PineappleCAS is licensed under the MIT, all copyright belongs to Nathan for his amazing work on the original project.
+This fork is licensed under the GPL.
