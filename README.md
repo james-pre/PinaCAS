@@ -41,6 +41,12 @@ make
 ```
 The calculator program compiles consistently on Ubuntu, but Windows has a problem with it. Executing make on Windows many times seems to work for some reason. (I blame the compiler!)
 
+**Run in CEmu:**
+```
+scripts/emu.sh --libs
+```
+Builds PCAS, starts [CEmu](https://ce-programming.github.io/CEmu/) with the ROM at `tmp/TI84+CE.rom` (override with `CEMU_ROM`), sends the program, and launches it through Cesium. `--libs` also sends `clibs.8xg`, which is only needed once. Set `CEMU_CESIUM_APP` to Cesium's number in the APPS menu if it is not 4.
+
 **Compile for PC:**
 ```
 git clone --recursive https://github.com/nathanfarlow/PineappleCAS
