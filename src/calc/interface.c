@@ -78,21 +78,20 @@ typedef struct {
 } arg_list;
 
 uint8_t *parse_one(uint8_t *input, unsigned input_len, unsigned start, unsigned *arg_len) {
-    unsigned i;
-    uint8_t *ret = NULL;
-
     *arg_len = 0;
 
-    for(i = start; i < input_len; i++) {
+    for(unsigned i = start; i < input_len; i++) {
         if(input[i] == TI_COMMA)
             break;
         (*arg_len)++;
     }
 
+    uint8_t *ret = NULL;
+
     if(*arg_len > 0)
         ret = malloc(sizeof(char) * (*arg_len));
 
-    for(i = 0; i < *arg_len; i++) {
+    for(unsigned i = 0; i < *arg_len; i++) {
         ret[i] = input[start + i];
     }
 
@@ -100,14 +99,12 @@ uint8_t *parse_one(uint8_t *input, unsigned input_len, unsigned start, unsigned 
 }
 
 bool parse_args(uint8_t *input, unsigned input_len, arg_list *args) {
-    unsigned i, arg_index = 0;
-
     if(input_len == 0)
         return false;
 
     /*Calculate amount of arguments*/
     args->amount = 1;
-    for(i = 0; i < input_len; i++) {
+    for(unsigned i = 0; i < input_len; i++) {
         if(input[i] == TI_COMMA)
             args->amount++;
     }
@@ -115,8 +112,10 @@ bool parse_args(uint8_t *input, unsigned input_len, arg_list *args) {
     args->args = malloc(sizeof(char*) * args->amount);
     args->arg_len = malloc(sizeof(unsigned) * args->amount);
 
+	unsigned arg_index = 0;
+
     /*Parse arguments one by one*/
-    for(i = 0; i < args->amount; i++) {
+    for(unsigned i = 0; i < args->amount; i++) {
         args->args[i] = parse_one(input, input_len, arg_index, &args->arg_len[i]);
         arg_index += args->arg_len[i] + 1; /*+ 1 to eliminate the comma*/
     }
@@ -125,9 +124,8 @@ bool parse_args(uint8_t *input, unsigned input_len, arg_list *args) {
 }
 
 void cleanup_args(arg_list *args) {
-    unsigned i;
 
-    for(i = 0; i < args->amount; i++) {
+    for(unsigned i = 0; i < args->amount; i++) {
         free(args->args[i]);
     }
 
@@ -141,11 +139,8 @@ void write_ans(int val) {
     ti_SetVar(TI_REAL_TYPE, ti_Ans, &real);
 }
 
-void success(void) {
-    write_ans(1);
-}
-
-void fail(char *message) {
+/*Shows message, if it is not NULL, and returns an error code*/
+int fail(char *message) {
     char buffer[150] = {0};
 
     if(message != NULL) {
@@ -160,10 +155,11 @@ void fail(char *message) {
 
         while (!os_GetCSC());
     }
-    write_ans(0);
+
+    return 1;
 }
 
-#define interface_assert(condition, message) do {if(!(condition)) {fail(message); return;}} while(0)
+#define interface_assert(condition, message) if(!(condition)) return fail(message);
 
 /*Valid symbols are Y1 through Y0, Str1 through Str0, and Ans*/
 bool tok_valid(uint8_t *symbol, unsigned symbol_len) {
@@ -184,9 +180,6 @@ bool tok_valid(uint8_t *symbol, unsigned symbol_len) {
 }
 /*Add two null terminators to symbol*/
 void tok_fix(uint8_t **symbol, unsigned *symbol_len) {
-    if(*symbol_len == 0)
-        return;
-
     *symbol = realloc(*symbol, sizeof(char) * (*symbol_len + 2));
     (*symbol)[*symbol_len] = 0;
     (*symbol)[*symbol_len + 1] = 0;
@@ -264,43 +257,17 @@ void write_to_tok(uint8_t *tok, pcas_ast_t *expression, pcas_error_t *err) {
     Boolean 5 = Evaluate trig constants
     Boolean 6 = Evaluate inverse trig constants
 */
-void interface_Simplify(arg_list *args, unsigned flags) {
-    pcas_ast_t *expression;
-    pcas_error_t err;
-
+int interface_Simplify(int argc, const char *args[], unsigned flags) {
     unsigned short simplify_flags = SIMP_ALL;
 
-    uint8_t *input, *output;
-    unsigned input_len, output_len;
-
-    interface_assert(args->amount >= 3, "Not enough arguments");
-
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
-
-    input = args->args[1];
-    output = args->args[2];
-
-    input_len = args->arg_len[1];
-    output_len = args->arg_len[2];
-
-    interface_assert(tok_valid(input, input_len), "Not a valid input variable");
-    interface_assert(tok_valid(output, output_len), "Not a valid output variable");
-
-    if(args->amount >= 4) {
-        uint8_t *options;
-        unsigned option_len;
-
-        unsigned i = 0;
-
+    if(argc >= 4) {
         simplify_flags ^= SIMP_ID_ALL;
 
-        options = args->args[3];
-        option_len = args->arg_len[3];
+        const char *options = args[3];
 
-        interface_assert(option_len == 6, "Wrong number of boolean options");
+        interface_assert(strlen(options) == 6, "Wrong number of boolean options");
 
-        for(i = 0; i < 6; i++)
+        for(unsigned i = 0; i < 6; i++)
             interface_assert(options[i] == '0' || options[i] == '1', "Boolean option must be 0 or 1");
 
         if(options[0] == '1') simplify_flags |= SIMP_ID_GENERAL;
@@ -311,47 +278,29 @@ void interface_Simplify(arg_list *args, unsigned flags) {
         if(options[5] == '1') simplify_flags |= SIMP_ID_TRIG_INV_CONSTANTS;
     }
 
-    expression = parse_from_tok(input, &err);
+	pcas_error_t err;
+    pcas_ast_t *expression = parse_from_tok((uint8_t*)args[1], &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
 
     simplify(expression, simplify_flags);
     simplify_canonical_form(expression, CANONICAL_ALL);
 
-    write_to_tok(output, expression, &err);
+    write_to_tok((uint8_t*)args[2], expression, &err);
 
     ast_Cleanup(expression);
 
     interface_assert(err == E_SUCCESS, NULL);
 
-    success();
+    return 0;
 }
 
 /*
     Syntax: EVAL,Y1,Y2
 */
-void interface_Eval(arg_list *args, unsigned flags) {
-    pcas_ast_t *expression;
+int interface_Eval(int argc, const char *args[], unsigned flags) {
     pcas_error_t err;
-
-    uint8_t *input, *output;
-    unsigned input_len, output_len;
-
-    interface_assert(args->amount >= 3, "Not enough arguments");
-
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
-
-    input = args->args[1];
-    output = args->args[2];
-
-    input_len = args->arg_len[1];
-    output_len = args->arg_len[2];
-
-    interface_assert(tok_valid(input, input_len), "Not a valid input variable");
-    interface_assert(tok_valid(output, output_len), "Not a valid output variable");
-
-    expression = parse_from_tok(input, &err);
+    pcas_ast_t *expression = parse_from_tok((uint8_t*)args[1], &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
 
@@ -360,53 +309,28 @@ void interface_Eval(arg_list *args, unsigned flags) {
     simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
     simplify_canonical_form(expression, CANONICAL_ALL);
 
-    write_to_tok(output, expression, &err);
+    write_to_tok((uint8_t*)args[2], expression, &err);
 
     ast_Cleanup(expression);
 
     interface_assert(err == E_SUCCESS, NULL);
 
-    success();
+    return 0;
 }
 
 /*
     Syntax: SUB,Y1,Y2,Str1,Str2
 */
-void interface_Substitute(arg_list *args, unsigned flags) {
+int interface_Substitute(int argc, const char *args[], unsigned flags) {
     pcas_ast_t *expression, *sub_from_expr, *sub_to_expr;
     pcas_error_t err;
 
-    uint8_t *input, *output, *sub_from, *sub_to;
-    unsigned input_len, output_len, sub_from_len, sub_to_len;
-
-    interface_assert(args->amount >= 5, "Not enough arguments");
-
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
-    tok_fix(&args->args[3], &args->arg_len[3]);
-    tok_fix(&args->args[4], &args->arg_len[4]);
-
-    input = args->args[1];
-    output = args->args[2];
-    sub_from = args->args[3];
-    sub_to = args->args[4];
-
-    input_len = args->arg_len[1];
-    output_len = args->arg_len[2];
-    sub_from_len = args->arg_len[3];
-    sub_to_len = args->arg_len[4];
-
-    interface_assert(tok_valid(input, input_len), "Not a valid input variable");
-    interface_assert(tok_valid(output, output_len), "Not a valid output variable");
-    interface_assert(tok_valid(sub_from, sub_from_len), "Not a valid substitute from variable");
-    interface_assert(tok_valid(sub_to, sub_to_len), "Not a valid substitute to variable");
-
-    expression = parse_from_tok(input, &err);
+    expression = parse_from_tok((uint8_t*)args[1], &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
-    sub_from_expr = parse_from_tok(sub_from, &err);
+    sub_from_expr = parse_from_tok((uint8_t*)args[3], &err);
     interface_assert(err == E_SUCCESS && sub_from_expr != NULL, NULL);
-    sub_to_expr = parse_from_tok(sub_to, &err);
+    sub_to_expr = parse_from_tok((uint8_t*)args[4], &err);
     interface_assert(err == E_SUCCESS && sub_to_expr != NULL, NULL);
 
     simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
@@ -414,7 +338,7 @@ void interface_Substitute(arg_list *args, unsigned flags) {
     simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
     simplify_canonical_form(expression, CANONICAL_ALL);
 
-    write_to_tok(output, expression, &err);
+    write_to_tok((uint8_t*)args[2], expression, &err);
 
     ast_Cleanup(expression);
     ast_Cleanup(sub_from_expr);
@@ -422,7 +346,7 @@ void interface_Substitute(arg_list *args, unsigned flags) {
 
     interface_assert(err == E_SUCCESS, NULL);
 
-    success();
+    return 0;
 }
 
 /*
@@ -433,41 +357,18 @@ void interface_Substitute(arg_list *args, unsigned flags) {
     Boolean 1 = expand multiplication (A+X)(B+2)
     Boolean 2 = expand powers (1+A)^6
 */
-void interface_Expand(arg_list *args, unsigned flags) {
+int interface_Expand(int argc, const char *args[], unsigned flags) {
     pcas_ast_t *expression;
     pcas_error_t err;
 
     unsigned short expand_flags = 0;
 
-    uint8_t *input, *output;
-    unsigned input_len, output_len;
+    if(argc >= 4) {
+        const char *options = args[3];
 
-    interface_assert(args->amount >= 3, "Not enough arguments");
-    
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
+        interface_assert(strlen(options) == 2, "Wrong number of boolean options");
 
-    input = args->args[1];
-    output = args->args[2];
-
-    input_len = args->arg_len[1];
-    output_len = args->arg_len[2];
-
-    interface_assert(tok_valid(input, input_len), "Not a valid input variable");
-    interface_assert(tok_valid(output, output_len), "Not a valid output variable");
-
-    if(args->amount >= 4) {
-        uint8_t *options;
-        unsigned option_len;
-
-        unsigned i = 0;
-
-        options = args->args[3];
-        option_len = args->arg_len[3];
-
-        interface_assert(option_len == 2, "Wrong number of boolean options");
-
-        for(i = 0; i < 2; i++)
+        for(unsigned i = 0; i < 2; i++)
             interface_assert(options[i] == '0' || options[i] == '1', "Boolean option must be 0 or 1");
 
         if(options[0] == '1') expand_flags |= EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION;
@@ -476,7 +377,7 @@ void interface_Expand(arg_list *args, unsigned flags) {
         expand_flags = EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION | EXP_EXPAND_POWERS;
     }
 
-    expression = parse_from_tok(input, &err);
+    expression = parse_from_tok((uint8_t*)args[1], &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && expression != NULL, NULL);
 
@@ -485,17 +386,18 @@ void interface_Expand(arg_list *args, unsigned flags) {
     simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | ((expand_flags & EXP_DISTRIB_MULTIPLICATION) ? SIMP_LIKE_TERMS : 0) | SIMP_EVAL);
     simplify_canonical_form(expression, CANONICAL_ALL ^ CANONICAL_COMBINE_POWERS);
 
-    write_to_tok(output, expression, &err);
+    write_to_tok((uint8_t*)args[2], expression, &err);
 
     ast_Cleanup(expression);
 
     interface_assert(err == E_SUCCESS, NULL);
 
-    success();
+    return 0;
 }
 
-bool valid_respect_to(uint8_t *symbol, unsigned symbol_len) {
-    return symbol_len == 1 && symbol[0] >= 'A' && symbol[0] <= ('Z' + 1); /*Z + 1 is theta*/
+/*Valid letters are A through Z and theta*/
+bool letter_valid(const char *symbol) {
+    return strlen(symbol) == 1 && symbol[0] >= 'A' && symbol[0] <= ('Z' + 1); /*Z + 1 is theta*/
 }
 
 pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, char *summary) {
@@ -554,19 +456,10 @@ pcas_error_t calculus_Verify(pcas_ast_t **items, unsigned count, pcas_ast_t *res
     return err;
 }
 
-/*
-    Syntax: DERIV,Y1,Y2,X or INTEG,Y1,Y2,X or DE,Y1,Y2,X
-
-    Takes the derivative or integral of, or classifies the differential equation in, the input with respect to the 4th argument
-*/
 /*Parses the "respect to" argument, which is a letter or theta*/
-static pcas_ast_t *parse_respect_to(uint8_t *respect_to, unsigned respect_to_len, pcas_error_t *err) {
-    char *theta = "theta";
-
-    if(respect_to[0] == 'Z' + 1)
-        return parse((uint8_t*)theta, strlen(theta), str_table, err);
-
-    return parse(respect_to, respect_to_len, str_table, err);
+static pcas_ast_t *parse_respect_to(const char *respect_to, pcas_error_t *err) {
+    const char *text = respect_to[0] == 'Z' + 1 ? "theta" : respect_to;
+    return parse((const uint8_t*)text, strlen(text), str_table, err);
 }
 
 static void cleanup_items(pcas_ast_t **items, unsigned count) {
@@ -574,38 +467,33 @@ static void cleanup_items(pcas_ast_t **items, unsigned count) {
         ast_Cleanup(items[--count]);
 }
 
-void interface_Calculus(arg_list *args, unsigned flags) {
-    pcas_ast_t *items[MAX_ITEMS], *respect_to_expr;
+/*
+    Syntax: DERIV,Y1,Y2,X or INTEG,Y1,Y2,X or DE,Y1,Y2,X
+
+    Takes the derivative or integral of, or classifies the differential equation in, the input with respect to the 4th argument
+*/
+int interface_Calculus(int argc, const char *args[], unsigned flags) {
+    pcas_ast_t *items[MAX_ITEMS], *respect_to;
     pcas_error_t err;
-    unsigned count;
 
-    interface_assert(args->amount >= 4, "Not enough arguments");
-
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
-
-    interface_assert(tok_valid(args->args[1], args->arg_len[1]), "Not a valid input variable");
-    interface_assert(tok_valid(args->args[2], args->arg_len[2]), "Not a valid output variable");
-    interface_assert(valid_respect_to(args->args[3], args->arg_len[3]), "Not a valid \"respect to\" variable");
-
-    count = parse_list_from_tok(args->args[1], items, MAX_ITEMS, &err);
+    unsigned count = parse_list_from_tok((uint8_t*)args[1], items, MAX_ITEMS, &err);
     /*Fail silently because syntax is correct, but input might be bad. Let basic program handle error*/
     interface_assert(err == E_SUCCESS && count > 0 && items[0] != NULL, NULL);
 
-    respect_to_expr = parse_respect_to(args->args[3], args->arg_len[3], &err);
-    interface_assert(err == E_SUCCESS && respect_to_expr != NULL, NULL);
+    respect_to = parse_respect_to(args[3], &err);
+    interface_assert(err == E_SUCCESS && respect_to != NULL, NULL);
 
-    err = calculus_Run((Calculus)flags, items, count, respect_to_expr, NULL);
+    err = calculus_Run((Calculus)flags, items, count, respect_to, NULL);
 
     if(err == E_SUCCESS)
-        write_to_tok(args->args[2], items[0], &err);
+        write_to_tok((uint8_t*)args[2], items[0], &err);
 
     cleanup_items(items, count);
-    ast_Cleanup(respect_to_expr);
+    ast_Cleanup(respect_to);
 
     interface_assert(err == E_SUCCESS, NULL);
 
-    success();
+    return 0;
 }
 
 /*
@@ -613,65 +501,99 @@ void interface_Calculus(arg_list *args, unsigned flags) {
 
     Checks whether the solution in the 3rd argument satisfies the differential equation and initial conditions in the 2nd. Writes 1 to Ans if it does and 0 if not.
 */
-void interface_Verify(arg_list *args, unsigned flags) {
-    pcas_ast_t *items[MAX_ITEMS], *solution, *respect_to_expr;
+int interface_Verify(int argc, const char *args[], unsigned flags) {
+    pcas_ast_t *items[MAX_ITEMS], *solution, *respect_to;
     pcas_error_t err;
-    unsigned count;
     bool satisfied = false;
 
-    interface_assert(args->amount >= 4, "Not enough arguments");
-
-    tok_fix(&args->args[1], &args->arg_len[1]);
-    tok_fix(&args->args[2], &args->arg_len[2]);
-
-    interface_assert(tok_valid(args->args[1], args->arg_len[1]), "Not a valid equation variable");
-    interface_assert(tok_valid(args->args[2], args->arg_len[2]), "Not a valid solution variable");
-    interface_assert(valid_respect_to(args->args[3], args->arg_len[3]), "Not a valid \"respect to\" variable");
-
-    count = parse_list_from_tok(args->args[1], items, MAX_ITEMS, &err);
+    unsigned count = parse_list_from_tok((uint8_t*)args[1], items, MAX_ITEMS, &err);
     interface_assert(err == E_SUCCESS && count > 0 && items[0] != NULL, NULL);
 
-    solution = parse_from_tok(args->args[2], &err);
-    respect_to_expr = parse_respect_to(args->args[3], args->arg_len[3], &err);
+    solution = parse_from_tok((uint8_t*)args[2], &err);
+    respect_to = parse_respect_to(args[3], &err);
 
-    if(solution != NULL && respect_to_expr != NULL)
-        err = calculus_Verify(items, count, respect_to_expr, solution, &satisfied);
+    if(solution != NULL && respect_to != NULL)
+        err = calculus_Verify(items, count, respect_to, solution, &satisfied);
 
     cleanup_items(items, count);
     ast_Cleanup(solution);
-    ast_Cleanup(respect_to_expr);
+    ast_Cleanup(respect_to);
 
-    write_ans(err == E_SUCCESS && satisfied);
+    return err == E_SUCCESS && satisfied ? 0 : 1;
 }
+
+#define MAX_PARAMS 4
+
+typedef enum {
+    /* This parameter is a variable, like Y1 through Y0, Str1 through Str0, or Ans */
+    P_VAR,
+    /* This parameter is a variable, like A through Z or theta, like the variable to differentiate with respect to */
+    P_LETTER,
+} ParamFlags;
+
+typedef struct {
+    const char *label;
+    ParamFlags flags;
+} interface_param;
 
 typedef struct interface_op {
 	const char* name;
-	/*Called with the flags of the operation*/
-	void (*func)(arg_list *args, unsigned flags);
+	/*Called with the arguments after they are checked, starting with the name, and the flags of the operation. Returns 0 on success.*/
+	int (*func)(int argc, const char *args[], unsigned flags);
+	/*The required parameters*/
+	interface_param params[MAX_PARAMS];
 	unsigned flags;
 } interface_op;
 
 static const struct interface_op ops[] = {
-	{"SIMP", interface_Simplify},
-	{"EVAL", interface_Eval},
-	{"SUB", interface_Substitute},
-	{"EXP", interface_Expand},
-	{"DERIV", interface_Calculus, CALCULUS_DERIVATIVE},
-	{"INTEG", interface_Calculus, CALCULUS_INTEGRAL},
-	{"DE", interface_Calculus, CALCULUS_DE},
-	{"VERIFY", interface_Verify}
+	{"SIMP", interface_Simplify, {{"input"}, {"output"}}},
+	{"EVAL", interface_Eval, {{"input"}, {"output"}}},
+	{"SUB", interface_Substitute, {{"input"}, {"output"}, {"substitute from"}, {"substitute to"}}},
+	{"EXP", interface_Expand, {{"input"}, {"output"}}},
+	{"DERIV", interface_Calculus, {{"input"}, {"output"}, {"respect to", P_LETTER}}, CALCULUS_DERIVATIVE},
+	{"INTEG", interface_Calculus, {{"input"}, {"output"}, {"respect to", P_LETTER}}, CALCULUS_INTEGRAL},
+	{"DE", interface_Calculus, {{"input"}, {"output"}, {"respect to", P_LETTER}}, CALCULUS_DE},
+	{"VERIFY", interface_Verify, {{"equation"}, {"solution"}, {"respect to", P_LETTER}}}
 };
 
 /*Returns the operation named by the first argument, or NULL if there is none*/
 static const interface_op *find_op(arg_list *args) {
-    unsigned i;
-
-    for(i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
+    for(unsigned i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
         if(strlen(ops[i].name) == args->arg_len[0] && !strncmp(ops[i].name, (char*)args->args[0], args->arg_len[0]))
             return &ops[i];
     }
 
     return NULL;
+}
+
+/*Checks the arguments for op and runs it. Returns 0 on success.*/
+static int run_op(const interface_op *op, arg_list *args) {
+    char buffer[50];
+    unsigned required = 0;
+
+    while(required < MAX_PARAMS && op->params[required].label != NULL)
+        required++;
+
+    interface_assert(args->amount > required, "Not enough arguments");
+
+    for(unsigned i = 0; i < args->amount; i++)
+        tok_fix(&args->args[i], &args->arg_len[i]);
+
+    for(unsigned i = 0; i < required; i++) {
+        const interface_param *param = &op->params[i];
+        uint8_t *arg = args->args[i + 1];
+        bool valid = false;
+
+        switch(param->flags) {
+        case P_VAR: valid = tok_valid(arg, args->arg_len[i + 1]); break;
+        case P_LETTER:   valid = letter_valid((char*)arg);              break;
+        }
+
+        sprintf(buffer, "Not a valid %s %s", param->label, param->flags == P_LETTER ? "letter" : "variable");
+        interface_assert(valid, buffer);
+    }
+
+    return op->func(args->amount, (const char**)args->args, op->flags);
 }
 
 void interface_Run(void) {
@@ -687,7 +609,7 @@ void interface_Run(void) {
         const interface_op *op = find_op(&args);
 
         if(op != NULL)
-            op->func(&args, op->flags);
+            write_ans(run_op(op, &args) == 0);
 
         id_UnloadAll();
 
