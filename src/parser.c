@@ -108,8 +108,9 @@ typedef struct _Tokenizer {
 /*'0' through '9' and including '.'*/
 #define is_num(byte) (((byte) >= 0x30 && (byte) <= 0x39) || (byte) == lookup[TOK_PERIOD].bytes[0])
 
-mp_rat
-read_num(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
+mp_rat read_num(
+	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+) {
 	mp_rat num;
 
 	unsigned size = 0;
@@ -147,8 +148,9 @@ read_num(const uint8_t *equation, unsigned index, unsigned length, const struct 
 	return num;
 }
 
-TokenType
-read_type(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
+TokenType read_type(
+	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+) {
 	unsigned identifier_index;
 
 	for (identifier_index = TOK_PLUS; identifier_index < AMOUNT_TOKENS; identifier_index++) {
@@ -176,8 +178,9 @@ read_type(const uint8_t *equation, unsigned index, unsigned length, const struct
 	return TOK_INVALID;
 }
 
-Symbol
-read_symbol(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
+Symbol read_symbol(
+	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+) {
 	/*Symbol letter enum values are mapped to their ascii code (SYM_B == 'B')*/
 	if (equation[index] >= 'A' && equation[index] <= 'Z') {
 		*consumed = 1;
@@ -193,8 +196,9 @@ read_symbol(const uint8_t *equation, unsigned index, unsigned length, const stru
 	}
 }
 
-token_t
-read_token(const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed) {
+token_t read_token(
+	const uint8_t *equation, unsigned index, unsigned length, const struct Identifier *lookup, unsigned *consumed
+) {
 	token_t tok;
 
 	if (is_num(equation[index])) {
@@ -216,8 +220,9 @@ read_token(const uint8_t *equation, unsigned index, unsigned length, const struc
 	return tok;
 }
 
-pcas_error_t
-_tokenize(token_t *tokens, const uint8_t *equation, unsigned length, unsigned *tok_amount, const struct Identifier *lookup) {
+pcas_error_t _tokenize(
+	token_t *tokens, const uint8_t *equation, unsigned length, unsigned *tok_amount, const struct Identifier *lookup
+) {
 	unsigned token_index = 0;
 	unsigned i = 0;
 

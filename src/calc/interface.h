@@ -18,8 +18,9 @@ typedef enum { CALCULUS_DERIVATIVE, CALCULUS_INTEGRAL, CALCULUS_DE } Calculus;
 /*Replaces items[0] with the result of kind with respect to respect_to, ready to export. The other items are initial conditions for CALCULUS_DE. Writes a one line summary to summary if it is not NULL.*/
 pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, char *summary);
 /*Checks whether solution satisfies the equation and initial conditions in items*/
-pcas_error_t
-calculus_Verify(pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, pcas_ast_t *solution, bool *satisfied);
+pcas_error_t calculus_Verify(
+	pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, pcas_ast_t *solution, bool *satisfied
+);
 
 /*Checks if Ans is trying to call a function of PCAS*/
 bool interface_Valid(void);

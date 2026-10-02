@@ -455,8 +455,9 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pca
 	return err;
 }
 
-pcas_error_t
-calculus_Verify(pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, pcas_ast_t *solution, bool *satisfied) {
+pcas_error_t calculus_Verify(
+	pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, pcas_ast_t *solution, bool *satisfied
+) {
 	pcas_de_t de;
 	pcas_error_t err;
 

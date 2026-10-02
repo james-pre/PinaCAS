@@ -2,5 +2,6 @@
 	"cSpell.words": [
 		"Pina",
 		"pinacas"
-	]
+	],
+	"editor.formatOnSave": true
 }

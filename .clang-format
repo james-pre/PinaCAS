@@ -18,6 +18,8 @@ BinPackArguments: false
 BinPackParameters: false
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
+BreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000
 
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
