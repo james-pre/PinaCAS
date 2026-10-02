@@ -30,8 +30,10 @@ typedef struct {
 /*Returns y with order primes*/
 pcas_ast_t *de_Derivative(pcas_ast_t *y, unsigned order);
 
-/*Classifies equation, an equals node or an expression equal to zero, and records the classification. Copies its arguments. de_Cleanup must be called even on failure.*/
+/*Classifies equation, an equals node or an expression equal to zero, and records it. Copies its arguments. de_Cleanup must be called even on failure.*/
 pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x);
+/*Records the order and linearity*/
+void de_Classify(pcas_de_t *de);
 void de_Cleanup(pcas_de_t *de);
 
 /*Returns the left side of the linear standard form*/

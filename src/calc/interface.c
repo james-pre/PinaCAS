@@ -519,6 +519,8 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pca
         err = de_LoadList(&de, items, count, respect_to);
 
         if(err == E_SUCCESS) {
+            de_Classify(&de);
+
             if(summary != NULL)
                 sprintf(summary, "Order %u, %s.", de.order, de.linear ? "linear" : "nonlinear");
 

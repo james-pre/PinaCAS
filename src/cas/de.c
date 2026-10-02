@@ -143,7 +143,6 @@ pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
     canonical_SetFunction(y->op.symbol);
 
     work_Step(STEP_EQUATION, NULL, ast_ChildGet(de->equation, 0), ast_ChildGet(de->equation, 1));
-    work_Text(order_names[de->order - 1]);
 
     f = ast_MakeBinary(OP_ADD,
             ast_Copy(ast_ChildGet(de->equation, 0)),
@@ -155,6 +154,12 @@ pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
 
     ast_Cleanup(f);
 
+    return E_SUCCESS;
+}
+
+void de_Classify(pcas_de_t *de) {
+    work_Text(order_names[de->order - 1]);
+
     if(de->linear) {
         pcas_ast_t *standard = de_StandardForm(de);
         work_Step(STEP_EQUATION, "Linear", standard, de->g);
@@ -162,8 +167,6 @@ pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
     } else {
         work_Text("Nonlinear");
     }
-
-    return E_SUCCESS;
 }
 
 void de_Cleanup(pcas_de_t *de) {

@@ -563,6 +563,8 @@ int run_de(int argc, char **argv) {
         err = de_Load(&de, e, x);
 
         if(err == E_SUCCESS) {
+            de_Classify(&de);
+
             printf("Order: %u\n", de.order);
             printf("Linear: %s\n", de.linear ? "yes" : "no");
 
