@@ -34,6 +34,7 @@ void display_help(void) {
     printf("\texpand [expression]\t\tExpands expression\n");
     printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
     printf("\tintegral [expression] [respect to]\n");
+    printf("\tde [equation] [(optional) respect to]\tClassifies a differential equation\n");
 }
 
 /*Trim null terminated string*/
@@ -539,6 +540,67 @@ int run_integral(int argc, char **argv) {
     return 0;
 }
 
+int run_de(int argc, char **argv) {
+
+    uint8_t *trimmed;
+    unsigned trimmed_len;
+
+    pcas_error_t err;
+    pcas_ast_t *e = NULL, *x = NULL;
+    pcas_de_t de;
+
+    if(argc <= 2) {
+        display_help();
+        return -1;
+    }
+
+    trimmed = trim(argv[2], &trimmed_len);
+    e = parse(trimmed, trimmed_len, str_table, &err);
+    free(trimmed);
+
+    if(err == E_SUCCESS) {
+        if(argc >= 4) {
+            trimmed = trim(argv[3], &trimmed_len);
+            x = parse(trimmed, trimmed_len, str_table, &err);
+            free(trimmed);
+        } else {
+            x = ast_MakeSymbol(SYM_X);
+        }
+    }
+
+    if(err == E_SUCCESS && e != NULL && x != NULL) {
+        err = de_Load(&de, e, x);
+
+        if(err == E_SUCCESS) {
+            printf("Order: %u\n", de.order);
+            printf("Linear: %s\n", de.linear ? "yes" : "no");
+
+            if(de.linear) {
+                pcas_ast_t *standard = de_StandardForm(&de);
+                pcas_ast_t *equation = ast_MakeBinary(OP_EQUALS, standard, ast_Copy(de.g));
+
+                simplify_canonical_form(equation, CANONICAL_ALL);
+                printf("Standard form: ");
+                print_ast(equation);
+                printf("\n");
+
+                ast_Cleanup(equation);
+            }
+        } else {
+            printf("%s\n", error_text[err]);
+        }
+
+        de_Cleanup(&de);
+    } else {
+        printf("%s\n", error_text[err]);
+    }
+
+    ast_Cleanup(e);
+    ast_Cleanup(x);
+
+    return err == E_SUCCESS ? 0 : -1;
+}
+
 int main(int argc, char **argv) {
     int ret;
     pcas_work_t work;
@@ -558,6 +620,7 @@ int main(int argc, char **argv) {
         else if(!strcmp(argv[1], "expand"))     ret = run_expand(argc, argv);
         else if(!strcmp(argv[1], "derivative")) ret = run_derivative(argc, argv);
         else if(!strcmp(argv[1], "integral"))   ret = run_integral(argc, argv);
+        else if(!strcmp(argv[1], "de"))         ret = run_de(argc, argv);
         else {
             display_help();
             return -1;

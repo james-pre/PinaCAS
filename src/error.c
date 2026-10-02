@@ -15,4 +15,8 @@ const char *error_text[AMOUNT_ERRORS] = {
     "Bad comma",
 
     "No mapping for symbol",
+
+    "No derivative in equation",
+    "Primes must follow one function",
+    "Order too high",
 };

@@ -19,6 +19,11 @@ typedef enum {
 
     E_EVAL_NO_MAPPING,
 
+    /*Differential equations*/
+    E_DE_NO_DERIVATIVE,
+    E_DE_BAD_FUNCTION,
+    E_DE_ORDER,
+
     AMOUNT_ERRORS
 } pcas_error_t;
 
