@@ -13,10 +13,12 @@ struct Identifier ti_table[AMOUNT_TOKENS] = {
     {1, {0xF0}},                /*TOK_POWER*/
     {1, {0x3B}},                /*TOK_SCIENTIFIC*/
     {1, {0xF1}},                /*TOK_ROOT*/
+    {1, {0x6A}},                /*TOK_EQUALS*/
 
     {1, {0xB0}},                            /*TOK_NEGATE*/
     {1, {0x0C}}, {1, {0x0D}}, {1, {0x0F}},  /*TOK_RECIPROCAL, TOK_SQUARE, TOK_CUBE*/
     {1, {0x2D}},                            /*TOK_FACTORIAL*/
+    {1, {0xAE}},                            /*TOK_PRIME*/
 
     {2, {0xEF, 0x34}},          /*TOK_LOG_BASE*/
     {1, {0x25}},                /*TOK_DERIV*/
@@ -53,10 +55,12 @@ struct Identifier str_table[AMOUNT_TOKENS] = {
     {1, "^"},                       /*TOK_POWER*/
     {3, "[E]"},                     /*TOK_SCIENTIFIC*/
     {4, "root"},                    /*TOK_ROOT*/
+    {1, "="},                       /*TOK_EQUALS*/
 
     {1, "-"},                               /*TOK_NEGATE*/
     {5, "^(-1)"}, {2, "^2"}, {2, "^3"},     /*TOK_RECIPROCAL, TOK_SQUARE, TOK_CUBE*/
     {1, "!"},                               /*TOK_FACTORIAL*/
+    {1, "'"},                               /*TOK_PRIME*/
 
     {5, "logb("},                   /*TOK_LOG_BASE*/
     {6, "deriv("},                  /*TOK_DERIV*/
@@ -255,6 +259,8 @@ pcas_error_t tokenize(tokenizer_t *t, const uint8_t *equation, unsigned length, 
 /*Larger = Higher precedence*/
 uint8_t precedence(TokenType type) {
     switch(type) {
+    case TOK_EQUALS:
+        return 1;
     case TOK_PLUS: case TOK_MINUS:
         return 5;
     case TOK_MULTIPLY: case TOK_NEGATE:
@@ -263,6 +269,7 @@ uint8_t precedence(TokenType type) {
     case TOK_POWER:  case TOK_RECIPROCAL:
     case TOK_SQUARE: case TOK_CUBE:
     case TOK_ROOT:   case TOK_FACTORIAL:
+    case TOK_PRIME:
         return 15;
     case TOK_SCIENTIFIC:
         return 20;
@@ -336,6 +343,8 @@ void translate(pcas_ast_t *e) {
         break;   
     }
     case TOK_ROOT:       optype(e) = OP_ROOT; break;
+    case TOK_EQUALS:     optype(e) = OP_EQUALS; break;
+    case TOK_PRIME:      optype(e) = OP_PRIME; break;
     case TOK_NEGATE:
         optype(e) = OP_MULT;
         ast_ChildInsert(e, ast_MakeNumber(num_FromInt(-1)), 0);

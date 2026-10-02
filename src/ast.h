@@ -34,6 +34,11 @@ typedef enum {
     /*1st child = f(var), 2nd child = var*/
     OP_INTEGRAL,
 
+    /*1st child = left side, 2nd child = right side*/
+    OP_EQUALS,
+    /*Derivative of the unknown function that is its child*/
+    OP_PRIME,
+
     /*Unary*/
     OP_FACTORIAL,
 

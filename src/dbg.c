@@ -16,7 +16,7 @@ void ti_debug(const char *format, ...) {
 #endif
 
 const char *operators[AMOUNT_OPS] = {
-    "+", "*", "/", "^", "root", "log", "deriv", "integ", "!", "int",
+    "+", "*", "/", "^", "root", "log", "deriv", "integ", "=", "'", "!", "int",
     "abs", "sin", "asin", "cos", "acos", "tan", "atan",
     "sinh", "asinh", "cosh", "acosh", "tanh", "atanh"
 };

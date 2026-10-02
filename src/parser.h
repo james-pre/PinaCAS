@@ -3,8 +3,8 @@
 #include "ast.h"
 #include "error.h"
 
-#define is_tok_unary_operator(tok)    ((tok) >= TOK_NEGATE && (tok) <= TOK_FACTORIAL)
-#define is_tok_binary_operator(tok)   ((tok) >= TOK_PLUS && (tok) <= TOK_ROOT)
+#define is_tok_unary_operator(tok)    ((tok) >= TOK_NEGATE && (tok) <= TOK_PRIME)
+#define is_tok_binary_operator(tok)   ((tok) >= TOK_PLUS && (tok) <= TOK_EQUALS)
 #define is_tok_operator(tok) (is_tok_unary_operator(tok) || is_tok_binary_operator(tok))
 
 #define is_tok_unary_function(tok)    ((tok) >= TOK_INT && (tok) <= TOK_TANH_INV)
@@ -22,11 +22,13 @@ typedef enum _TokenType {
     TOK_POWER,
     TOK_SCIENTIFIC,
     TOK_ROOT,
+    TOK_EQUALS,
 
     /*Unary*/
     TOK_NEGATE,
     TOK_RECIPROCAL, TOK_SQUARE, TOK_CUBE,
     TOK_FACTORIAL,
+    TOK_PRIME,
 
     TOK_LOG_BASE,
     TOK_DERIV,

@@ -11,6 +11,8 @@ which could be easily copied here. */
 
 static uint8_t precedence_type(OperatorType type) {
     switch(type) {
+    case OP_EQUALS:
+        return 1;
     case OP_ADD:
         return 5;
     case OP_MULT: case OP_DIV:
@@ -28,7 +30,7 @@ static uint8_t precedence(pcas_ast_t *e) {
     return 255;
 }
 
-#define is_right_operator_type(type) ((type) == OP_FACTORIAL)
+#define is_right_operator_type(type) ((type) == OP_FACTORIAL || (type) == OP_PRIME)
 
 #define need_paren(parent, child) ( (((parent)->type == NODE_OPERATOR && is_op_operator(optype(parent)) && !is_op_commutative(optype(parent)) && precedence(child) <= precedence(parent)) \
                                     || precedence(child) < precedence(parent)) \
@@ -58,6 +60,7 @@ pcas_ast_t *leftmost(pcas_ast_t *e) {
             /*FALLTHROUGH*/
         case OP_LOG:
         case OP_FACTORIAL:
+        case OP_PRIME:
             return leftmost(opbase(e));
         default:
             break;
@@ -287,7 +290,13 @@ static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct 
             index = _to_binary(ast_ChildGet(e, 1), data, index, lookup, err);
             add_token(TOK_CLOSE_PAR);
             break;
-        } case OP_FACTORIAL: {
+        } case OP_EQUALS: {
+            index = _to_binary(ast_ChildGet(e, 0), data, index, lookup, err);
+            add_token(TOK_EQUALS);
+            index = _to_binary(ast_ChildGet(e, 1), data, index, lookup, err);
+            break;
+        } case OP_FACTORIAL:
+          case OP_PRIME: {
 
             pcas_ast_t *a;
 
@@ -297,7 +306,7 @@ static unsigned _to_binary(pcas_ast_t *e, uint8_t *data, unsigned index, struct 
             index = _to_binary(a, data, index, lookup, err);
             if(need_paren(e, a)) add_token(TOK_CLOSE_PAR);
 
-            add_token(TOK_FACTORIAL);
+            add_token(optype(e) == OP_PRIME ? TOK_PRIME : TOK_FACTORIAL);
 
             break;
         } default:
