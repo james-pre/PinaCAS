@@ -234,6 +234,18 @@ Symbol fresh_symbol(pcas_ast_t *e) {
 	return SYM_INVALID;
 }
 
+unsigned node_count(pcas_ast_t *e) {
+	pcas_ast_t *child;
+	unsigned count = 1;
+
+	if (e->type == NODE_OPERATOR) {
+		for (child = opbase(e); child != NULL; child = child->next)
+			count += node_count(child);
+	}
+
+	return count;
+}
+
 Symbol constant_symbol(pcas_ast_t *e) {
 	return !contains_symbol(e, SYM_C) ? SYM_C : !contains_symbol(e, SYM_K) ? SYM_K : fresh_symbol(e);
 }

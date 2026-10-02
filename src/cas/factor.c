@@ -296,3 +296,17 @@ bool factor(pcas_ast_t *e, unsigned char flags) {
 	work_Leave(e);
 	return changed;
 }
+
+void factor_cancel(pcas_ast_t *e) {
+	pcas_ast_t *factored = ast_Copy(e);
+
+	work_Pause();
+	factor(factored, FAC_ALL);
+	simplify(factored, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+	work_Resume();
+
+	if (node_count(factored) < node_count(e))
+		replace_node(e, factored);
+	else
+		ast_Cleanup(factored);
+}

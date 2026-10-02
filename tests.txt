@@ -387,6 +387,11 @@ integ; Xe^(-X); X; -Xe^(-X)_e^(-X)
 integ; e^(-X); X; -e^(-X)
 integ; X^2e^(-3X); X; -X^2e^(-3X)/3_2Xe^(-3X)/9_2e^(-3X)/27
 integ; e^(X/2)/e^X; X; -2e^(-X/2)
+integ; 1/tan(X); X; ln(abs(sin(X)))
+integ; cos(X)/sin(X); X; ln(abs(sin(X)))
+integ; X^2/(1+X^2); X; X_atan(X)
+integ; X/(X+1); X; X_ln(abs(X+1))
+integ; (X^3+1)/(X_1); X; X^3/3+X^2/2+X+2ln(abs(X_1))
 deriv; integ(e^(X^2),X); X; e^(X^2)
 
 #Differential equations: order and linearity
@@ -437,3 +442,11 @@ solve; Y'=XY+X,Y(0)=1; Y=2e^(X^2/2)_1; X
 solve; Y'=e^(X+Y); Y=-ln(C_e^X); X
 solve; YY'=X; Y^2=X^2+C; X
 solve; Y'=2X; Y=X^2+C; X
+
+#Differential equations: first order linear
+solve; XY'_3Y=X^5,Y(1)=2; Y=X^5/2+3X^3/2; X
+solve; (1+X^2)Y'=2XY+X^2+X^4; Y=(X_atan(X)+C)(X^2+1); X
+solve; Y'=1/sin(X)_Ycos(X)/sin(X); Y=(X+C)/sin(X); X
+solve; X^2Y'+5XY=3X^2; Y=X/2+C/X^5; X
+solve; A'=8_A/150,A(0)=1800; A=1200+600e^(-T/150); T
+solve; Y'+2Y=e^(-X),Y(0)=3; Y=e^(-X)+2e^(-2X); X

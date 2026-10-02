@@ -637,7 +637,10 @@ static pcas_ast_t *divide(pcas_ast_t *f, pcas_ast_t *x) {
 			for (k = dd; k <= nd; k++)
 				ast_Cleanup(n[k]);
 
-			rewritten = add(polynomial(q, nd - dd, x), quotient(polynomial(n, dd - 1, x), ast_Copy(denominator)));
+			child = quotient(polynomial(n, dd - 1, x), ast_Copy(denominator));
+			simplify(child, SIMP_BASIC);
+			factor_cancel(child);
+			rewritten = add(polynomial(q, nd - dd, x), child);
 			simplify(rewritten, SIMP_BASIC);
 		}
 

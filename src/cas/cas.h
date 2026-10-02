@@ -142,6 +142,8 @@ resulting multiplication can be evauated numerically*/
 #define FAC_ALL 0xFF
 
 bool factor(pcas_ast_t *e, unsigned char flags);
+/*Factors e to cancel common factors of its numerator and denominator, keeping the result only if it has fewer nodes*/
+void factor_cancel(pcas_ast_t *e);
 
 /*EVAL_DISTRIBUTE_NUMBERS, EVAL_DISTRIBUTE_MULTIPLICATION, EVAL_DISTRIBUTE_ADDITION, EVAL_EXPAND_POWERS*/
 
@@ -210,6 +212,7 @@ bool contains_symbol(pcas_ast_t *e, Symbol symbol);
 Symbol fresh_symbol(pcas_ast_t *e);
 /*Returns C, or K, or another symbol that does not appear in e, to name an arbitrary constant*/
 Symbol constant_symbol(pcas_ast_t *e);
+unsigned node_count(pcas_ast_t *e);
 
 /*Returns true if the node is being multiplied by at least one negative or is already a negative number node.
 The node must be completely simplified for this to work, because it does not detect
