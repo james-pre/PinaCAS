@@ -374,8 +374,8 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
         break;
     }
     case BOX_INTEGRAL:
-        b->ascent = first->ascent + m->gap;
-        b->descent = first->descent + m->gap;
+        b->ascent = first->ascent + 2 * m->gap;
+        b->descent = first->descent + 2 * m->gap;
         b->width = m->integral_width(height(b)) + first->width;
         break;
     }
