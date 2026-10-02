@@ -6,6 +6,8 @@
 
 /*Limits how deeply integration rules are chained for one integral*/
 #define MAX_METHOD_DEPTH 12
+/*Highest degree of a polynomial that is divided*/
+#define MAX_DEGREE 8
 
 static pcas_ast_t *integer(mp_small n) {
 	return ast_MakeNumber(num_FromInt(n));
@@ -252,6 +254,11 @@ static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t 
 			case OP_COSH: return over_slope(ast_MakeUnary(OP_TANH, ast_Copy(v)), v, x);
 			default: return NULL;
 		}
+	}
+
+	if (is_ast_fraction(n, -1, 1) && isoptype(u, OP_TAN)) {
+		v = ast_ChildGet(u, 0);
+		return over_slope(ln(ast_MakeUnary(OP_ABS, ast_MakeUnary(OP_SIN, ast_Copy(v)))), v, x);
 	}
 
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != NULL)
@@ -537,6 +544,122 @@ static pcas_ast_t *substitution(pcas_ast_t *f, pcas_ast_t *x) {
 	return result;
 }
 
+/*Fills c with the coefficients of the polynomial e in x, constant first, and returns its degree, or -1 if it is higher than MAX_DEGREE*/
+static int coefficients(pcas_ast_t *e, pcas_ast_t *x, pcas_ast_t **c) {
+	pcas_ast_t *d = ast_Copy(e), *zero = integer(0);
+	int k;
+	mp_small factorial = 1;
+
+	for (k = 0; k <= MAX_DEGREE + 1 && !is_ast_int(d, 0); k++) {
+		pcas_ast_t *next;
+
+		if (k == MAX_DEGREE + 1) {
+			while (k-- > 0)
+				ast_Cleanup(c[k]);
+			k = -1;
+			break;
+		}
+
+		if (k > 0)
+			factorial *= k;
+
+		c[k] = ast_Copy(d);
+		substitute(c[k], x, zero);
+		c[k] = quotient(c[k], integer(factorial));
+		simplify(c[k], SIMP_BASIC);
+
+		next = ast_Copy(d);
+		derivative(next, x, x);
+		simplify(next, SIMP_BASIC);
+		ast_Cleanup(d);
+		d = next;
+	}
+
+	ast_Cleanup(d);
+	ast_Cleanup(zero);
+
+	return k < 0 ? -1 : k - 1;
+}
+
+/*Returns the sum of c[k]*x^k for k up to degree. Takes ownership of the coefficients.*/
+static pcas_ast_t *polynomial(pcas_ast_t **c, int degree, pcas_ast_t *x) {
+	pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
+	int k;
+
+	for (k = degree; k >= 0; k--)
+		ast_ChildAppend(sum, mul(c[k], power(ast_Copy(x), integer(k))));
+
+	ast_ChildAppend(sum, integer(0));
+	return sum;
+}
+
+/*Rewrites the integral of a quotient of polynomials whose numerator has at least the degree of the denominator as the integral of a polynomial plus a proper fraction. Records the step.*/
+static pcas_ast_t *divide(pcas_ast_t *f, pcas_ast_t *x) {
+	pcas_ast_t *product = factors_of(f), *numerator = ast_MakeOperator(OP_MULT),
+			   *denominator = ast_MakeOperator(OP_MULT);
+	pcas_ast_t *n[MAX_DEGREE + 1], *d[MAX_DEGREE + 1], *q[MAX_DEGREE + 1], *child, *rewritten = NULL, *before;
+	int nd = -1, dd = -1, j, k;
+
+	for (child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
+		mp_rat exponent;
+
+		if (isoptype(child, OP_POW) && (exponent = number_value(ast_ChildGet(child, 1))) != NULL) {
+			if (mp_rat_compare_zero(exponent) < 0)
+				ast_ChildAppend(denominator, reciprocal(child));
+			else
+				ast_ChildAppend(numerator, ast_Copy(child));
+			num_Cleanup(exponent);
+		} else {
+			ast_ChildAppend(numerator, ast_Copy(child));
+		}
+	}
+
+	ast_Cleanup(product);
+
+	work_Pause();
+
+	if (ast_ChildLength(denominator) > 0 && is_polynomial(numerator, x) && is_polynomial(denominator, x) &&
+		(dd = coefficients(denominator, x, d)) >= 1) {
+		if ((nd = coefficients(numerator, x, n)) < dd) {
+			for (k = 0; k <= nd; k++)
+				ast_Cleanup(n[k]);
+		} else {
+			for (k = nd - dd; k >= 0; k--) {
+				q[k] = quotient(ast_Copy(n[k + dd]), ast_Copy(d[dd]));
+				simplify(q[k], SIMP_BASIC);
+
+				for (j = 0; j <= dd; j++) {
+					n[k + j] = add(n[k + j], negate(mul(ast_Copy(q[k]), ast_Copy(d[j]))));
+					simplify(n[k + j], SIMP_BASIC);
+				}
+			}
+
+			for (k = dd; k <= nd; k++)
+				ast_Cleanup(n[k]);
+
+			rewritten = add(polynomial(q, nd - dd, x), quotient(polynomial(n, dd - 1, x), ast_Copy(denominator)));
+			simplify(rewritten, SIMP_BASIC);
+		}
+
+		for (k = 0; k <= dd; k++)
+			ast_Cleanup(d[k]);
+	}
+
+	work_Resume();
+
+	if (rewritten != NULL) {
+		rewritten = integral_node(rewritten, x);
+		before = integral_node(ast_Copy(f), x);
+		work_Step(STEP_INTEGRAL, "Divide", before, rewritten);
+		ast_Cleanup(before);
+	}
+
+	ast_Cleanup(numerator);
+	ast_Cleanup(denominator);
+
+	return rewritten;
+}
+
 static unsigned liate_rank(pcas_ast_t *h, pcas_ast_t *x) {
 	if (isoptype(h, OP_LOG) && is_constant(ast_ChildGet(h, 0), x))
 		return 5;
@@ -633,7 +756,10 @@ static bool integrate_node(pcas_ast_t *e, unsigned budget) {
 		work_Step(STEP_INTEGRAL, NULL, before, F);
 		replace_node(e, F);
 		progress = true;
-	} else if (!isoptype(f, OP_ADD) && ((F = substitution(f, x)) != NULL || (F = by_parts(f, x)) != NULL)) {
+	} else if (
+		!isoptype(f, OP_ADD) &&
+		((F = divide(f, x)) != NULL || (F = substitution(f, x)) != NULL || (F = by_parts(f, x)) != NULL)
+	) {
 		replace_node(e, F);
 		integrate_all(e, budget - 1);
 		simplify_quietly(e);
