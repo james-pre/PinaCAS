@@ -56,3 +56,6 @@ remove: clean
 
 test:
 	./bin/pinacas test tests.txt
+.PHONY: format
+format:
+	clang-format -i $(wildcard $(SRCDIR)/*.[ch] $(SRCDIR)/*/*.[ch])
