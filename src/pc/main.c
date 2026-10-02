@@ -36,7 +36,7 @@ void display_help(void) {
 	printf("\texpand [expression]\t\tExpands expression\n");
 	printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
 	printf("\tintegral [expression] [respect to]\n");
-	printf("\tde [equation] [(optional) respect to]\tClassifies a differential equation\n");
+	printf("\tde [equation,conditions] [(optional) respect to]\tClassifies and solves a differential equation\n");
 	printf(
 		"\tverify [equation,conditions] [solution] [(optional) respect to]\tChecks a solution of a differential "
 		"equation\n"
@@ -519,12 +519,14 @@ int run_integral(int argc, char **argv) {
 	return 0;
 }
 
+#define MAX_ITEMS (DE_MAX_CONDITIONS + 1)
+
 int run_de(int argc, char **argv) {
 	uint8_t *trimmed;
-	unsigned trimmed_len;
+	unsigned trimmed_len, count = 0;
 
 	pcas_error_t err;
-	pcas_ast_t *e = NULL, *x = NULL;
+	pcas_ast_t *items[MAX_ITEMS], *x = NULL, *solution = NULL;
 	pcas_de_t de;
 
 	if (argc <= 2) {
@@ -533,7 +535,7 @@ int run_de(int argc, char **argv) {
 	}
 
 	trimmed = trim(argv[2], &trimmed_len);
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
 	free(trimmed);
 
 	if (err == E_SUCCESS) {
@@ -546,8 +548,8 @@ int run_de(int argc, char **argv) {
 		}
 	}
 
-	if (err == E_SUCCESS && e != NULL && x != NULL) {
-		err = de_Load(&de, e, x);
+	if (err == E_SUCCESS && count > 0 && items[0] != NULL && x != NULL) {
+		err = de_LoadList(&de, items, count, x);
 
 		if (err == E_SUCCESS) {
 			de_Classify(&de);
@@ -566,22 +568,33 @@ int run_de(int argc, char **argv) {
 
 				ast_Cleanup(equation);
 			}
-		} else {
-			printf("%s\n", error_text[err]);
+
+			err = de_Solve(&de, &solution);
+
+			if (err == E_SUCCESS) {
+				simplify_canonical_form(solution, CANONICAL_ALL);
+				printf("Method: %s\n", de.method);
+				printf("Solution: ");
+				print_ast(solution);
+				printf("\n");
+			}
 		}
+
+		if (err != E_SUCCESS)
+			printf("%s\n", error_text[err]);
 
 		de_Cleanup(&de);
 	} else {
 		printf("%s\n", error_text[err]);
 	}
 
-	ast_Cleanup(e);
+	for (unsigned i = 0; i < count; i++)
+		ast_Cleanup(items[i]);
 	ast_Cleanup(x);
+	ast_Cleanup(solution);
 
 	return err == E_SUCCESS ? 0 : -1;
 }
-
-#define MAX_ITEMS (DE_MAX_CONDITIONS + 1)
 
 int run_verify(int argc, char **argv) {
 	uint8_t *trimmed;

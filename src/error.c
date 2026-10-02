@@ -21,4 +21,6 @@ const char *error_text[AMOUNT_ERRORS] = {
 	"Order too high",
 	"Bad initial condition",
 	"Solution must be explicit",
+	"No method for this DE yet",
+	"Unable to integrate",
 };

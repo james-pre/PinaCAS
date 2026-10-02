@@ -434,13 +434,32 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pca
 			err = de_LoadList(&de, items, count, respect_to);
 
 			if (err == E_SUCCESS) {
+				pcas_ast_t *solution;
+
 				de_Classify(&de);
+				err = de_Solve(&de, &solution);
 
-				if (summary != NULL)
-					sprintf(summary, "Order %u, %s.", de.order, de.linear ? "linear" : "nonlinear");
+				if (err == E_SUCCESS) {
+					if (summary != NULL)
+						sprintf(summary, "Solved. %s.", de.method);
 
-				if (de.linear)
-					replace_node(e, ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g)));
+					if (ast_Compare(opbase(solution), de.y)) {
+						replace_node(e, ast_Copy(opbase(solution)->next));
+						ast_Cleanup(solution);
+					} else {
+						replace_node(e, solution);
+					}
+				} else if (err == E_DE_UNSOLVED || err == E_DE_INTEGRAL) {
+					if (summary != NULL)
+						sprintf(
+							summary, "Order %u, %s. %s.", de.order, de.linear ? "linear" : "nonlinear", error_text[err]
+						);
+
+					if (de.linear)
+						replace_node(e, ast_MakeBinary(OP_EQUALS, de_StandardForm(&de), ast_Copy(de.g)));
+
+					err = E_SUCCESS;
+				}
 
 				simplify_canonical_form(e, CANONICAL_ALL);
 			}

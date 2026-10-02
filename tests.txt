@@ -424,3 +424,16 @@ solves; X''+16X=0,X(0)=1; cos(4T); T
 notsolves; Y'+2Y=e^(-X); e^X; X
 notsolves; Y'+2Y=e^(-X),Y(0)=1; e^(-X)+2e^(-2X); X
 notsolves; Y''+16Y=0,Y(0)=2,Y'(0)=2; 2cos(4X)_1/2sin(4X); X
+
+#Differential equations: separable
+solve; Y'=X^2Y; Y=Ce^(X^3/3); X
+solve; Y'=X/sin(Y),Y(0)=pi/4; Y=acos(sqrt(2)/2_X^2/2); X
+solve; Y'=X/sin(Y); Y=acos(C_X^2/2); X
+solve; Y'=Xe^Y,Y(2)=0; Y=-ln(3_X^2/2); X
+solve; Y'_5Y=0,Y(0)=18; Y=18e^(5X); X
+solve; Y'=X^2e^(6Y),Y(8)=0; Y=-ln(1025_2X^3)/6; X
+solve; Y'=X^2Y,Y(0)=0; Y=0; X
+solve; Y'=XY+X,Y(0)=1; Y=2e^(X^2/2)_1; X
+solve; Y'=e^(X+Y); Y=-ln(C_e^X); X
+solve; YY'=X; Y^2=X^2+C; X
+solve; Y'=2X; Y=X^2+C; X

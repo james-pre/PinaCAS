@@ -54,6 +54,8 @@ TestType resolve_type(char *type) {
 		return TEST_DE_SOLVES;
 	if (!strcmp(type, "notsolves"))
 		return TEST_DE_NOT_SOLVES;
+	if (!strcmp(type, "solve"))
+		return TEST_DE_SOLVE;
 
 	return TEST_INVALID;
 }
@@ -212,6 +214,54 @@ static bool run_verify(test_t *t) {
 	return passed;
 }
 
+static void simplify_solution(pcas_ast_t *e) {
+	simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
+	simplify_canonical_form(e, CANONICAL_ALL);
+}
+
+/*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable. An explicit solution must also pass verification.*/
+static bool run_solve(test_t *t) {
+	pcas_ast_t *items[MAX_ITEMS], *expected, *x, *solution = NULL;
+	pcas_error_t err;
+	pcas_de_t de;
+	unsigned count, i;
+	bool satisfied = true, passed = false;
+
+	count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	expected = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
+	x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+
+	if (count == 0 || items[0] == NULL || expected == NULL || x == NULL) {
+		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
+	} else if (
+		(err = de_LoadList(&de, items, count, x)) != E_SUCCESS || (err = de_Solve(&de, &solution)) != E_SUCCESS
+	) {
+		printf("Test failed on line %u. %s\n", t->line, error_text[err]);
+		de_Cleanup(&de);
+	} else {
+		simplify_solution(solution);
+		simplify_solution(expected);
+		passed = check(t, solution, expected);
+
+		if (passed && ast_Compare(opbase(solution), de.y)) {
+			err = de_Verify(&de, solution, &satisfied);
+			passed = err == E_SUCCESS && satisfied;
+			if (!passed)
+				printf("Test failed on line %u. The solution does not verify.\n", t->line);
+		}
+
+		de_Cleanup(&de);
+	}
+
+	for (i = 0; i < count; i++)
+		ast_Cleanup(items[i]);
+	ast_Cleanup(expected);
+	ast_Cleanup(x);
+	ast_Cleanup(solution);
+
+	return passed;
+}
+
 bool test_Run(test_t *t) {
 	pcas_ast_t *a = NULL, *b = NULL, *c = NULL, *expected, *actual;
 	pcas_error_t err;
@@ -219,6 +269,8 @@ bool test_Run(test_t *t) {
 
 	if (t->type == TEST_DE_SOLVES || t->type == TEST_DE_NOT_SOLVES)
 		return run_verify(t);
+	if (t->type == TEST_DE_SOLVE)
+		return run_solve(t);
 
 	a = parse((uint8_t *)t->arg1, strlen(t->arg1), str_table, &err);
 	if (err != E_SUCCESS) {

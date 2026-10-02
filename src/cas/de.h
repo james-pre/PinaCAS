@@ -25,6 +25,9 @@ typedef struct {
 
 	pcas_condition_t conditions[DE_MAX_CONDITIONS];
 	unsigned condition_count;
+
+	/*Name of the method de_Solve used*/
+	const char *method;
 } pcas_de_t;
 
 /*Returns y with order primes*/
@@ -47,3 +50,6 @@ pcas_error_t de_AddCondition(pcas_de_t *de, pcas_ast_t *condition);
 
 /*Checks whether solution, written as y = f or as f, satisfies the equation and the initial conditions, and records the check*/
 pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied);
+
+/*Solves the equation, using the initial conditions, and records the work. The solution is y = f when explicit and an implicit equation otherwise.*/
+pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution);

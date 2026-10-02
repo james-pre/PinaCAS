@@ -4,6 +4,21 @@
 
 #define SIMP_BASIC (SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS)
 
+/*Limits how many operations are undone to solve for the function*/
+#define MAX_ISOLATE_STEPS 12
+
+static pcas_ast_t *integer(mp_small n) {
+	return ast_MakeNumber(num_FromInt(n));
+}
+
+static pcas_ast_t *negate(pcas_ast_t *a) {
+	return ast_MakeBinary(OP_MULT, integer(-1), a);
+}
+
+static pcas_ast_t *difference(pcas_ast_t *a, pcas_ast_t *b) {
+	return ast_MakeBinary(OP_ADD, a, negate(b));
+}
+
 static const char *order_names[DE_MAX_ORDER] = {
 	"First order",
 	"Second order",
@@ -95,7 +110,7 @@ static bool linear_form(pcas_de_t *de, pcas_ast_t *f) {
 	}
 
 	if (linear) {
-		de->g = ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(f));
+		de->g = negate(ast_Copy(f));
 
 		for (k = 0; k <= de->order; k++) {
 			pcas_ast_t *zero = ast_MakeNumber(num_FromInt(0));
@@ -128,6 +143,7 @@ pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
 	de->linear = false;
 	de->g = NULL;
 	de->condition_count = 0;
+	de->method = NULL;
 	for (k = 0; k <= DE_MAX_ORDER; k++)
 		de->a[k] = NULL;
 
@@ -150,11 +166,7 @@ pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
 
 	work_Step(STEP_EQUATION, NULL, ast_ChildGet(de->equation, 0), ast_ChildGet(de->equation, 1));
 
-	f = ast_MakeBinary(
-		OP_ADD,
-		ast_Copy(ast_ChildGet(de->equation, 0)),
-		ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(ast_ChildGet(de->equation, 1)))
-	);
+	f = difference(ast_Copy(ast_ChildGet(de->equation, 0)), ast_Copy(ast_ChildGet(de->equation, 1)));
 
 	work_Pause();
 	de->linear = linear_form(de, f);
@@ -266,6 +278,51 @@ pcas_error_t de_AddCondition(pcas_de_t *de, pcas_ast_t *condition) {
 	return E_SUCCESS;
 }
 
+static bool is_euler(pcas_ast_t *e) {
+	return e->type == NODE_SYMBOL && e->op.symbol == SYM_EULER;
+}
+
+static pcas_ast_t *ln(pcas_ast_t *a) {
+	return ast_MakeBinary(OP_LOG, ast_MakeSymbol(SYM_EULER), a);
+}
+
+/*Returns base^e, writing e^(A+B) as e^A*e^B, e^ln(A) as A and e^(n*ln(A)) as A^n. Takes ownership of e.*/
+static pcas_ast_t *exponential(pcas_ast_t *base, pcas_ast_t *e) {
+	pcas_ast_t *result, *child;
+
+	if (is_euler(base) && isoptype(e, OP_LOG) && is_euler(opbase(e))) {
+		result = ast_Copy(opbase(e)->next);
+	} else if (
+		is_euler(base) && isoptype(e, OP_MULT) && ast_ChildLength(e) == 2 && opbase(e)->type == NODE_NUMBER &&
+		isoptype(opbase(e)->next, OP_LOG) && is_euler(opbase(opbase(e)->next))
+	) {
+		result = ast_MakeBinary(OP_POW, ast_Copy(opbase(opbase(e)->next)->next), ast_Copy(opbase(e)));
+	} else if (is_euler(base) && isoptype(e, OP_ADD)) {
+		result = ast_MakeOperator(OP_MULT);
+		for (child = opbase(e); child != NULL; child = child->next)
+			ast_ChildAppend(result, exponential(base, ast_Copy(child)));
+	} else {
+		return ast_MakeBinary(OP_POW, ast_Copy(base), e);
+	}
+
+	ast_Cleanup(e);
+	return result;
+}
+
+/*Rewrites every power of e with exponential*/
+static void split_exponentials(pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (e->type != NODE_OPERATOR)
+		return;
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		split_exponentials(child);
+
+	if (isoptype(e, OP_POW) && is_euler(opbase(e)))
+		replace_node(e, exponential(opbase(e), ast_Copy(opbase(e)->next)));
+}
+
 /*Writes e as one fraction num/den, without simplifying*/
 static void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 	pcas_ast_t *child;
@@ -338,6 +395,7 @@ static bool numerator_vanishes(pcas_ast_t *e, unsigned short flags) {
 	bool zero;
 
 	simplify(copy, flags);
+	split_exponentials(copy);
 	rational_parts(copy, &numerator, &denominator);
 
 	expand(numerator, EXP_ALL);
@@ -362,15 +420,15 @@ static bool is_zero(pcas_ast_t *e) {
 	return zero;
 }
 
-static bool involves_function(pcas_ast_t *e, pcas_ast_t *y) {
+static bool involves(pcas_ast_t *e, pcas_ast_t *v) {
 	pcas_ast_t *child;
 
-	if (ast_Compare(e, y))
+	if (ast_Compare(e, v))
 		return true;
 
 	if (e->type == NODE_OPERATOR) {
 		for (child = opbase(e); child != NULL; child = child->next) {
-			if (involves_function(child, y))
+			if (involves(child, v))
 				return true;
 		}
 	}
@@ -393,7 +451,7 @@ static void substitute_derivatives(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t **de
 static pcas_ast_t *evaluate_side(pcas_de_t *de, pcas_ast_t *side, pcas_ast_t **derivatives, const char *label) {
 	pcas_ast_t *e = ast_Copy(side);
 
-	if (!involves_function(e, de->y))
+	if (!involves(e, de->y))
 		return e;
 
 	work_Text(label);
@@ -424,11 +482,7 @@ static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **der
 		simplify(value, SIMP_ALL);
 	work_Resume();
 
-	holds = is_zero(
-		chain = ast_MakeBinary(
-			OP_ADD, ast_Copy(value), ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(c->value))
-		)
-	);
+	holds = is_zero(chain = difference(ast_Copy(value), ast_Copy(c->value)));
 	ast_Cleanup(chain);
 
 	chain = ast_MakeBinary(OP_EQUALS, substituted, value);
@@ -442,13 +496,13 @@ static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **der
 
 pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
-	pcas_ast_t *f = solution, *left, *right, *difference;
+	pcas_ast_t *f = solution, *left, *right, *remainder;
 	unsigned k;
 
 	if (isoptype(f, OP_EQUALS) && ast_Compare(opbase(f), de->y))
 		f = opbase(f)->next;
 
-	if (involves_function(f, de->y))
+	if (involves(f, de->y))
 		return E_DE_IMPLICIT;
 
 	work_Step(STEP_EQUATION, "Solution", de->y, f);
@@ -482,11 +536,9 @@ pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 	left = evaluate_side(de, opbase(de->equation), derivatives, "Left side");
 	right = evaluate_side(de, opbase(de->equation)->next, derivatives, "Right side");
 
-	difference = ast_MakeBinary(
-		OP_ADD, ast_Copy(left), ast_MakeBinary(OP_MULT, ast_MakeNumber(num_FromInt(-1)), ast_Copy(right))
-	);
-	*satisfied = is_zero(difference);
-	ast_Cleanup(difference);
+	remainder = difference(ast_Copy(left), ast_Copy(right));
+	*satisfied = is_zero(remainder);
+	ast_Cleanup(remainder);
 
 	work_Step(STEP_EQUATION, *satisfied ? "Satisfies the equation" : "Does not satisfy the equation", left, right);
 
@@ -501,4 +553,565 @@ pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 	ast_Cleanup(right);
 
 	return E_SUCCESS;
+}
+
+/*Returns the logarithm of e to base. Takes ownership of e.*/
+static pcas_ast_t *logarithm(pcas_ast_t *base, pcas_ast_t *e) {
+	return is_euler(base) ? ln(e) : ast_MakeBinary(OP_DIV, ln(e), ln(ast_Copy(base)));
+}
+
+/*Returns the right side of the first order equation solved for y', or NULL if y' does not appear linearly*/
+static pcas_ast_t *solve_for_prime(pcas_de_t *de) {
+	pcas_ast_t *symbols[DE_MAX_ORDER + 1];
+	pcas_ast_t *f, *a, *zero, *F = NULL;
+
+	f = difference(ast_Copy(opbase(de->equation)), ast_Copy(opbase(de->equation)->next));
+	derivatives_to_symbols(de, f, symbols);
+	simplify(f, SIMP_BASIC);
+
+	a = ast_Copy(f);
+	derivative(a, symbols[1], symbols[1]);
+	simplify(a, SIMP_BASIC);
+
+	if (is_constant(a, symbols[1]) && !is_ast_int(a, 0)) {
+		zero = integer(0);
+		substitute(f, symbols[1], zero);
+		ast_Cleanup(zero);
+
+		F = ast_MakeBinary(OP_DIV, negate(f), a);
+		simplify(F, SIMP_BASIC);
+	} else {
+		ast_Cleanup(f);
+		ast_Cleanup(a);
+	}
+
+	ast_Cleanup(symbols[0]);
+	ast_Cleanup(symbols[1]);
+
+	return F;
+}
+
+/*Appends the factors of e, raised to exponent, to g when they do not involve y and to h when they do not involve x. Returns false if e is not such a product.*/
+static bool separate(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *exponent, pcas_ast_t *g, pcas_ast_t *h) {
+	pcas_ast_t *child, *base, *power, *next;
+	bool in_x = involves(e, de->x), in_y = involves(e, de->y), separable = true;
+
+	if (!in_y || (!in_x && !isoptype(e, OP_MULT) && !isoptype(e, OP_DIV))) {
+		ast_ChildAppend(in_y ? h : g, ast_MakeBinary(OP_POW, ast_Copy(e), ast_Copy(exponent)));
+		return true;
+	}
+
+	if (isoptype(e, OP_MULT)) {
+		for (child = opbase(e); child != NULL && separable; child = child->next)
+			separable = separate(de, child, exponent, g, h);
+		return separable;
+	}
+
+	if (isoptype(e, OP_DIV)) {
+		next = negate(ast_Copy(exponent));
+		separable = separate(de, opbase(e), exponent, g, h) && separate(de, opbase(e)->next, next, g, h);
+		ast_Cleanup(next);
+		return separable;
+	}
+
+	if (isoptype(e, OP_POW)) {
+		base = opbase(e);
+		power = base->next;
+
+		if (!involves(power, de->x) && !involves(power, de->y)) {
+			next = ast_MakeBinary(OP_MULT, ast_Copy(exponent), ast_Copy(power));
+			separable = separate(de, base, next, g, h);
+			ast_Cleanup(next);
+			return separable;
+		}
+
+		if (involves(base, de->x) || involves(base, de->y) || !isoptype(power, OP_ADD))
+			return false;
+
+		for (child = opbase(power); child != NULL && separable; child = child->next) {
+			next = ast_MakeBinary(OP_POW, ast_Copy(base), ast_Copy(child));
+			separable = separate(de, next, exponent, g, h);
+			ast_Cleanup(next);
+		}
+
+		return separable;
+	}
+
+	if (isoptype(e, OP_ADD)) {
+		next = ast_Copy(e);
+		factor(next, FAC_ALL);
+		separable = !isoptype(next, OP_ADD) && separate(de, next, exponent, g, h);
+		ast_Cleanup(next);
+		return separable;
+	}
+
+	return false;
+}
+
+/*Returns 1 or -1 when the sign of e is known, otherwise 0*/
+static int sign_of(pcas_ast_t *e) {
+	pcas_ast_t *child;
+	int sign = 1, compared;
+
+	if (e->type == NODE_NUMBER) {
+		compared = mp_rat_compare_zero(e->op.num);
+		return (compared > 0) - (compared < 0);
+	}
+
+	if (e->type == NODE_SYMBOL)
+		return e->op.symbol == SYM_PI || e->op.symbol == SYM_EULER;
+
+	if (isoptype(e, OP_POW))
+		return sign_of(opbase(e)) > 0;
+
+	if (isoptype(e, OP_MULT) || isoptype(e, OP_DIV)) {
+		for (child = opbase(e); child != NULL; child = child->next)
+			sign *= sign_of(child);
+		return sign;
+	}
+
+	return 0;
+}
+
+/*Returns the sign of e at the initial condition, or 0 if it is unknown*/
+static int sign_at(pcas_de_t *de, pcas_ast_t *e, pcas_condition_t *c) {
+	pcas_ast_t *value = ast_Copy(e);
+	int sign;
+
+	work_Pause();
+	substitute(value, de->y, c->value);
+	substitute(value, de->x, c->at);
+	simplify(value, SIMP_ALL);
+	work_Resume();
+
+	sign = sign_of(value);
+	ast_Cleanup(value);
+
+	return sign;
+}
+
+/*Returns the index of the only child of e that involves v, or -1*/
+static int only_child_with(pcas_ast_t *e, pcas_ast_t *v) {
+	pcas_ast_t *child;
+	int i, found = -1;
+
+	for (child = opbase(e), i = 0; child != NULL; child = child->next, i++) {
+		if (involves(child, v)) {
+			if (found >= 0)
+				return -1;
+			found = i;
+		}
+	}
+
+	return found;
+}
+
+/*Merges constants that are added to or multiply the arbitrary constant into it*/
+static void absorb(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *constant) {
+	pcas_ast_t *child, *kept;
+	int i;
+
+	if (e->type != NODE_OPERATOR || !involves(e, constant))
+		return;
+
+	if (!involves(e, de->x) && !involves(e, de->y)) {
+		replace_node(e, ast_Copy(constant));
+		return;
+	}
+
+	if (isoptype(e, OP_POW) && !involves(opbase(e), de->x) && !involves(opbase(e), de->y)) {
+		kept = ast_Copy(opbase(e)->next);
+		absorb(de, kept, constant);
+
+		if (isoptype(kept, OP_ADD) && (i = only_child_with(kept, constant)) >= 0 &&
+			ast_Compare(ast_ChildGet(kept, i), constant)) {
+			ast_Cleanup(ast_ChildRemoveIndex(kept, i));
+			replace_node(
+				e, ast_MakeBinary(OP_MULT, ast_Copy(constant), ast_MakeBinary(OP_POW, ast_Copy(opbase(e)), kept))
+			);
+		} else {
+			ast_Cleanup(kept);
+		}
+
+		return;
+	}
+
+	if ((isoptype(e, OP_ADD) || isoptype(e, OP_MULT)) && (i = only_child_with(e, constant)) >= 0) {
+		child = ast_ChildGet(e, i);
+
+		if (!involves(child, de->x) && !involves(child, de->y)) {
+			kept = ast_MakeOperator(optype(e));
+
+			for (child = opbase(e); child != NULL; child = child->next) {
+				if (involves(child, de->x) || involves(child, de->y))
+					ast_ChildAppend(kept, ast_Copy(child));
+			}
+
+			ast_ChildAppend(kept, ast_Copy(constant));
+			replace_node(e, kept);
+			return;
+		}
+	}
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		absorb(de, child, constant);
+}
+
+/*True if e is the arbitrary constant or a multiple of it*/
+static bool is_arbitrary_multiple(pcas_ast_t *e, pcas_ast_t *constant) {
+	pcas_ast_t *child;
+
+	if (constant == NULL)
+		return false;
+
+	if (ast_Compare(e, constant))
+		return true;
+
+	if (isoptype(e, OP_MULT)) {
+		for (child = opbase(e); child != NULL; child = child->next) {
+			if (ast_Compare(child, constant))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+static const OperatorType inverse_pairs[][2] = {
+	{OP_SIN, OP_SIN_INV},
+	{OP_COS, OP_COS_INV},
+	{OP_TAN, OP_TAN_INV},
+	{OP_SINH, OP_SINH_INV},
+	{OP_COSH, OP_COSH_INV},
+	{OP_TANH, OP_TANH_INV}
+};
+
+/*Returns the inverse of the function op, or AMOUNT_OPS if it has none*/
+static OperatorType inverse_of(OperatorType op) {
+	unsigned i;
+
+	for (i = 0; i < sizeof(inverse_pairs) / sizeof(inverse_pairs[0]); i++) {
+		if (inverse_pairs[i][0] == op)
+			return inverse_pairs[i][1];
+		if (inverse_pairs[i][1] == op)
+			return inverse_pairs[i][0];
+	}
+
+	return AMOUNT_OPS;
+}
+
+static pcas_ast_t *reciprocal(pcas_ast_t *e) {
+	if (isoptype(e, OP_POW))
+		return ast_MakeBinary(OP_POW, ast_Copy(opbase(e)), negate(ast_Copy(opbase(e)->next)));
+
+	return ast_MakeBinary(OP_POW, ast_Copy(e), integer(-1));
+}
+
+/*Writes the quotient a/(b*c) as a*b^-1*c^-1*/
+static pcas_ast_t *as_product(pcas_ast_t *quotient) {
+	pcas_ast_t *product = ast_MakeOperator(OP_MULT), *child;
+
+	ast_ChildAppend(product, ast_Copy(opbase(quotient)));
+	for (child = opbase(opbase(quotient)->next); child != NULL; child = child->next)
+		ast_ChildAppend(product, reciprocal(child));
+
+	return product;
+}
+
+/*Undoes the outermost operation applied to y in lhs = rhs. Returns false if it cannot.*/
+static bool isolate_step(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_t *constant, pcas_condition_t *c) {
+	pcas_ast_t *L = *lhs, *R = *rhs, *left, *right, *rest, *base, *power;
+	OperatorType inverse;
+	int i, sign = 1;
+
+	if (L->type != NODE_OPERATOR)
+		return false;
+
+	if (isoptype(L, OP_DIV) && !involves(opbase(L), de->y) && isoptype(opbase(L)->next, OP_MULT)) {
+		rest = as_product(L);
+		ast_Cleanup(L);
+		*lhs = L = rest;
+	}
+
+	if (isoptype(L, OP_ADD) || isoptype(L, OP_MULT)) {
+		if ((i = only_child_with(L, de->y)) < 0)
+			return false;
+
+		rest = ast_Copy(L);
+		left = ast_ChildRemoveIndex(rest, i);
+		right = isoptype(L, OP_ADD) ? difference(ast_Copy(R), rest) : ast_MakeBinary(OP_DIV, ast_Copy(R), rest);
+	} else if (isoptype(L, OP_DIV)) {
+		base = opbase(L);
+
+		if (!involves(base, de->y) && isoptype(base->next, OP_POW) && !involves(opbase(base->next), de->y)) {
+			power = negate(ast_Copy(opbase(base->next)->next));
+
+			if (is_ast_int(base, 1)) {
+				left = power;
+				right = logarithm(opbase(base->next), ast_Copy(R));
+			} else {
+				left = ast_MakeBinary(OP_POW, ast_Copy(opbase(base->next)), power);
+				right = ast_MakeBinary(OP_DIV, ast_Copy(R), ast_Copy(base));
+			}
+		} else if (!involves(base->next, de->y)) {
+			left = ast_Copy(base);
+			right = ast_MakeBinary(OP_MULT, ast_Copy(R), ast_Copy(base->next));
+		} else if (!involves(base, de->y)) {
+			left = ast_Copy(base->next);
+			right = ast_MakeBinary(OP_DIV, ast_Copy(base), ast_Copy(R));
+		} else {
+			return false;
+		}
+	} else if (isoptype(L, OP_POW)) {
+		base = opbase(L);
+		power = base->next;
+
+		if (!involves(power, de->y)) {
+			if (power->type == NODE_NUMBER && mp_int_is_even(MP_NUMER_P(power->op.num))) {
+				sign = c != NULL ? sign_at(de, base, c) : 0;
+				if (sign == 0)
+					return false;
+			}
+
+			left = ast_Copy(base);
+			right = ast_MakeBinary(OP_POW, ast_Copy(R), ast_MakeBinary(OP_DIV, integer(1), ast_Copy(power)));
+		} else if (!involves(base, de->y)) {
+			left = ast_Copy(power);
+			right = logarithm(base, ast_Copy(R));
+		} else {
+			return false;
+		}
+	} else if (isoptype(L, OP_LOG)) {
+		base = opbase(L);
+
+		if (involves(base, de->y))
+			return false;
+
+		left = ast_Copy(base->next);
+		right = exponential(base, ast_Copy(R));
+	} else if (isoptype(L, OP_ABS)) {
+		sign = c != NULL ? sign_at(de, opbase(L), c) : is_arbitrary_multiple(R, constant);
+		if (sign == 0)
+			return false;
+
+		left = ast_Copy(opbase(L));
+		right = ast_Copy(R);
+	} else if ((inverse = inverse_of(optype(L))) != AMOUNT_OPS) {
+		left = ast_Copy(opbase(L));
+		right = ast_MakeUnary(inverse, ast_Copy(R));
+	} else {
+		return false;
+	}
+
+	if (sign < 0)
+		right = negate(right);
+
+	ast_Cleanup(L);
+	ast_Cleanup(R);
+	*lhs = left;
+	*rhs = right;
+
+	return true;
+}
+
+/*Solves lhs = rhs for y, recording each step. The arbitrary constant absorbs other constants unless it is NULL. Returns false if y is left implicit.*/
+static bool isolate(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_t *constant, pcas_condition_t *c) {
+	const char *text = "Solve for the function";
+	unsigned steps = 0;
+
+	while (!ast_Compare(*lhs, de->y)) {
+		if (steps++ == MAX_ISOLATE_STEPS || !isolate_step(de, lhs, rhs, constant, c))
+			return false;
+
+		work_Pause();
+		simplify(*lhs, SIMP_BASIC);
+		simplify(*rhs, SIMP_BASIC);
+
+		if (constant != NULL) {
+			expand(*rhs, EXP_DISTRIB_NUMBERS);
+			absorb(de, *rhs, constant);
+			simplify(*rhs, SIMP_BASIC);
+		}
+		work_Resume();
+
+		if (!ast_Compare(*lhs, de->y)) {
+			work_Step(STEP_EQUATION, text, *lhs, *rhs);
+			text = NULL;
+		}
+	}
+
+	return true;
+}
+
+/*Finds the constant in lhs = antiderivative + constant from the initial condition and substitutes it into rhs*/
+static void apply_condition(
+	pcas_de_t *de,
+	pcas_condition_t *c,
+	pcas_ast_t *lhs,
+	pcas_ast_t *antiderivative,
+	pcas_ast_t **rhs,
+	pcas_ast_t *constant
+) {
+	pcas_ast_t *at, *left, *right, *value;
+
+	at = ast_MakeBinary(OP_AT, ast_Copy(de->y), ast_Copy(c->at));
+	work_Step(STEP_EQUATION, "Initial condition", at, c->value);
+	ast_Cleanup(at);
+
+	left = ast_Copy(lhs);
+	right = ast_Copy(*rhs);
+
+	work_Pause();
+	substitute(left, de->y, c->value);
+	substitute(right, de->x, c->at);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, left, right);
+	ast_Cleanup(right);
+
+	right = ast_Copy(antiderivative);
+
+	work_Pause();
+	substitute(right, de->x, c->at);
+	value = difference(left, right);
+	simplify(value, SIMP_ALL);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, constant, value);
+
+	work_Pause();
+	substitute(*rhs, constant, value);
+	simplify(*rhs, SIMP_BASIC);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, lhs, *rhs);
+	ast_Cleanup(value);
+}
+
+/*True if h is zero at the initial value, which makes y constant*/
+static bool is_equilibrium(pcas_de_t *de, pcas_ast_t *h, pcas_condition_t *c) {
+	pcas_ast_t *value = ast_Copy(h), *zero;
+	bool equilibrium;
+
+	work_Pause();
+	substitute(value, de->y, c->value);
+	zero = ast_Copy(value);
+	simplify(zero, SIMP_ALL);
+	work_Resume();
+
+	equilibrium = is_ast_int(zero, 0);
+
+	if (equilibrium) {
+		work_Step(STEP_EQUATION, "Zero at the initial value", value, zero);
+		work_Step(STEP_EQUATION, "Constant solution", de->y, c->value);
+	}
+
+	ast_Cleanup(value);
+	ast_Cleanup(zero);
+
+	return equilibrium;
+}
+
+static pcas_error_t solve_separable(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_condition_t *c = de->condition_count > 0 ? &de->conditions[0] : NULL;
+	pcas_ast_t *F, *g, *h, *one, *prime, *equation, *lhs, *antiderivative, *rhs, *constant;
+	bool separable, explicit;
+
+	work_Pause();
+	F = solve_for_prime(de);
+	g = ast_MakeOperator(OP_MULT);
+	h = ast_MakeOperator(OP_MULT);
+	one = integer(1);
+	separable = F != NULL && separate(de, F, one, g, h);
+	simplify(g, SIMP_BASIC);
+	simplify(h, SIMP_BASIC);
+	work_Resume();
+
+	ast_Cleanup(F);
+	ast_Cleanup(one);
+
+	if (!separable) {
+		ast_Cleanup(g);
+		ast_Cleanup(h);
+		return E_DE_UNSOLVED;
+	}
+
+	de->method = "Separable";
+
+	prime = de_Derivative(de->y, 1);
+	F = ast_MakeBinary(OP_MULT, ast_Copy(g), ast_Copy(h));
+	work_Step(STEP_EQUATION, "Separable", prime, F);
+	ast_Cleanup(prime);
+	ast_Cleanup(F);
+
+	if (c != NULL && is_equilibrium(de, h, c)) {
+		*solution = ast_MakeBinary(OP_EQUALS, ast_Copy(de->y), ast_Copy(c->value));
+		ast_Cleanup(g);
+		ast_Cleanup(h);
+		return E_SUCCESS;
+	}
+
+	work_Pause();
+	lhs = ast_MakeBinary(OP_DIV, integer(1), h);
+	simplify(lhs, SIMP_BASIC);
+	work_Resume();
+
+	lhs = ast_MakeBinary(OP_INTEGRAL, lhs, ast_Copy(de->y));
+	antiderivative = ast_MakeBinary(OP_INTEGRAL, g, ast_Copy(de->x));
+	work_Step(STEP_EQUATION, "Separate variables", lhs, antiderivative);
+
+	equation = ast_MakeBinary(OP_EQUALS, lhs, antiderivative);
+	eval_integrals(equation);
+
+	if (contains_integral(equation)) {
+		ast_Cleanup(equation);
+		return E_DE_INTEGRAL;
+	}
+
+	lhs = ast_Copy(opbase(equation));
+	antiderivative = ast_Copy(opbase(equation)->next);
+	ast_Cleanup(equation);
+
+	constant = ast_MakeSymbol(constant_symbol(de->equation));
+
+	work_Pause();
+	simplify(lhs, SIMP_BASIC);
+	simplify(antiderivative, SIMP_BASIC);
+	rhs = ast_MakeBinary(OP_ADD, ast_Copy(antiderivative), ast_Copy(constant));
+	simplify(rhs, SIMP_COMMUTATIVE);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, lhs, rhs);
+
+	if (c != NULL)
+		apply_condition(de, c, lhs, antiderivative, &rhs, constant);
+
+	explicit = isolate(de, &lhs, &rhs, c == NULL ? constant : NULL, c);
+	work_Step(STEP_EQUATION, explicit ? "Solution" : "Implicit solution", lhs, rhs);
+
+	*solution = ast_MakeBinary(OP_EQUALS, lhs, rhs);
+
+	ast_Cleanup(antiderivative);
+	ast_Cleanup(constant);
+
+	return E_SUCCESS;
+}
+
+pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
+	unsigned k;
+
+	*solution = NULL;
+
+	if (de->condition_count > de->order)
+		return E_DE_BAD_CONDITION;
+
+	for (k = 0; k < de->condition_count; k++) {
+		if (de->conditions[k].order >= de->order)
+			return E_DE_BAD_CONDITION;
+	}
+
+	if (de->order == 1)
+		return solve_separable(de, solution);
+
+	return E_DE_UNSOLVED;
 }

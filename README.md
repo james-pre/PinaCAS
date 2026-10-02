@@ -11,6 +11,7 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Step-by-step work for derivatives and integrals, shown in a scrollable viewer with fractions, exponents, roots, and integral signs drawn as in print
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
 - Checking that a function solves a differential equation and its initial conditions
+- Solving separable first order equations and initial value problems, solved for the function when possible
 - Integral and Solve DE functions in the GUI, and `INTEG` and `DE` commands in the TI-Basic interface
 - Much faster simplification, especially when showing work
 - Builds with the LLVM-based CE C toolchain, with imath as a git submodule
@@ -21,6 +22,8 @@ The program is still called PCAS on the calculator, and the existing TI-Basic co
 Type the equation into a Y= variable or string. Write derivatives of the unknown function with primes from the ANGLE menu (2nd, APPS), and the equals sign from the TEST menu (2nd, MATH). For example, y'' + 16y = 0 is `Y''+16Y=0`. Choose the independent variable with "Respect to", which is X by default. Any letter can be the unknown function, so x'' + w²x = F cos(gt) is `X''+W²X=Fcos(GT)` with respect to T.
 
 Add initial conditions after the equation, separated by commas: y'' + 16y = 0, y(0) = 2, y'(0) = -2 is `Y''+16Y=0,Y(0)=2,Y'(0)=-2`.
+
+Solve DE classifies the equation and solves it when it can, writing the solution to the output variable. For now it solves separable first order equations. An initial condition determines the constant, and the solution is solved for the function when each inverse step is unambiguous, so `Y'=X²e^(6Y),Y(8)=0` gives `-ln(1025-2X³)/6`. Otherwise the implicit solution is written as an equation, like `Y²=X²+C`. Equations it cannot solve yet are classified, and linear ones are written in standard form.
 
 To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X)` or just `2cos(4X)-1/2sin(4X)`. On the Solve DE page, check "Verify solution" and choose that variable under "Solution in". PinaCAS differentiates the solution, substitutes it into both sides of the equation, and checks each initial condition.
 
@@ -187,11 +190,11 @@ Boolean options from left to right:
 ## Differential equation
 **Usage:** DE,[Input],[Output],[Variable respect to]
 
-**Description:** Classifies the differential equation in input, with [Variable respect to] as the independent variable. If it is linear, its standard form is written to output.
+**Description:** Solves the differential equation and initial conditions in input, with [Variable respect to] as the independent variable. An explicit solution y = f is written to output as f, and an implicit one as an equation. If PinaCAS cannot solve it yet and it is linear, its standard form is written to output.
 
 **Example program:**
 ```
-:"Write the standard form of the differential equation in Y1 to Y2."
+:"Solve the differential equation in Y1 and write the solution to Y2."
 :"DE,Y1,Y2,X"
 :Asm(prgmPCAS)
 ```

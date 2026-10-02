@@ -25,6 +25,8 @@ typedef enum {
 	E_DE_ORDER,
 	E_DE_BAD_CONDITION,
 	E_DE_IMPLICIT,
+	E_DE_UNSOLVED,
+	E_DE_INTEGRAL,
 
 	AMOUNT_ERRORS
 } pcas_error_t;
