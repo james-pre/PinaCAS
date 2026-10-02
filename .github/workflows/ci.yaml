@@ -18,10 +18,10 @@ jobs:
           submodules: true
 
       - name: Build
-        run: make -f pc.makefile
+        run: make pc
 
       - name: Test
-        run: make -f pc.makefile test
+        run: make check
 
       - name: Build with CMake (-Werror)
         run: |
@@ -39,6 +39,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
+          fetch-depth: 0
 
       - name: Install CE toolchain
         run: |
