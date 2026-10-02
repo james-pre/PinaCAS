@@ -5,6 +5,7 @@ tmp
 .*
 !.gitignore
 !.gitmodules
+!.clang-format
 !.vscode
 !.github
 
