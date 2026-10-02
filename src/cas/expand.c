@@ -158,7 +158,7 @@ static bool _expand(pcas_ast_t *e, unsigned char flags) {
                 mp_int val;
                 pcas_ast_t *replacement;
 
-                if(isoptype(base, OP_ADD) && mp_rat_is_integer(power->op.num)) {
+                if(isoptype(base, OP_ADD) && power->type == NODE_NUMBER && mp_rat_is_integer(power->op.num) && mp_rat_compare_zero(power->op.num) > 0) {
                     val = &power->op.num->num;
                     replacement = ast_MakeOperator(OP_MULT);
 
