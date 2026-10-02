@@ -2,11 +2,8 @@
 
 #include "../parser.h"
 
-/*Neither the from or the to text can exceed 50 characters*/
-#define ID_MAX_TEXT 50
-
 typedef struct {
-	const char from_text[ID_MAX_TEXT], to_text[ID_MAX_TEXT];
+	const char *from_text, *to_text;
 	pcas_ast_t *from, *to;
 } pcas_id_t;
 
