@@ -423,6 +423,10 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
     int multiplier = 1;
     int rank_a = function_rank(a), rank_b = function_rank(b);
 
+    /*An added constant of integration goes last*/
+    if(add && (a->type == NODE_SYMBOL && a->op.symbol == SYM_C) != (b->type == NODE_SYMBOL && b->op.symbol == SYM_C))
+        return a->type == NODE_SYMBOL && a->op.symbol == SYM_C ? 1 : -1;
+
     /*Highest derivatives first in sums, and the unknown function last in products*/
     if(rank_a != rank_b)
         return add ? rank_b - rank_a : rank_a - rank_b;

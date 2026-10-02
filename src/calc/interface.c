@@ -519,7 +519,7 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t *e, pcas_ast_t *respect_to, 
         break;
     case CALCULUS_INTEGRAL:
         simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
-        integral(e, respect_to);
+        integral_Indefinite(e, respect_to);
         break;
     case CALCULUS_DE:
         err = de_Load(&de, e, respect_to);

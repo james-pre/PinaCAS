@@ -513,7 +513,7 @@ int run_integral(int argc, char **argv) {
 
     if(err == E_SUCCESS && e != NULL && respect_to != NULL) {
         simplify(e, SIMP_ALL);
-        integral(e, respect_to);
+        integral_Indefinite(e, respect_to);
         simplify(e, SIMP_ALL);
         simplify_canonical_form(e, CANONICAL_ALL);
 

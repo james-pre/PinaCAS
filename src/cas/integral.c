@@ -675,14 +675,47 @@ bool eval_integrals(pcas_ast_t *e) {
     return integrate_all(e, MAX_METHOD_DEPTH);
 }
 
-void integral(pcas_ast_t *e, pcas_ast_t *respect_to) {
+static bool contains_integral(pcas_ast_t *e) {
+    pcas_ast_t *child;
+
+    if(isoptype(e, OP_INTEGRAL))
+        return true;
+
+    if(e->type == NODE_OPERATOR) {
+        for(child = opbase(e); child != NULL; child = child->next) {
+            if(contains_integral(child))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+static void antiderivative(pcas_ast_t *e, pcas_ast_t *respect_to, bool constant) {
     pcas_ast_t *node;
 
     work_Enter(e);
 
     node = integral_node(ast_Copy(e), respect_to);
     eval_integrals(node);
+
+    if(constant && !contains_integral(node)) {
+        Symbol c = !contains_symbol(node, SYM_C) ? SYM_C : !contains_symbol(node, SYM_K) ? SYM_K : fresh_symbol(node);
+        node = add(node, ast_MakeSymbol(c));
+        work_Pause();
+        simplify(node, SIMP_COMMUTATIVE);
+        work_Resume();
+    }
+
     replace_node(e, node);
 
     work_Leave(e);
+}
+
+void integral(pcas_ast_t *e, pcas_ast_t *respect_to) {
+    antiderivative(e, respect_to, false);
+}
+
+void integral_Indefinite(pcas_ast_t *e, pcas_ast_t *respect_to) {
+    antiderivative(e, respect_to, true);
 }
