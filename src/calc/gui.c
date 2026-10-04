@@ -16,7 +16,8 @@
 #include "../cas/derivative.h"
 #include "../version.h"
 
-#include "interface.h"
+#include "calculus.h"
+#include "vars.h"
 #include "viewer.h"
 #include "../work.h"
 

@@ -8,7 +8,6 @@
 
 #include "gui.h"
 #include "heap.h"
-#include "interface.h"
 
 static jmp_buf out_of_memory;
 
@@ -33,10 +32,7 @@ int main(void) {
 
 	heap_SetFailure(fail_out_of_memory);
 
-	if (interface_Valid())
-		interface_Run();
-	else
-		gui_Run();
+	gui_Run();
 
 	return 0;
 }
