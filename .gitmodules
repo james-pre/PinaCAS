@@ -1,3 +1,6 @@
 [submodule "lib/imath"]
 	path = lib/imath
 	url = https://github.com/creachadair/imath
+[submodule "lib/app_tools"]
+	path = lib/app_tools
+	url = https://github.com/commandblockguy/app_tools

@@ -1,11 +1,11 @@
 # ----------------------------
-# Calculator (CE C toolchain)
+# Calculator app (CE C toolchain)
 # ----------------------------
 
-NAME         = PCAS
-COMPRESSED   = YES
+NAME         = PinaCAS
 ICON         = iconc.png
 DESCRIPTION  = "PinaCAS"
+APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
 CFLAGS       = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
@@ -13,16 +13,41 @@ CXXFLAGS     = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
 
 EXTRA_CSOURCES = lib/imath/imath.c lib/imath/imrat.c
 
+ifneq ($(filter debug,$(MAKECMDGOALS)),)
+OBJDIR       = obj/debug
+BINDIR       = bin/debug
+endif
+
 $(shell scripts/version.sh)
 
 CEDEV_MAKEFILE := $(shell cedev-config --makefile 2>/dev/null)
 
 ifneq ($(CEDEV_MAKEFILE),)
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := package
 include $(CEDEV_MAKEFILE)
+
+# The app is installed on the calculator by running the installer program, which reads the app from AppVars
+INSTALLER    = PINACAS
+APPVAR_SIZE  = 65200
+
+.PHONY: package
+package: $(BINDIR)/$(NAME).b84
+debug: package
+
+$(BINDIR)/$(INSTALLER).8xp: $(wildcard lib/app_tools/installer/src/*)
+	$(Q)$(MAKE) -C lib/app_tools/installer MAKEFLAGS= NAME=$(INSTALLER) APPVAR_PREFIX='"$(NAME)"' \
+		APPVAR_SPLIT_SIZE=$(APPVAR_SIZE)
+	$(Q)cp lib/app_tools/installer/bin/$(INSTALLER).8xp $@
+
+$(BINDIR)/$(NAME).b84: $(BINDIR)/$(TARGET) $(BINDIR)/$(INSTALLER).8xp
+	$(Q)rm -f $(BINDIR)/$(NAME).*.8xv
+	$(Q)$(CONVBIN) --iformat 8ek --input $< --oformat 8xv-split --maxvarsize $(APPVAR_SIZE) \
+		--output $(BINDIR)/$(NAME).8xv --name $(NAME)
+	$(Q)$(CONVBIN) --iformat 8x $$(for f in $(BINDIR)/$(INSTALLER).8xp $(BINDIR)/$(NAME).*.8xv; do printf -- '--input %s ' "$$f"; done) \
+		--oformat b84 --output $@
 else
-.PHONY: build clean
-build:
+.PHONY: package clean
+package:
 	$(error The CE C toolchain was not found. Install it with scripts/install-toolchain.sh, or build for PC with "make pc")
 clean:
 	rm -rf obj bin

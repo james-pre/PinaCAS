@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds PCAS, sends it to a CEmu instance (starting one if needed), and launches it through Cesium.
-# Usage: scripts/emu.sh [--libs] [--no-build] [--no-launch]
+# Builds the PinaCAS app, sends it and its installer to a CEmu instance (starting one if needed), and runs the installer through Cesium.
+# Usage: scripts/emu.sh [--debug] [--libs] [--no-build] [--no-install]
+# The installer does not replace an installed app, so delete PinaCAS in Mem Management (2nd, +, 2, Apps) before reinstalling.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -12,14 +13,16 @@ CEDEV="${CEDEV:-/opt/CEdev}"
 
 libs=0
 build=1
-launch=1
+install=1
+bindir=bin
 for arg in "$@"; do
 	case "$arg" in
+		--debug) bindir=bin/debug ;;
 		--libs) libs=1 ;;
 		--no-build) build=0 ;;
-		--no-launch) launch=0 ;;
+		--no-install) install=0 ;;
 		-h | --help)
-			sed -n '2,3s/^# //p' "$0"
+			sed -n '2,4s/^# //p' "$0"
 			exit 0
 			;;
 		*)
@@ -29,9 +32,18 @@ for arg in "$@"; do
 	esac
 done
 
-((build)) && make
+if ((build)); then
+	if [[ $bindir == bin/debug ]]; then
+		make debug
+	else
+		make
+	fi
+fi
 
-files=("\"$PWD/bin/PCAS.8xp\"")
+files=("\"$PWD/$bindir/PINACAS.8xp\"")
+for appvar in "$bindir"/PinaCAS.*.8xv; do
+	files+=("\"$PWD/$appvar\"")
+done
 ((libs)) && files=("\"$CEDEV/clibs.8xg\"" "${files[@]}")
 
 if ! pgrep -f "cemu --id $ID( |$)" >/dev/null; then
@@ -45,7 +57,8 @@ if ! pgrep -f "cemu --id $ID( |$)" >/dev/null; then
 fi
 
 sequence='"key|clear", "delay|500", "key|clear", "delay|300"'
-if ((launch)); then
+if ((install)); then
+	# 8 is P, which selects the first program starting with P in Cesium
 	sequence+=", \"key|apps\", \"delay|800\", \"key|$CESIUM_APP\", \"delay|2500\", \"key|8\", \"delay|500\", \"key|enter\""
 fi
 
@@ -53,7 +66,7 @@ test="${XDG_RUNTIME_DIR:-/tmp}/cemu-$ID.json"
 cat >"$test" <<EOF
 {
   "transfer_files": [$(IFS=,; echo "${files[*]}")],
-  "target": {"name": "PCAS", "isASM": true},
+  "target": {"name": "PINACAS", "isASM": true},
   "sequence": [$sequence],
   "hashes": {}
 }
