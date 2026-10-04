@@ -687,9 +687,11 @@ void compile_all(void) {
 	compile_complex();
 }
 
-static const char *const token_table[21] = {ti_Y1,   ti_Y2,   ti_Y3,   ti_Y4,   ti_Y5,   ti_Y6,   ti_Y7,
-											ti_Y8,   ti_Y9,   ti_Y0,   ti_Str1, ti_Str2, ti_Str3, ti_Str4,
-											ti_Str5, ti_Str6, ti_Str7, ti_Str8, ti_Str9, ti_Str0, ti_Ans};
+static const char *const token_table[21] = {OS_VAR_Y1,   OS_VAR_Y2,   OS_VAR_Y3,   OS_VAR_Y4,   OS_VAR_Y5,
+											OS_VAR_Y6,   OS_VAR_Y7,   OS_VAR_Y8,   OS_VAR_Y9,   OS_VAR_Y0,
+											OS_VAR_STR1, OS_VAR_STR2, OS_VAR_STR3, OS_VAR_STR4, OS_VAR_STR5,
+											OS_VAR_STR6, OS_VAR_STR7, OS_VAR_STR8, OS_VAR_STR9, OS_VAR_STR0,
+											OS_VAR_ANS};
 
 pcas_ast_t *parse_from_dropdown_index(unsigned index, pcas_error_t *err) {
 	return parse_from_tok(token_table[index], err);

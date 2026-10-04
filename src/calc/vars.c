@@ -13,12 +13,12 @@ static bool is_var_string_type(ti_var_t var) {
 }
 
 unsigned parse_list_from_tok(const char *tok, pcas_ast_t **items, unsigned max, pcas_error_t *err) {
-	ti_CloseAll();
-
-	ti_var_t var = ti_OpenVar((char *)tok, "r", tok[0] == 0x5Eu ? TI_EQU_TYPE : TI_STRING_TYPE);
+	ti_var_t var = ti_OpenVar(tok, "r", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
 
 	/*If we're opening Ans or a string and the type is not a string type*/
 	if (var == 0 || (tok[0] != 0x5Eu && !is_var_string_type(var))) {
+		if (var != 0)
+			ti_Close(var);
 		*err = E_GENERIC;
 		return 0;
 	}
@@ -36,9 +36,7 @@ pcas_ast_t *parse_from_tok(const char *tok, pcas_error_t *err) {
 }
 
 void write_to_tok(const char *tok, const pcas_ast_t *expression, pcas_error_t *err) {
-	ti_CloseAll();
-
-	ti_var_t var = ti_OpenVar((char *)tok, "w", tok[0] == 0x5Eu ? TI_EQU_TYPE : TI_STRING_TYPE);
+	ti_var_t var = ti_OpenVar(tok, "w", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
 
 	if (var != 0) {
 		unsigned bin_len;
