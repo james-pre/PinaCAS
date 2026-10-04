@@ -28,6 +28,8 @@ typedef struct {
 
 	/*Name of the method de_Solve used*/
 	const char *method;
+	/*True for the equation of a substitution, whose solution de_Solve does not label as final*/
+	bool nested;
 } pcas_de_t;
 
 /*Returns y with order primes*/

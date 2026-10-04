@@ -450,3 +450,15 @@ solve; Y'=1/sin(X)_Ycos(X)/sin(X); Y=(X+C)/sin(X); X
 solve; X^2Y'+5XY=3X^2; Y=X/2+C/X^5; X
 solve; A'=8_A/150,A(0)=1800; A=1200+600e^(-T/150); T
 solve; Y'+2Y=e^(-X),Y(0)=3; Y=e^(-X)+2e^(-2X); X
+
+#Differential equations: substitutions
+solve; Y'+Y=e^(2X)Y^3; Y^2=1/(Ce^(2X)_2Xe^(2X)); X
+solve; Y'+Y=e^(2X)Y^3,Y(0)=1; Y=1/sqrt(e^(2X)_2Xe^(2X)); X
+solve; Y(6Y^2_X_1)+2XY'=0; Y^2=Xe^X/(6e^X+C); X
+solve; XYY'=X^2_XY+Y^2; ln(abs(X_Y))+Y/X=C; X
+solve; XYY'=X^2_XY+Y^2,Y(1)=0; ln(abs(X_Y))+Y/X=0; X
+solve; Y'=Y/X+X/Y,Y(1)=2; Y=Xsqrt(2ln(abs(X))+4); X
+solve; Y'=tan(X+Y)^2; 2Y_2X+sin(2X+2Y)=C; X
+solve; Y'=(Y_X+1)/(Y_X); (Y_X)^2=2X+C; X
+solve; Y'=(Y_X+1)/(Y_X),Y(0)=1; Y=X+sqrt(2X+1); X
+solve; Y'=(X+Y)^2; Y=tan(X+C)_X; X

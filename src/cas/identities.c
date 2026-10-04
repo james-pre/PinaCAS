@@ -67,6 +67,7 @@ pcas_id_t id_trig_identities[ID_NUM_TRIG_IDENTITIES] = {
 	{"1_2sin(X)^2+C", "cos(2X)+C"},
 
 	{"sin(X)^2+cos(X)^2+C", "1+C"},
+	{"tan(X)^2+1+C", "1/cos(X)^2+C"},
 
 	/*tan identities*/
 	{"Asin(X)/(Bcos(X", "Atan(X)/B"},
@@ -567,6 +568,7 @@ void id_UnloadAll(void) {
 	id_UnloadTable(id_derivative, ID_NUM_DERIV);
 
 	id_Unload(&id_deriv_power_rule);
+	id_Unload(&id_deriv_exponential_rule);
 	id_Unload(&id_deriv_constant_rule);
 	id_Unload(&id_deriv_product_rule);
 }

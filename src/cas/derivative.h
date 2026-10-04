@@ -6,6 +6,7 @@
 extern pcas_id_t id_derivative[ID_NUM_DERIV];
 
 extern pcas_id_t id_deriv_power_rule;
+extern pcas_id_t id_deriv_exponential_rule;
 extern pcas_id_t id_deriv_constant_rule;
 extern pcas_id_t id_deriv_product_rule;
 

@@ -10,7 +10,7 @@ pcas_id_t id_derivative[ID_NUM_DERIV] = {
 	{"deriv(A/B,X,T", "(deriv(A,X,T)B_deriv(B,X,T)A)/B^2"},
 
 	{"deriv(e^A,X,T", "deriv(A,X,T)e^A"},
-	{"deriv(B^A,X,T", "deriv(e^(Aln(B,X,T"},
+	{"deriv(abs(A,X,T", "deriv(A,X,T)abs(A)/A"},
 
 	{"deriv(ln(A,X,T", "deriv(A,X,T)/A"},
 	{"deriv(logb(A,B),X,T", "deriv(ln(A)/ln(B,X,T"},
@@ -34,6 +34,7 @@ pcas_id_t id_derivative[ID_NUM_DERIV] = {
 
 /*Identities we have to check manually because we have to check for constants*/
 pcas_id_t id_deriv_power_rule = {"deriv(A^B,X,T", "deriv(A,X,T)BA^(B_1"};
+pcas_id_t id_deriv_exponential_rule = {"deriv(B^A,X,T", "deriv(e^(Aln(B,X,T"};
 pcas_id_t id_deriv_constant_rule = {"deriv(CX,X,T", "C"};
 pcas_id_t id_deriv_product_rule = {"deriv(AB,X,T", "Aderiv(B,X,T)+Bderiv(A,X,T"};
 
@@ -114,6 +115,8 @@ bool eval_derivative_nodes(pcas_ast_t *e) {
 	/*Hardcode power rule because we have to check if the power is a constant*/
 	else if (isoptype(expr, OP_POW) && is_constant(ast_ChildGet(expr, 1), respect_to)) {
 		changed |= id_Execute(e, &id_deriv_power_rule, false);
+	} else if (isoptype(expr, OP_POW) && !(opbase(expr)->type == NODE_SYMBOL && opbase(expr)->op.symbol == SYM_EULER)) {
+		changed |= id_Execute(e, &id_deriv_exponential_rule, false);
 	} else {
 		/*While is necessary because of power rules.*/
 		while (id_ExecuteTable(e, id_derivative, ID_NUM_DERIV, false))

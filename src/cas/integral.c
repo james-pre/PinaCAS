@@ -243,7 +243,15 @@ static pcas_ast_t *over_slope(pcas_ast_t *F, pcas_ast_t *u, pcas_ast_t *x) {
 
 /*Antiderivatives of u^n where u is not linear*/
 static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t *x) {
-	pcas_ast_t *v;
+	pcas_ast_t *v, *F;
+
+	if (is_ast_fraction(n, 2, 1) && (isoptype(u, OP_SIN) || isoptype(u, OP_COS))) {
+		v = ast_ChildGet(u, 0);
+		F = quotient(ast_MakeUnary(OP_SIN, mul(integer(2), ast_Copy(v))), integer(4));
+		if (isoptype(u, OP_SIN))
+			F = negate(F);
+		return over_slope(add(quotient(ast_Copy(v), integer(2)), F), v, x);
+	}
 
 	if (is_ast_fraction(n, -2, 1) && u->type == NODE_OPERATOR) {
 		v = ast_ChildGet(u, 0);
@@ -777,6 +785,20 @@ static bool integrate_node(pcas_ast_t *e, unsigned budget) {
 			integrate_all(e, budget - 1);
 		} else {
 			ast_Cleanup(F);
+			F = ast_Copy(f);
+
+			work_Pause();
+			simplify(F, SIMP_ALL);
+			work_Resume();
+
+			if (!ast_Compare(F, f)) {
+				F = integral_node(F, x);
+				work_Step(STEP_EQUATION, "Identity", before, F);
+				replace_node(e, F);
+				progress = integrate_node(e, budget - 1);
+			} else {
+				ast_Cleanup(F);
+			}
 		}
 	}
 

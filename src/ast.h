@@ -104,9 +104,9 @@ typedef enum {
 } Symbol;
 
 /*Shortcuts for NODE_OPERATOR*/
-#define optype(e) e->op.operator.type
+#define optype(e) (e)->op.operator.type
 #define isoptype(e, op) ((e)->type == NODE_OPERATOR && optype(e) == (op))
-#define opbase(e) e->op.operator.base
+#define opbase(e) (e)->op.operator.base
 
 #define is_ast_int(e, val) ((e)->type == NODE_NUMBER && num_IsInt((e)->op.num, val))
 
