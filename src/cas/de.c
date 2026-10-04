@@ -501,13 +501,13 @@ static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **der
 	return holds;
 }
 
-/*Returns d/dx(e) as an unevaluated derivative node*/
-static pcas_ast_t *derivative_node(pcas_de_t *de, pcas_ast_t *e) {
+/*Returns d/dv(e) as an unevaluated derivative node*/
+static pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v) {
 	pcas_ast_t *node = ast_MakeOperator(OP_DERIV);
 
 	ast_ChildAppend(node, e);
-	ast_ChildAppend(node, ast_Copy(de->x));
-	ast_ChildAppend(node, ast_Copy(de->x));
+	ast_ChildAppend(node, ast_Copy(v));
+	ast_ChildAppend(node, ast_Copy(v));
 
 	return node;
 }
@@ -542,7 +542,7 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 		simplify(d, SIMP_BASIC);
 		work_Resume();
 
-		chain = ast_MakeBinary(OP_EQUALS, derivative_node(de, ast_Copy(derivatives[k - 1])), ast_Copy(d));
+		chain = ast_MakeBinary(OP_EQUALS, derivative_node(ast_Copy(derivatives[k - 1]), de->x), ast_Copy(d));
 
 		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, prime, chain);
 
@@ -579,33 +579,47 @@ static pcas_ast_t *logarithm(const pcas_ast_t *base, pcas_ast_t *e) {
 	return is_euler(base) ? ln(e) : ast_MakeBinary(OP_DIV, ln(e), ln(ast_Copy(base)));
 }
 
-/*Returns the right side of the first order equation solved for y', or NULL if y' does not appear linearly*/
-static pcas_ast_t *solve_for_prime(pcas_de_t *de) {
+/*Writes the first order equation as M + Ny' = 0, without simplifying M. Returns false if y' does not appear linearly.*/
+static bool differential_form(pcas_de_t *de, pcas_ast_t **M, pcas_ast_t **N) {
 	pcas_ast_t *symbols[DE_MAX_ORDER + 1];
-	pcas_ast_t *f, *a, *zero, *F = NULL;
+	pcas_ast_t *f, *zero;
+	bool linear;
 
 	f = difference(ast_Copy(opbase(de->equation)), ast_Copy(opbase(de->equation)->next));
 	derivatives_to_symbols(de, f, symbols);
 	simplify(f, SIMP_BASIC);
 
-	a = ast_Copy(f);
-	derivative(a, symbols[1], symbols[1]);
-	simplify(a, SIMP_BASIC);
+	*N = ast_Copy(f);
+	derivative(*N, symbols[1], symbols[1]);
+	simplify(*N, SIMP_BASIC);
 
-	if (is_constant(a, symbols[1]) && !is_ast_int(a, 0)) {
+	linear = is_constant(*N, symbols[1]) && !is_ast_int(*N, 0);
+
+	if (linear) {
 		zero = integer(0);
 		substitute(f, symbols[1], zero);
 		ast_Cleanup(zero);
-
-		F = ast_MakeBinary(OP_DIV, negate(f), a);
-		simplify(F, SIMP_BASIC);
+		*M = f;
 	} else {
 		ast_Cleanup(f);
-		ast_Cleanup(a);
+		ast_Cleanup(*N);
 	}
 
 	ast_Cleanup(symbols[0]);
 	ast_Cleanup(symbols[1]);
+
+	return linear;
+}
+
+/*Returns the right side of the first order equation solved for y', or NULL if y' does not appear linearly*/
+static pcas_ast_t *solve_for_prime(pcas_de_t *de) {
+	pcas_ast_t *M, *N, *F;
+
+	if (!differential_form(de, &M, &N))
+		return NULL;
+
+	F = ast_MakeBinary(OP_DIV, negate(M), N);
+	simplify(F, SIMP_BASIC);
 
 	return F;
 }
@@ -785,6 +799,9 @@ static bool is_arbitrary_multiple(const pcas_ast_t *e, const pcas_ast_t *constan
 
 	if (ast_Compare(e, constant))
 		return true;
+
+	if (isoptype(e, OP_DIV))
+		return is_arbitrary_multiple(opbase(e), constant);
 
 	if (isoptype(e, OP_MULT)) {
 		for (child = opbase(e); child != NULL; child = child->next) {
@@ -1254,8 +1271,12 @@ static void finish(pcas_de_t *de, pcas_ast_t *lhs, pcas_ast_t *antiderivative, p
 	work_Pause();
 	simplify(lhs, SIMP_BASIC);
 	simplify(antiderivative, SIMP_BASIC);
-	rhs = ast_MakeBinary(OP_ADD, ast_Copy(antiderivative), ast_Copy(constant));
-	simplify(rhs, SIMP_COMMUTATIVE);
+	if (is_ast_int(antiderivative, 0)) {
+		rhs = ast_Copy(constant);
+	} else {
+		rhs = ast_MakeBinary(OP_ADD, ast_Copy(antiderivative), ast_Copy(constant));
+		simplify(rhs, SIMP_COMMUTATIVE);
+	}
 	work_Resume();
 
 	work_Step(STEP_EQUATION, NULL, lhs, rhs);
@@ -1342,9 +1363,34 @@ static void drop_absolute_values(pcas_ast_t *e) {
 		replace_node(e, ast_Copy(opbase(e)));
 }
 
+/*Returns e^(integral of P dv) without absolute values, recording the integral, or NULL if it cannot be found. Takes ownership of P.*/
+static pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v) {
+	pcas_ast_t *G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(v)), *power, *mu;
+
+	eval_integrals(G);
+
+	if (contains_integral(G)) {
+		ast_Cleanup(G);
+		return NULL;
+	}
+
+	work_Pause();
+	simplify(G, SIMP_BASIC);
+	power = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
+	drop_absolute_values(G);
+	mu = exponential(opbase(power), G);
+	simplify(mu, SIMP_BASIC);
+	work_Resume();
+
+	work_Step(STEP_EQUATION, NULL, power, mu);
+	ast_Cleanup(power);
+
+	return mu;
+}
+
 /*Solves y' + Py = Q by multiplying by the integrating factor e^(integral of P)*/
 static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
-	pcas_ast_t *P, *Q, *left, *G, *mu, *product, *right;
+	pcas_ast_t *P, *Q, *left, *mu, *product, *right;
 
 	work_Pause();
 	P = ast_MakeBinary(OP_DIV, ast_Copy(de->a[0]), ast_Copy(de->a[1]));
@@ -1365,25 +1411,10 @@ static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
 
 	work_Text("Integrating factor");
 
-	G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(de->x));
-	eval_integrals(G);
-
-	if (contains_integral(G)) {
-		ast_Cleanup(G);
+	if ((mu = exponential_of_integral(P, de->x)) == NULL) {
 		ast_Cleanup(Q);
 		return E_DE_INTEGRAL;
 	}
-
-	work_Pause();
-	simplify(G, SIMP_BASIC);
-	left = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
-	drop_absolute_values(G);
-	mu = exponential(opbase(left), G);
-	simplify(mu, SIMP_BASIC);
-	work_Resume();
-
-	work_Step(STEP_EQUATION, NULL, left, mu);
-	ast_Cleanup(left);
 
 	work_Pause();
 	product = ast_MakeBinary(OP_MULT, ast_Copy(mu), ast_Copy(de->y));
@@ -1393,7 +1424,7 @@ static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
 	factor_cancel(right);
 	work_Resume();
 
-	left = derivative_node(de, ast_Copy(product));
+	left = derivative_node(ast_Copy(product), de->x);
 	work_Step(STEP_EQUATION, "Multiply by the integrating factor", left, right);
 	ast_Cleanup(left);
 
@@ -1813,6 +1844,198 @@ static pcas_error_t solve_linear_argument(pcas_de_t *de, pcas_ast_t **solution) 
 	return solve_substituted(de, sum, ast_MakeBinary(OP_EQUALS, left, right), solve_separable, solution);
 }
 
+static pcas_ast_t *partial(const pcas_ast_t *e, const pcas_ast_t *v) {
+	pcas_ast_t *d = ast_Copy(e);
+
+	work_Pause();
+	derivative(d, v, v);
+	simplify(d, SIMP_BASIC);
+	work_Resume();
+
+	return d;
+}
+
+/*Records d/dv(e) = value*/
+static void record_partial(const pcas_ast_t *e, const pcas_ast_t *v, const pcas_ast_t *value, const char *text) {
+	pcas_ast_t *node = derivative_node(ast_Copy(e), v);
+
+	work_Step(STEP_EQUATION, text, node, value);
+	ast_Cleanup(node);
+}
+
+/*True if M + Ny' = 0 is exact, recording the check if record*/
+static bool is_exact(pcas_de_t *de, const pcas_ast_t *M, const pcas_ast_t *N, bool record) {
+	pcas_ast_t *My = partial(M, de->y), *Nx = partial(N, de->x), *remainder;
+	bool exact = is_zero(remainder = difference(ast_Copy(My), ast_Copy(Nx)));
+
+	if (record) {
+		record_partial(M, de->y, My, NULL);
+		record_partial(N, de->x, Nx, NULL);
+		work_Text(exact ? "Exact" : "Not exact");
+	}
+
+	ast_Cleanup(remainder);
+	ast_Cleanup(My);
+	ast_Cleanup(Nx);
+
+	return exact;
+}
+
+/*Returns (a_v - b_w)/c simplified if it involves only v, otherwise NULL*/
+static pcas_ast_t *factor_rate(
+	pcas_de_t *de,
+	const pcas_ast_t *a,
+	const pcas_ast_t *w,
+	const pcas_ast_t *b,
+	const pcas_ast_t *v,
+	const pcas_ast_t *c
+) {
+	pcas_ast_t *rate = ast_MakeBinary(OP_DIV, difference(partial(a, w), partial(b, v)), ast_Copy(c));
+	const pcas_ast_t *other = ast_Compare(v, de->x) ? de->y : de->x;
+
+	combine(rate);
+
+	if (involves(rate, other)) {
+		ast_Cleanup(rate);
+		return NULL;
+	}
+
+	return rate;
+}
+
+/*Solves M + Ny' = 0 when it is exact, or becomes exact after multiplying by an integrating factor of x or y alone*/
+static pcas_error_t solve_exact(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_ast_t *M, *N, *rate = NULL, *v = NULL, *mu, *P, *Q, *r, *G, *left, *zero;
+	bool exact;
+
+	work_Pause();
+	if (!differential_form(de, &M, &N)) {
+		work_Resume();
+		return E_DE_UNSOLVED;
+	}
+
+	simplify(M, SIMP_BASIC);
+	exact = is_exact(de, M, N, false);
+
+	if (!exact) {
+		if ((rate = factor_rate(de, M, de->y, N, de->x, N)) != NULL)
+			v = de->x;
+		else if ((rate = factor_rate(de, N, de->x, M, de->y, M)) != NULL)
+			v = de->y;
+	}
+	work_Resume();
+
+	if (!exact && rate == NULL) {
+		ast_Cleanup(M);
+		ast_Cleanup(N);
+		return E_DE_UNSOLVED;
+	}
+
+	de->method = "Exact";
+
+	left = ast_MakeSymbol(SYM_M);
+	work_Step(STEP_EQUATION, NULL, left, M);
+	ast_Cleanup(left);
+	left = ast_MakeSymbol(SYM_N);
+	work_Step(STEP_EQUATION, NULL, left, N);
+	ast_Cleanup(left);
+
+	is_exact(de, M, N, true);
+
+	if (!exact) {
+		work_Text("Integrating factor");
+
+		left = v == de->x ? ast_MakeBinary(OP_DIV, difference(partial(M, de->y), partial(N, de->x)), ast_Copy(N))
+						  : ast_MakeBinary(OP_DIV, difference(partial(N, de->x), partial(M, de->y)), ast_Copy(M));
+		work_Step(STEP_EQUATION, NULL, tidy(left), rate);
+		ast_Cleanup(left);
+
+		if ((mu = exponential_of_integral(rate, v)) == NULL) {
+			ast_Cleanup(M);
+			ast_Cleanup(N);
+			return E_DE_INTEGRAL;
+		}
+
+		work_Pause();
+		M = ast_MakeBinary(OP_MULT, ast_Copy(mu), M);
+		N = ast_MakeBinary(OP_MULT, mu, N);
+		expand(M, EXP_ALL);
+		expand(N, EXP_ALL);
+		simplify(M, SIMP_BASIC);
+		simplify(N, SIMP_BASIC);
+		left = ast_MakeBinary(OP_ADD, ast_Copy(M), ast_MakeBinary(OP_MULT, ast_Copy(N), de_Derivative(de->y, 1)));
+		zero = integer(0);
+		work_Resume();
+
+		work_Step(STEP_EQUATION, "Multiply by the integrating factor", tidy(left), zero);
+		ast_Cleanup(left);
+		ast_Cleanup(zero);
+
+		if (!is_exact(de, M, N, true)) {
+			ast_Cleanup(M);
+			ast_Cleanup(N);
+			return E_DE_UNSOLVED;
+		}
+	}
+
+	P = ast_MakeBinary(OP_INTEGRAL, M, ast_Copy(de->x));
+	eval_integrals(P);
+
+	if (contains_integral(P)) {
+		ast_Cleanup(P);
+		ast_Cleanup(N);
+		return E_DE_INTEGRAL;
+	}
+
+	work_Pause();
+	simplify(P, SIMP_BASIC);
+	work_Resume();
+
+	Q = partial(P, de->y);
+	record_partial(P, de->y, Q, "Differentiate with respect to the function");
+
+	work_Pause();
+	r = difference(ast_Copy(N), ast_Copy(Q));
+	expand(r, EXP_ALL);
+	simplify(r, SIMP_BASIC);
+	work_Resume();
+
+	if (involves(r, de->x)) {
+		ast_Cleanup(r);
+		ast_Cleanup(P);
+		ast_Cleanup(Q);
+		ast_Cleanup(N);
+		return E_DE_UNSOLVED;
+	}
+
+	G = substitution_symbol(de, SYM_G);
+	left = ast_MakeBinary(OP_ADD, Q, de_Derivative(G, 1));
+	work_Step(STEP_EQUATION, NULL, left, N);
+	ast_Cleanup(left);
+	ast_Cleanup(N);
+	left = de_Derivative(G, 1);
+	work_Step(STEP_EQUATION, NULL, left, r);
+	ast_Cleanup(left);
+	ast_Cleanup(G);
+
+	if (is_ast_int(r, 0)) {
+		G = r;
+	} else {
+		G = ast_MakeBinary(OP_INTEGRAL, r, ast_Copy(de->y));
+		eval_integrals(G);
+
+		if (contains_integral(G)) {
+			ast_Cleanup(G);
+			ast_Cleanup(P);
+			return E_DE_INTEGRAL;
+		}
+	}
+
+	finish(de, ast_MakeBinary(OP_ADD, P, G), integer(0), solution);
+
+	return E_SUCCESS;
+}
+
 pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 	pcas_error_t err;
 	unsigned k;
@@ -1831,6 +2054,8 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 		if (de->linear && !is_ast_int(de->a[0], 0) && !is_ast_int(de->g, 0))
 			return solve_linear_first(de, solution);
 		if ((err = solve_separable(de, solution)) != E_DE_UNSOLVED)
+			return err;
+		if ((err = solve_exact(de, solution)) != E_DE_UNSOLVED)
 			return err;
 		if ((err = solve_bernoulli(de, solution)) != E_DE_UNSOLVED)
 			return err;

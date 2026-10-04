@@ -451,6 +451,13 @@ solve; X^2Y'+5XY=3X^2; Y=X/2+C/X^5; X
 solve; A'=8_A/150,A(0)=1800; A=1200+600e^(-T/150); T
 solve; Y'+2Y=e^(-X),Y(0)=3; Y=e^(-X)+2e^(-2X); X
 
+#Differential equations: exact
+solve; (Y^2_2XY+6X)_(X^2_2XY+2)Y'=0; XY^2_X^2Y+3X^2_2Y=C; X
+solve; 4XY+3Y^2_X+X(X+2Y)Y'=0; 4X^4Y+4X^3Y^2_X^4=C; X
+solve; e^X+5X^4Y+5+(6Y^3+X^5+2)Y'=0; 2e^X+2X^5Y+10X+3Y^4+4Y=C; X
+solve; e^X+5X^4Y+5+(6Y^3+X^5+2)Y'=0,Y(0)=0; 2e^X+2X^5Y+10X+3Y^4+4Y=2; X
+solve; 2XY+(X^2+1)Y'=0; Y=C/abs(X^2+1); X
+
 #Differential equations: substitutions
 solve; Y'+Y=e^(2X)Y^3; Y^2=1/(Ce^(2X)_2Xe^(2X)); X
 solve; Y'+Y=e^(2X)Y^3,Y(0)=1; Y=1/sqrt(e^(2X)_2Xe^(2X)); X
