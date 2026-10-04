@@ -12,7 +12,7 @@ include_directories(
     src/pc
 )
 
-file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.[ch]" "src/*/*.[ch]" "lib/imath/imath.[ch]" "lib/imath/imrat.[ch]")
+file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.[ch]" "src/*/*.[ch]" "src/*/*/*.[ch]" "lib/imath/imath.[ch]" "lib/imath/imrat.[ch]")
 
 add_executable(pinacas ${SOURCE_FILES})
 
