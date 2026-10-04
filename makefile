@@ -6,6 +6,7 @@ NAME         = PCAS
 COMPRESSED   = YES
 ICON         = iconc.png
 DESCRIPTION  = "PinaCAS"
+ALLOCATOR    = CUSTOM
 
 CFLAGS       = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
 CXXFLAGS     = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
