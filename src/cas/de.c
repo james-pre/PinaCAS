@@ -30,7 +30,7 @@ static const char *order_names[DE_MAX_ORDER] = {
 	"Eighth order"
 };
 
-pcas_ast_t *de_Derivative(pcas_ast_t *y, unsigned order) {
+pcas_ast_t *de_Derivative(const pcas_ast_t *y, unsigned order) {
 	pcas_ast_t *d = ast_Copy(y);
 
 	while (order-- > 0)
@@ -132,7 +132,7 @@ static bool linear_form(pcas_de_t *de, pcas_ast_t *f) {
 	return linear;
 }
 
-pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x) {
+pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t *x) {
 	pcas_ast_t *f, *y = NULL;
 	pcas_error_t err;
 	unsigned k;
@@ -225,7 +225,7 @@ pcas_ast_t *de_StandardForm(pcas_de_t *de) {
 }
 
 /*Returns the number of primes if e is a derivative of y, or -1*/
-static int derivative_order(pcas_ast_t *e, pcas_ast_t *y) {
+static int derivative_order(const pcas_ast_t *e, const pcas_ast_t *y) {
 	int order = 0;
 
 	while (isoptype(e, OP_PRIME)) {
@@ -236,7 +236,7 @@ static int derivative_order(pcas_ast_t *e, pcas_ast_t *y) {
 	return ast_Compare(e, y) ? order : -1;
 }
 
-pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, pcas_ast_t *x) {
+pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, const pcas_ast_t *x) {
 	pcas_error_t err;
 	unsigned i;
 
@@ -248,7 +248,7 @@ pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, pcas
 	return err;
 }
 
-pcas_error_t de_AddCondition(pcas_de_t *de, pcas_ast_t *condition) {
+pcas_error_t de_AddCondition(pcas_de_t *de, const pcas_ast_t *condition) {
 	pcas_ast_t *left;
 	pcas_condition_t *c;
 	int order;
@@ -278,7 +278,7 @@ pcas_error_t de_AddCondition(pcas_de_t *de, pcas_ast_t *condition) {
 	return E_SUCCESS;
 }
 
-static bool is_euler(pcas_ast_t *e) {
+static bool is_euler(const pcas_ast_t *e) {
 	return e->type == NODE_SYMBOL && e->op.symbol == SYM_EULER;
 }
 
@@ -287,7 +287,7 @@ static pcas_ast_t *ln(pcas_ast_t *a) {
 }
 
 /*Returns base^e, writing e^(A+B) as e^A*e^B, e^ln(A) as A and e^(n*ln(A)) as A^n. Takes ownership of e.*/
-static pcas_ast_t *exponential(pcas_ast_t *base, pcas_ast_t *e) {
+static pcas_ast_t *exponential(const pcas_ast_t *base, pcas_ast_t *e) {
 	pcas_ast_t *result, *child;
 
 	if (is_euler(base) && isoptype(e, OP_LOG) && is_euler(opbase(e))) {
@@ -390,7 +390,7 @@ static void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 }
 
 /*True if the numerator of e over a common denominator expands to zero after simplifying e with flags*/
-static bool numerator_vanishes(pcas_ast_t *e, unsigned short flags) {
+static bool numerator_vanishes(const pcas_ast_t *e, unsigned short flags) {
 	pcas_ast_t *copy = ast_Copy(e), *numerator, *denominator;
 	bool zero;
 
@@ -416,7 +416,7 @@ static bool numerator_vanishes(pcas_ast_t *e, unsigned short flags) {
 }
 
 /*True if e simplifies to zero, trying identities only when needed*/
-static bool is_zero(pcas_ast_t *e) {
+static bool is_zero(const pcas_ast_t *e) {
 	bool zero;
 
 	work_Pause();
@@ -426,7 +426,7 @@ static bool is_zero(pcas_ast_t *e) {
 	return zero;
 }
 
-static bool involves(pcas_ast_t *e, pcas_ast_t *v) {
+static bool involves(const pcas_ast_t *e, const pcas_ast_t *v) {
 	pcas_ast_t *child;
 
 	if (ast_Compare(e, v))
@@ -454,7 +454,7 @@ static void substitute_derivatives(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t **de
 }
 
 /*Substitutes the derivatives into one side of the equation and simplifies it, recording each form*/
-static pcas_ast_t *evaluate_side(pcas_de_t *de, pcas_ast_t *side, pcas_ast_t **derivatives, const char *label) {
+static pcas_ast_t *evaluate_side(pcas_de_t *de, const pcas_ast_t *side, pcas_ast_t **derivatives, const char *label) {
 	pcas_ast_t *e = ast_Copy(side);
 
 	if (!involves(e, de->y))
@@ -511,9 +511,10 @@ static pcas_ast_t *derivative_node(pcas_de_t *de, pcas_ast_t *e) {
 	return node;
 }
 
-pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
+pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfied) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
-	pcas_ast_t *f = solution, *left, *right, *remainder;
+	pcas_ast_t *left, *right, *remainder;
+	const pcas_ast_t *f = solution;
 	unsigned k;
 
 	if (isoptype(f, OP_EQUALS) && ast_Compare(opbase(f), de->y))
@@ -569,7 +570,7 @@ pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied) {
 }
 
 /*Returns the logarithm of e to base. Takes ownership of e.*/
-static pcas_ast_t *logarithm(pcas_ast_t *base, pcas_ast_t *e) {
+static pcas_ast_t *logarithm(const pcas_ast_t *base, pcas_ast_t *e) {
 	return is_euler(base) ? ln(e) : ast_MakeBinary(OP_DIV, ln(e), ln(ast_Copy(base)));
 }
 
@@ -605,7 +606,7 @@ static pcas_ast_t *solve_for_prime(pcas_de_t *de) {
 }
 
 /*Appends the factors of e, raised to exponent, to g when they do not involve y and to h when they do not involve x. Returns false if e is not such a product.*/
-static bool separate(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *exponent, pcas_ast_t *g, pcas_ast_t *h) {
+static bool separate(pcas_de_t *de, const pcas_ast_t *e, const pcas_ast_t *exponent, pcas_ast_t *g, pcas_ast_t *h) {
 	pcas_ast_t *child, *base, *power, *next;
 	bool in_x = involves(e, de->x), in_y = involves(e, de->y), separable = true;
 
@@ -662,7 +663,7 @@ static bool separate(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *exponent, pcas_as
 }
 
 /*Returns 1 or -1 when the sign of e is known, otherwise 0*/
-static int sign_of(pcas_ast_t *e) {
+static int sign_of(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 	int sign = 1, compared;
 
@@ -687,7 +688,7 @@ static int sign_of(pcas_ast_t *e) {
 }
 
 /*Returns the sign of e at the initial condition, or 0 if it is unknown*/
-static int sign_at(pcas_de_t *de, pcas_ast_t *e, pcas_condition_t *c) {
+static int sign_at(pcas_de_t *de, const pcas_ast_t *e, pcas_condition_t *c) {
 	pcas_ast_t *value = ast_Copy(e);
 	int sign;
 
@@ -704,7 +705,7 @@ static int sign_at(pcas_de_t *de, pcas_ast_t *e, pcas_condition_t *c) {
 }
 
 /*Returns the index of the only child of e that involves v, or -1*/
-static int only_child_with(pcas_ast_t *e, pcas_ast_t *v) {
+static int only_child_with(const pcas_ast_t *e, const pcas_ast_t *v) {
 	pcas_ast_t *child;
 	int i, found = -1;
 
@@ -720,7 +721,7 @@ static int only_child_with(pcas_ast_t *e, pcas_ast_t *v) {
 }
 
 /*Merges constants that are added to or multiply the arbitrary constant into it*/
-static void absorb(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *constant) {
+static void absorb(pcas_de_t *de, pcas_ast_t *e, const pcas_ast_t *constant) {
 	pcas_ast_t *child, *kept;
 	int i;
 
@@ -771,7 +772,7 @@ static void absorb(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t *constant) {
 }
 
 /*True if e is the arbitrary constant or a multiple of it*/
-static bool is_arbitrary_multiple(pcas_ast_t *e, pcas_ast_t *constant) {
+static bool is_arbitrary_multiple(const pcas_ast_t *e, const pcas_ast_t *constant) {
 	pcas_ast_t *child;
 
 	if (constant == NULL)
@@ -813,7 +814,7 @@ static OperatorType inverse_of(OperatorType op) {
 	return AMOUNT_OPS;
 }
 
-static pcas_ast_t *reciprocal(pcas_ast_t *e) {
+static pcas_ast_t *reciprocal(const pcas_ast_t *e) {
 	if (isoptype(e, OP_POW))
 		return ast_MakeBinary(OP_POW, ast_Copy(opbase(e)), negate(ast_Copy(opbase(e)->next)));
 
@@ -821,7 +822,7 @@ static pcas_ast_t *reciprocal(pcas_ast_t *e) {
 }
 
 /*Writes the quotient a/(b*c) as a*b^-1*c^-1*/
-static pcas_ast_t *as_product(pcas_ast_t *quotient) {
+static pcas_ast_t *as_product(const pcas_ast_t *quotient) {
 	pcas_ast_t *product = ast_MakeOperator(OP_MULT), *child;
 
 	ast_ChildAppend(product, ast_Copy(opbase(quotient)));
@@ -832,7 +833,13 @@ static pcas_ast_t *as_product(pcas_ast_t *quotient) {
 }
 
 /*Undoes the outermost operation applied to y in lhs = rhs. Returns false if it cannot.*/
-static bool isolate_step(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_t *constant, pcas_condition_t *c) {
+static bool isolate_step(
+	pcas_de_t *de,
+	pcas_ast_t **lhs,
+	pcas_ast_t **rhs,
+	const pcas_ast_t *constant,
+	pcas_condition_t *c
+) {
 	pcas_ast_t *L = *lhs, *R = *rhs, *left, *right, *rest, *base, *power;
 	OperatorType inverse;
 	int i, sign = 1;
@@ -928,7 +935,13 @@ static bool isolate_step(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas
 }
 
 /*Solves lhs = rhs for y, recording each step. The arbitrary constant absorbs other constants unless it is NULL. Returns false if y is left implicit.*/
-static bool isolate(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_t *constant, pcas_condition_t *c) {
+static bool isolate(
+	pcas_de_t *de,
+	pcas_ast_t **lhs,
+	pcas_ast_t **rhs,
+	const pcas_ast_t *constant,
+	pcas_condition_t *c
+) {
 	const char *text = "Solve for the function";
 	unsigned steps = 0;
 
@@ -957,7 +970,7 @@ static bool isolate(pcas_de_t *de, pcas_ast_t **lhs, pcas_ast_t **rhs, pcas_ast_
 }
 
 /*Returns e with the point of the initial condition substituted*/
-static pcas_ast_t *at_condition(pcas_de_t *de, pcas_ast_t *e, pcas_condition_t *c) {
+static pcas_ast_t *at_condition(pcas_de_t *de, const pcas_ast_t *e, pcas_condition_t *c) {
 	pcas_ast_t *copy = ast_Copy(e);
 
 	work_Pause();
@@ -1005,7 +1018,7 @@ static void apply_condition(
 }
 
 /*True if h is zero at the initial value, which makes y constant*/
-static bool is_equilibrium(pcas_de_t *de, pcas_ast_t *h, pcas_condition_t *c) {
+static bool is_equilibrium(pcas_de_t *de, const pcas_ast_t *h, pcas_condition_t *c) {
 	pcas_ast_t *value = ast_Copy(h), *zero;
 	bool equilibrium;
 
@@ -1028,13 +1041,13 @@ static bool is_equilibrium(pcas_de_t *de, pcas_ast_t *h, pcas_condition_t *c) {
 	return equilibrium;
 }
 
-static bool is_monomial(pcas_ast_t *e) {
+static bool is_monomial(const pcas_ast_t *e) {
 	return e->type != NODE_OPERATOR || isoptype(e, OP_POW);
 }
 
 /*True if e is one sum multiplied or divided by numbers, symbols and powers*/
-static bool is_sum_times_monomials(pcas_ast_t *e) {
-	pcas_ast_t *child, *numerator = e;
+static bool is_sum_times_monomials(const pcas_ast_t *e) {
+	const pcas_ast_t *child, *numerator = e;
 	unsigned sums = 0;
 
 	if (isoptype(e, OP_DIV)) {

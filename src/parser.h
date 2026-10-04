@@ -98,4 +98,4 @@ unsigned parse_list(
 	unsigned max,
 	pcas_error_t *err
 );
-uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, const struct Identifier *lookup, pcas_error_t *err);
+uint8_t *export_to_binary(const pcas_ast_t *e, unsigned *len, const struct Identifier *lookup, pcas_error_t *err);

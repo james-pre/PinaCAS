@@ -192,7 +192,7 @@ bool simplify_normalize(pcas_ast_t *e) {
 	return changed;
 }
 
-bool has_imaginary_node(pcas_ast_t *e) {
+bool has_imaginary_node(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 
 	if (e->type == NODE_SYMBOL && e->op.symbol == SYM_IMAG)
@@ -206,7 +206,7 @@ bool has_imaginary_node(pcas_ast_t *e) {
 	return false;
 }
 
-bool contains_symbol(pcas_ast_t *e, Symbol symbol) {
+bool contains_symbol(const pcas_ast_t *e, Symbol symbol) {
 	pcas_ast_t *child;
 
 	if (e->type == NODE_SYMBOL)
@@ -222,7 +222,7 @@ bool contains_symbol(pcas_ast_t *e, Symbol symbol) {
 	return false;
 }
 
-Symbol fresh_symbol(pcas_ast_t *e) {
+Symbol fresh_symbol(const pcas_ast_t *e) {
 	const char *candidates = "UVWTSRQPNMKJHGFDCBA";
 	unsigned i;
 
@@ -234,7 +234,7 @@ Symbol fresh_symbol(pcas_ast_t *e) {
 	return SYM_INVALID;
 }
 
-unsigned node_count(pcas_ast_t *e) {
+unsigned node_count(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 	unsigned count = 1;
 
@@ -246,12 +246,12 @@ unsigned node_count(pcas_ast_t *e) {
 	return count;
 }
 
-Symbol constant_symbol(pcas_ast_t *e) {
+Symbol constant_symbol(const pcas_ast_t *e) {
 	return !contains_symbol(e, SYM_C) ? SYM_C : !contains_symbol(e, SYM_K) ? SYM_K : fresh_symbol(e);
 }
 
 /*Expects everything to be completely simplified*/
-bool is_negative_for_sure(pcas_ast_t *a) {
+bool is_negative_for_sure(const pcas_ast_t *a) {
 	if (a->type == NODE_NUMBER && mp_rat_compare_zero(a->op.num) < 0)
 		return true;
 

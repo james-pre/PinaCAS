@@ -107,10 +107,10 @@ static bool starts_with_number(pcas_ast_t *e) {
 	}
 }
 
-static ts_box_t *convert(pcas_ast_t *e);
+static ts_box_t *convert(const pcas_ast_t *e);
 
 /*Writes a numeric fraction on one line, as in an exponent, or returns NULL if e is not one*/
-static ts_box_t *inline_fraction(pcas_ast_t *e) {
+static ts_box_t *inline_fraction(const pcas_ast_t *e) {
 	mp_rat value;
 	ts_box_t *row;
 
@@ -139,12 +139,12 @@ static ts_box_t *inline_fraction(pcas_ast_t *e) {
 	return row;
 }
 
-static ts_box_t *parenthesized(pcas_ast_t *e, bool parens) {
+static ts_box_t *parenthesized(const pcas_ast_t *e, bool parens) {
 	ts_box_t *b = convert(e);
 	return parens ? delimited(b, '(', ')') : b;
 }
 
-static ts_box_t *function_box(pcas_ast_t *e) {
+static ts_box_t *function_box(const pcas_ast_t *e) {
 	const char *name;
 	bool inverse = false;
 
@@ -171,7 +171,7 @@ static ts_box_t *function_box(pcas_ast_t *e) {
 	);
 }
 
-static ts_box_t *sum_box(pcas_ast_t *e) {
+static ts_box_t *sum_box(const pcas_ast_t *e) {
 	ts_box_t *row = ts_Row();
 	pcas_ast_t *term;
 
@@ -192,7 +192,7 @@ static ts_box_t *sum_box(pcas_ast_t *e) {
 	return row;
 }
 
-static ts_box_t *product_box(pcas_ast_t *e) {
+static ts_box_t *product_box(const pcas_ast_t *e) {
 	ts_box_t *row = ts_Row();
 	pcas_ast_t *factor;
 	bool empty = true;
@@ -222,7 +222,7 @@ static ts_box_t *product_box(pcas_ast_t *e) {
 	return row;
 }
 
-static ts_box_t *log_box(pcas_ast_t *e) {
+static ts_box_t *log_box(const pcas_ast_t *e) {
 	pcas_ast_t *base = ast_ChildGet(e, 0);
 	ts_box_t *name;
 
@@ -236,7 +236,7 @@ static ts_box_t *log_box(pcas_ast_t *e) {
 	return row2(name, delimited(convert(ast_ChildGet(e, 1)), '(', ')'));
 }
 
-static ts_box_t *operator_box(pcas_ast_t *e) {
+static ts_box_t *operator_box(const pcas_ast_t *e) {
 	pcas_ast_t *a = opbase(e);
 	pcas_ast_t *b = a != NULL ? a->next : NULL;
 
@@ -279,7 +279,7 @@ static ts_box_t *operator_box(pcas_ast_t *e) {
 	}
 }
 
-static ts_box_t *convert(pcas_ast_t *e) {
+static ts_box_t *convert(const pcas_ast_t *e) {
 	if (is_negative_for_sure(e)) {
 		pcas_ast_t *magnitude = ast_Copy(e);
 		ts_box_t *b;
@@ -298,7 +298,7 @@ static ts_box_t *convert(pcas_ast_t *e) {
 	}
 }
 
-ts_box_t *ts_FromAst(pcas_ast_t *e) {
+ts_box_t *ts_FromAst(const pcas_ast_t *e) {
 	return convert(e);
 }
 

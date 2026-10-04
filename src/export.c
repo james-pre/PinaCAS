@@ -31,7 +31,7 @@ static uint8_t precedence_type(OperatorType type) {
 	}
 }
 
-static uint8_t precedence(pcas_ast_t *e) {
+static uint8_t precedence(const pcas_ast_t *e) {
 	if (e->type == NODE_OPERATOR)
 		return precedence_type(optype(e));
 	return 255;
@@ -46,7 +46,7 @@ static uint8_t precedence(pcas_ast_t *e) {
 	 (is_right_operator_type(optype(parent)) && (child)->type == NODE_NUMBER &&                                        \
 	  mp_rat_compare_zero((child)->op.num) < 0))
 
-pcas_ast_t *rightmost(pcas_ast_t *e) {
+static const pcas_ast_t *rightmost(const pcas_ast_t *e) {
 	if (e->type == NODE_OPERATOR) {
 		switch (optype(e)) {
 			case OP_POW: return rightmost(ast_ChildGetLast(e));
@@ -56,7 +56,7 @@ pcas_ast_t *rightmost(pcas_ast_t *e) {
 
 	return e;
 }
-pcas_ast_t *leftmost(pcas_ast_t *e) {
+static const pcas_ast_t *leftmost(const pcas_ast_t *e) {
 	if (e->type == NODE_OPERATOR) {
 		switch (optype(e)) {
 			case OP_POW:
@@ -76,7 +76,7 @@ pcas_ast_t *leftmost(pcas_ast_t *e) {
 }
 
 /*True if every factor of the multiplication is 1 or -1*/
-static bool only_units(pcas_ast_t *e) {
+static bool only_units(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 
 	for (child = opbase(e); child != NULL; child = child->next) {
@@ -89,7 +89,7 @@ static bool only_units(pcas_ast_t *e) {
 
 /*Returns length of buffer. Writes to buffer is buffer != NULL*/
 static unsigned _to_binary(
-	pcas_ast_t *e,
+	const pcas_ast_t *e,
 	uint8_t *data,
 	unsigned index,
 	const struct Identifier *lookup,
@@ -386,9 +386,7 @@ static unsigned _to_binary(
 	return index;
 }
 
-uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, const struct Identifier *lookup, pcas_error_t *err) {
-	uint8_t *data;
-
+uint8_t *export_to_binary(const pcas_ast_t *e, unsigned *len, const struct Identifier *lookup, pcas_error_t *err) {
 	*err = E_SUCCESS;
 
 	*len = _to_binary(e, NULL, 0, lookup, err);
@@ -398,7 +396,7 @@ uint8_t *export_to_binary(pcas_ast_t *e, unsigned *len, const struct Identifier 
 		return NULL;
 	}
 
-	data = malloc(*len);
+	uint8_t *data = malloc(*len);
 	_to_binary(e, data, 0, lookup, err);
 
 	return data;

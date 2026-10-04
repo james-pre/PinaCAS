@@ -687,20 +687,16 @@ void compile_all(void) {
 	compile_complex();
 }
 
-char
-	*
-		token_table[21] =
-			{ti_Y1,   ti_Y2,   ti_Y3,   ti_Y4,   ti_Y5,         ti_Y6,         ti_Y7,
-			 ti_Y8,   ti_Y9,   ti_Y0,   ti_Str1, ti_Str2,       ti_Str3,       ti_Str4,
-			 ti_Str5, ti_Str6, ti_Str7, ti_Str8, ("\xAA\x8\0"), ("\xAA\x9\0"), /*ti_Str0 is misnamed and ti_Str9 does not exist in the current toolchain*/
-			 ti_Ans};
+static const char *const token_table[21] = {ti_Y1,   ti_Y2,   ti_Y3,   ti_Y4,   ti_Y5,   ti_Y6,   ti_Y7,
+											ti_Y8,   ti_Y9,   ti_Y0,   ti_Str1, ti_Str2, ti_Str3, ti_Str4,
+											ti_Str5, ti_Str6, ti_Str7, ti_Str8, ti_Str9, ti_Str0, ti_Ans};
 
 pcas_ast_t *parse_from_dropdown_index(unsigned index, pcas_error_t *err) {
-	return parse_from_tok((uint8_t *)token_table[index], err);
+	return parse_from_tok(token_table[index], err);
 }
 
 void write_to_dropdown_index(unsigned index, pcas_ast_t *expression, pcas_error_t *err) {
-	write_to_tok((uint8_t *)token_table[index], expression, err);
+	write_to_tok(token_table[index], expression, err);
 }
 
 void execute_simplify(void) {
@@ -940,7 +936,7 @@ pcas_ast_t *parse_respect_to(view_t *charselect, pcas_error_t *err) {
 }
 
 unsigned parse_list_from_dropdown_index(unsigned index, pcas_ast_t **items, pcas_error_t *err) {
-	return parse_list_from_tok((uint8_t *)token_table[index], items, MAX_ITEMS, err);
+	return parse_list_from_tok(token_table[index], items, MAX_ITEMS, err);
 }
 
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/

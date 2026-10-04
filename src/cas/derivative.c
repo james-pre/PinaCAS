@@ -37,7 +37,7 @@ pcas_id_t id_deriv_power_rule = {"deriv(A^B,X,T", "deriv(A,X,T)BA^(B_1"};
 pcas_id_t id_deriv_constant_rule = {"deriv(CX,X,T", "C"};
 pcas_id_t id_deriv_product_rule = {"deriv(AB,X,T", "Aderiv(B,X,T)+Bderiv(A,X,T"};
 
-bool is_constant(pcas_ast_t *e, pcas_ast_t *respect_to) {
+bool is_constant(const pcas_ast_t *e, const pcas_ast_t *respect_to) {
 	if (ast_Compare(e, respect_to))
 		return false;
 
@@ -161,7 +161,7 @@ bool eval_derivatives(pcas_ast_t *e) {
 	return true;
 }
 
-void derivative(pcas_ast_t *e, pcas_ast_t *respect_to, pcas_ast_t *eval_at) {
+void derivative(pcas_ast_t *e, const pcas_ast_t *respect_to, const pcas_ast_t *eval_at) {
 	pcas_ast_t *deriv_node = ast_MakeOperator(OP_DERIV);
 
 	work_Enter(e);

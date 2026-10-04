@@ -192,12 +192,12 @@ such as 1A = A, A + 0 = A. Returns true if the ast was changed.*/
 bool eval(pcas_ast_t *e, unsigned short flags);
 
 /*Replaces all instances of from ast to to ast in e*/
-bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to);
+bool substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t *to);
 
 /*Returns the greatest common divisor of two expressions.
 gcd(X(X+1)^2, AX) = X 
 gcd(6AX, 10X) = 2X*/
-pcas_ast_t *gcd(pcas_ast_t *a, pcas_ast_t *b);
+pcas_ast_t *gcd(const pcas_ast_t *a, const pcas_ast_t *b);
 
 /*Helper functions*/
 
@@ -205,19 +205,19 @@ pcas_ast_t *gcd(pcas_ast_t *a, pcas_ast_t *b);
 void replace_node(pcas_ast_t *a, pcas_ast_t *b);
 
 /*Returns true if the node has an imaginary node.*/
-bool has_imaginary_node(pcas_ast_t *e);
+bool has_imaginary_node(const pcas_ast_t *e);
 
-bool contains_symbol(pcas_ast_t *e, Symbol symbol);
+bool contains_symbol(const pcas_ast_t *e, Symbol symbol);
 /*Returns a symbol that does not appear in e, or SYM_INVALID if every candidate does*/
-Symbol fresh_symbol(pcas_ast_t *e);
+Symbol fresh_symbol(const pcas_ast_t *e);
 /*Returns C, or K, or another symbol that does not appear in e, to name an arbitrary constant*/
-Symbol constant_symbol(pcas_ast_t *e);
-unsigned node_count(pcas_ast_t *e);
+Symbol constant_symbol(const pcas_ast_t *e);
+unsigned node_count(const pcas_ast_t *e);
 
 /*Returns true if the node is being multiplied by at least one negative or is already a negative number node.
 The node must be completely simplified for this to work, because it does not detect
 multiplying by more than one negative to make a positive. */
-bool is_negative_for_sure(pcas_ast_t *a);
+bool is_negative_for_sure(const pcas_ast_t *a);
 
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
 bool absolute_val(pcas_ast_t *e);

@@ -42,11 +42,11 @@ void work_Pause(void);
 void work_Resume(void);
 
 /*Brackets a CAS operation on e. The outermost operation records the state of e on entry and exit.*/
-void work_Enter(pcas_ast_t *e);
-void work_Leave(pcas_ast_t *e);
+void work_Enter(const pcas_ast_t *e);
+void work_Leave(const pcas_ast_t *e);
 
 /*Records a step. Copies before and after.*/
-void work_Step(StepType type, const char *text, pcas_ast_t *before, pcas_ast_t *after);
+void work_Step(StepType type, const char *text, const pcas_ast_t *before, const pcas_ast_t *after);
 void work_Text(const char *text);
 
 /*Lays out the math of a step, or returns NULL if it has none. A continued state follows another state, so it starts with =.*/

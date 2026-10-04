@@ -21,7 +21,7 @@ const char *operators[AMOUNT_OPS] = {"+",   "*",    "/",    "^",     "root", "lo
 
 const char *symbols[SYM_THETA - SYM_IMAG + 1] = {"i", "pi", "e", "theta"};
 
-void _print_tree(pcas_ast_t *e, unsigned indent, unsigned index) {
+void _print_tree(const pcas_ast_t *e, unsigned indent, unsigned index) {
 	unsigned i;
 
 	if (e == NULL)
@@ -54,11 +54,11 @@ void _print_tree(pcas_ast_t *e, unsigned indent, unsigned index) {
 	}
 }
 
-void dbg_print_tree(pcas_ast_t *e, unsigned indent) {
+void dbg_print_tree(const pcas_ast_t *e, unsigned indent) {
 	_print_tree(e, indent, 0);
 }
 
-unsigned dbg_count_nodes(pcas_ast_t *e) {
+unsigned dbg_count_nodes(const pcas_ast_t *e) {
 	unsigned amount = 1;
 
 	if (e->type == NODE_OPERATOR) {

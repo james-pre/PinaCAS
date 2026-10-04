@@ -31,10 +31,10 @@ typedef struct {
 } pcas_de_t;
 
 /*Returns y with order primes*/
-pcas_ast_t *de_Derivative(pcas_ast_t *y, unsigned order);
+pcas_ast_t *de_Derivative(const pcas_ast_t *y, unsigned order);
 
 /*Classifies equation, an equals node or an expression equal to zero, and records it. Copies its arguments. de_Cleanup must be called even on failure.*/
-pcas_error_t de_Load(pcas_de_t *de, pcas_ast_t *equation, pcas_ast_t *x);
+pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t *x);
 /*Records the order and linearity*/
 void de_Classify(pcas_de_t *de);
 void de_Cleanup(pcas_de_t *de);
@@ -43,13 +43,13 @@ void de_Cleanup(pcas_de_t *de);
 pcas_ast_t *de_StandardForm(pcas_de_t *de);
 
 /*Loads the equation in items[0] and the initial conditions in the rest, as parse_list returns them*/
-pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, pcas_ast_t *x);
+pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, const pcas_ast_t *x);
 
 /*Adds an initial condition written like Y(0)=1 or Y'(2)=-3, as parsed and before simplification*/
-pcas_error_t de_AddCondition(pcas_de_t *de, pcas_ast_t *condition);
+pcas_error_t de_AddCondition(pcas_de_t *de, const pcas_ast_t *condition);
 
 /*Checks whether solution, written as y = f or as f, satisfies the equation and the initial conditions, and records the check*/
-pcas_error_t de_Verify(pcas_de_t *de, pcas_ast_t *solution, bool *satisfied);
+pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfied);
 
 /*Solves the equation, using the initial conditions, and records the work. The solution is y = f when explicit and an implicit equation otherwise.*/
 pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution);

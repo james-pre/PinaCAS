@@ -106,7 +106,7 @@ pcas_ast_t *ast_MakeBinary(OperatorType type, pcas_ast_t *left, pcas_ast_t *righ
 	return ret;
 }
 
-pcas_ast_t *ast_Copy(pcas_ast_t *e) {
+pcas_ast_t *ast_Copy(const pcas_ast_t *e) {
 	if (e == NULL)
 		return NULL;
 
@@ -140,7 +140,7 @@ static bool has_used(const unsigned *buffer, unsigned top, unsigned index) {
 	return false;
 }
 
-bool ast_Compare(pcas_ast_t *a, pcas_ast_t *b) {
+bool ast_Compare(const pcas_ast_t *a, const pcas_ast_t *b) {
 	if (a == b)
 		return true;
 
@@ -247,7 +247,7 @@ pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child) {
 	return E_SUCCESS;
 }
 
-pcas_ast_t *ast_ChildGet(pcas_ast_t *parent, LSIZE index) {
+pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, LSIZE index) {
 	LSIZE i;
 	pcas_ast_t *current;
 
@@ -265,7 +265,7 @@ pcas_ast_t *ast_ChildGet(pcas_ast_t *parent, LSIZE index) {
 	return 0;
 }
 
-pcas_ast_t *ast_ChildGetLast(pcas_ast_t *parent) {
+pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent) {
 	if (parent->type != NODE_OPERATOR)
 		return NULL;
 
@@ -324,7 +324,7 @@ pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child) {
 	return ast_ChildRemoveIndex(parent, ast_ChildIndexOf(parent, child));
 }
 
-LSIZE ast_ChildIndexOf(pcas_ast_t *parent, pcas_ast_t *child) {
+LSIZE ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
 	LSIZE i;
 	pcas_ast_t *current;
 
@@ -380,7 +380,7 @@ pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index) {
 	return NULL;
 }
 
-LSIZE ast_ChildLength(pcas_ast_t *parent) {
+LSIZE ast_ChildLength(const pcas_ast_t *parent) {
 	LSIZE i;
 	pcas_ast_t *current;
 

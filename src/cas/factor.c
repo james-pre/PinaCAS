@@ -3,7 +3,7 @@
 #include "../work.h"
 
 /*Handles gcd for AB, BC gcd = B*/
-static pcas_ast_t *gcd_mult(pcas_ast_t *mult, pcas_ast_t *b) {
+static pcas_ast_t *gcd_mult(const pcas_ast_t *mult, const pcas_ast_t *b) {
 	unsigned i;
 	pcas_ast_t *current_gcd, *copy;
 
@@ -30,7 +30,7 @@ static pcas_ast_t *gcd_mult(pcas_ast_t *mult, pcas_ast_t *b) {
 }
 
 /*Handles gcd for A + AB, A gcd = A*/
-static pcas_ast_t *gcd_add(pcas_ast_t *add, pcas_ast_t *b) {
+static pcas_ast_t *gcd_add(const pcas_ast_t *add, const pcas_ast_t *b) {
 	unsigned i;
 	pcas_ast_t *current_gcd;
 
@@ -49,8 +49,9 @@ static pcas_ast_t *gcd_add(pcas_ast_t *add, pcas_ast_t *b) {
 	return current_gcd;
 }
 
-static pcas_ast_t *gcd_div(pcas_ast_t *div, pcas_ast_t *b) {
-	pcas_ast_t *num1, *num2, *den1, *den2, *num_g, *den_g;
+static pcas_ast_t *gcd_div(const pcas_ast_t *div, const pcas_ast_t *b) {
+	const pcas_ast_t *num1, *num2, *den1, *den2;
+	pcas_ast_t *num_g, *den_g, *one = NULL;
 
 	num1 = ast_ChildGet(div, 0);
 	den1 = ast_ChildGet(div, 1);
@@ -60,20 +61,19 @@ static pcas_ast_t *gcd_div(pcas_ast_t *div, pcas_ast_t *b) {
 		den2 = ast_ChildGet(b, 1);
 	} else {
 		num2 = b;
-		den2 = ast_MakeNumber(num_FromInt(1));
+		den2 = one = ast_MakeNumber(num_FromInt(1));
 	}
 
 	num_g = gcd(num1, num2);
 	den_g = gcd(den1, den2);
 
-	if (!isoptype(b, OP_DIV))
-		ast_Cleanup(den2);
+	ast_Cleanup(one);
 
 	return ast_MakeBinary(OP_DIV, num_g, den_g);
 }
 
 /*gcd of both bases, raised to smallest power*/
-static pcas_ast_t *gcd_pow(pcas_ast_t *pow, pcas_ast_t *b) {
+static pcas_ast_t *gcd_pow(const pcas_ast_t *pow, const pcas_ast_t *b) {
 	pcas_ast_t *base1, *power1;
 
 	base1 = ast_ChildGet(pow, 0);
@@ -109,7 +109,7 @@ static pcas_ast_t *gcd_pow(pcas_ast_t *pow, pcas_ast_t *b) {
 	return ast_MakeNumber(num_FromInt(1));
 }
 
-pcas_ast_t *gcd(pcas_ast_t *a, pcas_ast_t *b) {
+pcas_ast_t *gcd(const pcas_ast_t *a, const pcas_ast_t *b) {
 	pcas_ast_t *ret = NULL;
 
 	if (ast_Compare(a, b))

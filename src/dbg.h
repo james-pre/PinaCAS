@@ -35,5 +35,5 @@ void ti_debug(const char *format, ...);
 
 #endif
 
-void dbg_print_tree(pcas_ast_t *e, unsigned indent);
-unsigned dbg_count_nodes(pcas_ast_t *e);
+void dbg_print_tree(const pcas_ast_t *e, unsigned indent);
+unsigned dbg_count_nodes(const pcas_ast_t *e);

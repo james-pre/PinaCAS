@@ -38,7 +38,7 @@ static pcas_ast_t *ln(pcas_ast_t *a) {
 }
 
 /*Takes ownership of f*/
-static pcas_ast_t *integral_node(pcas_ast_t *f, pcas_ast_t *x) {
+static pcas_ast_t *integral_node(pcas_ast_t *f, const pcas_ast_t *x) {
 	return ast_MakeBinary(OP_INTEGRAL, f, ast_Copy(x));
 }
 
@@ -807,7 +807,7 @@ bool eval_integrals(pcas_ast_t *e) {
 	return integrate_all(e, MAX_METHOD_DEPTH);
 }
 
-bool contains_integral(pcas_ast_t *e) {
+bool contains_integral(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 
 	if (isoptype(e, OP_INTEGRAL))
@@ -823,7 +823,7 @@ bool contains_integral(pcas_ast_t *e) {
 	return false;
 }
 
-static void antiderivative(pcas_ast_t *e, pcas_ast_t *respect_to, bool constant) {
+static void antiderivative(pcas_ast_t *e, const pcas_ast_t *respect_to, bool constant) {
 	pcas_ast_t *node;
 
 	work_Enter(e);
@@ -843,10 +843,10 @@ static void antiderivative(pcas_ast_t *e, pcas_ast_t *respect_to, bool constant)
 	work_Leave(e);
 }
 
-void integral(pcas_ast_t *e, pcas_ast_t *respect_to) {
+void integral(pcas_ast_t *e, const pcas_ast_t *respect_to) {
 	antiderivative(e, respect_to, false);
 }
 
-void integral_Indefinite(pcas_ast_t *e, pcas_ast_t *respect_to) {
+void integral_Indefinite(pcas_ast_t *e, const pcas_ast_t *respect_to) {
 	antiderivative(e, respect_to, true);
 }

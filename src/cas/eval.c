@@ -670,7 +670,7 @@ bool eval(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-static bool _substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
+static bool _substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t *to) {
 	if (ast_Compare(e, from)) {
 		replace_node(e, ast_Copy(to));
 		return true;
@@ -689,7 +689,7 @@ static bool _substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
 	return false;
 }
 
-bool substitute(pcas_ast_t *e, pcas_ast_t *from, pcas_ast_t *to) {
+bool substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t *to) {
 	bool changed;
 	work_Enter(e);
 	changed = _substitute(e, from, to);

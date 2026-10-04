@@ -44,7 +44,7 @@ void work_Resume(void) {
 	paused--;
 }
 
-static pcas_ast_t *display_copy(pcas_ast_t *e) {
+static pcas_ast_t *display_copy(const pcas_ast_t *e) {
 	pcas_ast_t *copy;
 
 	if (e == NULL)
@@ -81,7 +81,7 @@ static pcas_step_t *make_step(StepType type, const char *text, pcas_ast_t *befor
 }
 
 /*True if a and b are drawn the same way*/
-static bool same_display(pcas_ast_t *a, pcas_ast_t *b) {
+static bool same_display(const pcas_ast_t *a, const pcas_ast_t *b) {
 	ts_box_t *box_a, *box_b;
 	bool same;
 
@@ -98,7 +98,7 @@ static bool same_display(pcas_ast_t *a, pcas_ast_t *b) {
 	return same;
 }
 
-static void record_state(pcas_ast_t *e) {
+static void record_state(const pcas_ast_t *e) {
 	pcas_step_t *last = current->last;
 	pcas_ast_t *snapshot = display_copy(e);
 
@@ -117,17 +117,17 @@ static void record_state(pcas_ast_t *e) {
 	append(make_step(STEP_STATE, NULL, NULL, snapshot));
 }
 
-void work_Enter(pcas_ast_t *e) {
+void work_Enter(const pcas_ast_t *e) {
 	if (depth++ == 0 && work_Recording())
 		record_state(e);
 }
 
-void work_Leave(pcas_ast_t *e) {
+void work_Leave(const pcas_ast_t *e) {
 	if (--depth == 0 && work_Recording())
 		record_state(e);
 }
 
-void work_Step(StepType type, const char *text, pcas_ast_t *before, pcas_ast_t *after) {
+void work_Step(StepType type, const char *text, const pcas_ast_t *before, const pcas_ast_t *after) {
 	if (!work_Recording())
 		return;
 

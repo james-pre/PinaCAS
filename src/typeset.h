@@ -73,7 +73,7 @@ ts_box_t *ts_Row(void);
 ts_box_t *ts_Append(ts_box_t *parent, ts_box_t *child);
 
 /*Lays out e in math notation*/
-ts_box_t *ts_FromAst(pcas_ast_t *e);
+ts_box_t *ts_FromAst(const pcas_ast_t *e);
 
 /*Computes the size of b and its descendants*/
 void ts_Measure(ts_box_t *b, const ts_metrics_t *m);

@@ -152,8 +152,8 @@ pcas_ast_t *ast_MakeOperator(OperatorType type);
 pcas_ast_t *ast_MakeUnary(OperatorType type, pcas_ast_t *operand);
 pcas_ast_t *ast_MakeBinary(OperatorType type, pcas_ast_t *left, pcas_ast_t *right);
 
-pcas_ast_t *ast_Copy(pcas_ast_t *e);
-bool ast_Compare(pcas_ast_t *a, pcas_ast_t *b);
+pcas_ast_t *ast_Copy(const pcas_ast_t *e);
+bool ast_Compare(const pcas_ast_t *a, const pcas_ast_t *b);
 
 void ast_Cleanup(pcas_ast_t *e);
 
@@ -161,11 +161,11 @@ void ast_Cleanup(pcas_ast_t *e);
 pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child);
 pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, LSIZE index);
 
-pcas_ast_t *ast_ChildGet(pcas_ast_t *parent, LSIZE index);
-pcas_ast_t *ast_ChildGetLast(pcas_ast_t *parent);
+pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, LSIZE index);
+pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent);
 
 /*returns -1 (unsigned) if not found*/
-LSIZE ast_ChildIndexOf(pcas_ast_t *parent, pcas_ast_t *child);
+LSIZE ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child);
 
 /*
 Returns the removed node, null if none
@@ -175,4 +175,4 @@ use that if possible.
 pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child);
 pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index);
 
-LSIZE ast_ChildLength(pcas_ast_t *parent);
+LSIZE ast_ChildLength(const pcas_ast_t *parent);
