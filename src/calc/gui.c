@@ -602,19 +602,12 @@ void gui_Run(void) {
 	gui_Cleanup();
 }
 
-void compile(pcas_id_t *arr, unsigned len) {
-	unsigned i;
-	for (i = 0; i < len; i++) {
-		id_Load(&arr[i]);
-	}
-}
-
 void compile_general(void) {
 	static bool compiled = false;
 
 	if (!compiled) {
 		console_write("Compiling basic ids...");
-		compile(id_general, ID_NUM_GENERAL);
+		id_LoadTable(id_general);
 		compiled = true;
 	}
 }
@@ -624,7 +617,7 @@ void compile_trig(void) {
 
 	if (!compiled) {
 		console_write("Compiling trig ids...");
-		compile(id_trig_identities, ID_NUM_TRIG_IDENTITIES);
+		id_LoadTable(id_trig_identities);
 		compiled = true;
 	}
 }
@@ -634,7 +627,7 @@ void compile_trig_constants(void) {
 
 	if (!compiled) {
 		console_write("Compiling trig const ids...");
-		compile(id_trig_constants, ID_NUM_TRIG_CONSTANTS);
+		id_LoadTable(id_trig_constants);
 		compiled = true;
 	}
 }
@@ -644,7 +637,7 @@ void compile_trig_inv_constants(void) {
 
 	if (!compiled) {
 		console_write("Compiling inv trig const ids...");
-		compile(id_trig_inv_constants, ID_NUM_TRIG_INV_CONSTANTS);
+		id_LoadTable(id_trig_inv_constants);
 		compiled = true;
 	}
 }
@@ -654,7 +647,7 @@ void compile_hyperbolic(void) {
 
 	if (!compiled) {
 		console_write("Compiling hyperbolic ids...");
-		compile(id_hyperbolic, ID_NUM_HYPERBOLIC);
+		id_LoadTable(id_hyperbolic);
 		compiled = true;
 	}
 }
@@ -664,7 +657,7 @@ void compile_complex(void) {
 
 	if (!compiled) {
 		console_write("Compiling complex ids...");
-		compile(id_complex, ID_NUM_COMPLEX);
+		id_LoadTable(id_complex);
 		compiled = true;
 	}
 }
@@ -674,7 +667,7 @@ void compile_derivative(void) {
 
 	if (!compiled) {
 		console_write("Compiling derivative ids...");
-		compile(id_derivative, ID_NUM_DERIV);
+		id_LoadTable(id_derivative);
 		compiled = true;
 	}
 }

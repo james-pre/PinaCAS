@@ -3,7 +3,7 @@
 #include "../work.h"
 
 /*Sum rule, constant rule, product rule, and power rule are hardcoded for speed or because of limitations in identity searching*/
-pcas_id_t id_derivative[ID_NUM_DERIV] = {
+pcas_id_t id_derivative[] = {
 	{"deriv(X,X,T", "1"},
 	{"deriv(integ(A,X),X,T", "A"},
 
@@ -30,6 +30,7 @@ pcas_id_t id_derivative[ID_NUM_DERIV] = {
 	{"deriv(asinh(A,X,T", "deriv(A,X,T)/sqrt(X^2+1"},
 	{"deriv(acosh(A,X,T", "deriv(A,X,T)/sqrt(X^2_1"},
 	{"deriv(atanh(A,X,T", "deriv(A,X,T)/(1_X^2"},
+	{NULL}
 };
 
 /*Identities we have to check manually because we have to check for constants*/
@@ -119,7 +120,7 @@ bool eval_derivative_nodes(pcas_ast_t *e) {
 		changed |= id_Execute(e, &id_deriv_exponential_rule, false);
 	} else {
 		/*While is necessary because of power rules.*/
-		while (id_ExecuteTable(e, id_derivative, ID_NUM_DERIV, false))
+		while (id_ExecuteTable(e, id_derivative, false))
 			changed = true;
 	}
 

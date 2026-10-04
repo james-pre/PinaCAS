@@ -913,26 +913,26 @@ bool simplify_identities(pcas_ast_t *e, unsigned short flags) {
 	bool changed = false;
 
 	if (flags & SIMP_ID_GENERAL)
-		changed |= id_ExecuteTable(e, id_general, ID_NUM_GENERAL, true);
+		changed |= id_ExecuteTable(e, id_general, true);
 
 	if (flags & SIMP_ID_COMPLEX)
-		while (id_ExecuteTable(e, id_complex, ID_NUM_COMPLEX, true))
+		while (id_ExecuteTable(e, id_complex, true))
 			changed = true;
 
 	if (flags & SIMP_ID_TRIG) {
 		while (simplify_periodic(e))
 			changed = true;
-		changed |= id_ExecuteTable(e, id_trig_identities, ID_NUM_TRIG_IDENTITIES, true);
+		changed |= id_ExecuteTable(e, id_trig_identities, true);
 	}
 
 	if (flags & SIMP_ID_TRIG_CONSTANTS)
-		changed |= id_ExecuteTable(e, id_trig_constants, ID_NUM_TRIG_CONSTANTS, true);
+		changed |= id_ExecuteTable(e, id_trig_constants, true);
 
 	if (flags & SIMP_ID_TRIG_INV_CONSTANTS)
-		changed |= id_ExecuteTable(e, id_trig_inv_constants, ID_NUM_TRIG_INV_CONSTANTS, true);
+		changed |= id_ExecuteTable(e, id_trig_inv_constants, true);
 
 	if (flags & SIMP_ID_HYPERBOLIC)
-		changed |= id_ExecuteTable(e, id_hyperbolic, ID_NUM_HYPERBOLIC, true);
+		changed |= id_ExecuteTable(e, id_hyperbolic, true);
 
 	return changed;
 }

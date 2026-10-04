@@ -15,7 +15,7 @@
 
     I and J are reserved for real numbers.
 */
-pcas_id_t id_general[ID_NUM_GENERAL] = {
+pcas_id_t id_general[] = {
 	/*logb(value, base)*/
 
 	/*This identity is hardcoded in eval.c so that it executes before
@@ -42,10 +42,11 @@ pcas_id_t id_general[ID_NUM_GENERAL] = {
 	{"asinh(sinh(X", "X"},
 	{"cosh(acosh(X", "X"},
 	{"tanh(atanh(X", "X"},
-	{"atanh(tanh(X", "X"}
+	{"atanh(tanh(X", "X"},
+	{NULL}
 };
 
-pcas_id_t id_trig_identities[ID_NUM_TRIG_IDENTITIES] = {
+pcas_id_t id_trig_identities[] = {
 	{"sin(pi/2_X+C", "cos(X+C"},
 	{"cos(pi/2_X+C", "sin(X+C"},
 
@@ -80,10 +81,11 @@ pcas_id_t id_trig_identities[ID_NUM_TRIG_IDENTITIES] = {
 	{"sin(acos(X", "sqrt(1_X^2"},
 	{"sin(atan(X", "X/sqrt(1+X^2"},
 	{"tan(acos(X", "sqrt(1_X^2)/X"},
-	{"tan(asin(X", "X/(sqrt(1_X^2"}
+	{"tan(asin(X", "X/(sqrt(1_X^2"},
+	{NULL}
 };
 
-pcas_id_t id_trig_constants[ID_NUM_TRIG_CONSTANTS] = {
+pcas_id_t id_trig_constants[] = {
 	{"sin(0", "0"},
 	{"sin(pi/6", "1/2"},
 	{"sin(pi/4", "sqrt(2)/2"},
@@ -126,10 +128,11 @@ pcas_id_t id_trig_constants[ID_NUM_TRIG_CONSTANTS] = {
 	{"tan(2pi/3", "-sqrt(3"},
 	{"tan(3pi/4", "-1"},
 	{"tan(5pi/6", "-sqrt(3)/3"},
-	{"tan(pi", "0"}
+	{"tan(pi", "0"},
+	{NULL}
 };
 
-pcas_id_t id_trig_inv_constants[ID_NUM_TRIG_INV_CONSTANTS] = {
+pcas_id_t id_trig_inv_constants[] = {
 	{"asin(-1", "-pi/2"},      {"asin(-sqrt(3)/2", "-pi/3"}, {"asin(-1/2^(1/2", "-pi/4"},  {"asin(-1/2", "-pi/6"},
 	{"asin(0", "0"},           {"asin(1/2", "pi/6"},         {"asin(1/2^(1/2)", "pi/4"},   {"asin(sqrt(3)/2", "pi/3"},
 	{"asin(1", "pi/2"},
@@ -139,16 +142,13 @@ pcas_id_t id_trig_inv_constants[ID_NUM_TRIG_INV_CONSTANTS] = {
 	{"acos(1", "0"},
 
 	{"atan(-sqrt(3", "-pi/3"}, {"atan(-1", "-pi/4"},         {"atan(-1/sqrt(3", "-pi/6"},  {"atan(0", "0"},
-	{"atan(1/sqrt(3", "pi/6"}, {"atan(1", "pi/4"},           {"atan(sqrt(3", "pi/3"}
+	{"atan(1/sqrt(3", "pi/6"}, {"atan(1", "pi/4"},           {"atan(sqrt(3", "pi/3"},      {NULL}
 };
 
-pcas_id_t id_hyperbolic[ID_NUM_HYPERBOLIC] = {
-	{"cosh(X)_sinh(X)", "e^(-X"},
-	{"sinh(X)/cosh(X", "tanh(X"},
-	{"cosh(X)^2_sinh(X)^2+C", "1+C"},
-};
+pcas_id_t id_hyperbolic[] =
+	{{"cosh(X)_sinh(X)", "e^(-X"}, {"sinh(X)/cosh(X", "tanh(X"}, {"cosh(X)^2_sinh(X)^2+C", "1+C"}, {NULL}};
 
-pcas_id_t id_complex[ID_NUM_COMPLEX] = {
+pcas_id_t id_complex[] = {
 	{"(-A)^(X/Y)", "e^(ipiX/Y)A^(X/Y"},
 	{"1/i", "-i"},
 	{"e^(I+Ji", "e^I(cos(J)+isin(J"},
@@ -160,7 +160,8 @@ pcas_id_t id_complex[ID_NUM_COMPLEX] = {
 	{"logb(X,I+Ji", "ln(X)/ln(I+Ji"},
 	{"sin(I+Ji", "sin(I)cosh(J)+icos(I)sinh(J"},
 	{"cos(I+Ji", "cos(I)cosh(J)_isin(I)sinh(J)"},
-	{"tan(I+Ji", "sin(I+Ji)/cos(I+Ji"}
+	{"tan(I+Ji", "sin(I+Ji)/cos(I+Ji"},
+	{NULL}
 };
 
 typedef pcas_ast_t **Dictionary;
@@ -533,12 +534,11 @@ void id_Unload(pcas_id_t *id) {
 	id->to = NULL;
 }
 
-bool id_ExecuteTable(pcas_ast_t *e, pcas_id_t *table, unsigned table_len, bool recursive) {
-	unsigned i;
+bool id_ExecuteTable(pcas_ast_t *e, pcas_id_t *table, bool recursive) {
 	bool changed = false;
 
-	for (i = 0; i < table_len; i++) {
-		changed |= id_Execute(e, &table[i], recursive);
+	for (; table->from_text != NULL; table++) {
+		changed |= id_Execute(e, table, recursive);
 
 		/*Break if changed to save time on the calculator becaus chances are good
         that after an identity is applied, we do not need to go through the rest.*/
@@ -550,22 +550,26 @@ bool id_ExecuteTable(pcas_ast_t *e, pcas_id_t *table, unsigned table_len, bool r
 	return changed;
 }
 
-void id_UnloadTable(pcas_id_t *table, unsigned table_len) {
-	unsigned i;
-	for (i = 0; i < table_len; i++)
-		id_Unload(&table[i]);
+void id_LoadTable(pcas_id_t *table) {
+	for (; table->from_text != NULL; table++)
+		id_Load(table);
+}
+
+void id_UnloadTable(pcas_id_t *table) {
+	for (; table->from_text != NULL; table++)
+		id_Unload(table);
 }
 
 #include "derivative.h"
 void id_UnloadAll(void) {
-	id_UnloadTable(id_general, ID_NUM_GENERAL);
-	id_UnloadTable(id_trig_identities, ID_NUM_TRIG_IDENTITIES);
-	id_UnloadTable(id_trig_constants, ID_NUM_TRIG_CONSTANTS);
-	id_UnloadTable(id_trig_inv_constants, ID_NUM_TRIG_INV_CONSTANTS);
-	id_UnloadTable(id_hyperbolic, ID_NUM_HYPERBOLIC);
-	id_UnloadTable(id_complex, ID_NUM_COMPLEX);
+	id_UnloadTable(id_general);
+	id_UnloadTable(id_trig_identities);
+	id_UnloadTable(id_trig_constants);
+	id_UnloadTable(id_trig_inv_constants);
+	id_UnloadTable(id_hyperbolic);
+	id_UnloadTable(id_complex);
 
-	id_UnloadTable(id_derivative, ID_NUM_DERIV);
+	id_UnloadTable(id_derivative);
 
 	id_Unload(&id_deriv_power_rule);
 	id_Unload(&id_deriv_exponential_rule);
