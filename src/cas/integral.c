@@ -229,6 +229,39 @@ static pcas_ast_t *match_square_sum(pcas_ast_t *e, mp_small c, mp_small k) {
 	return ast_ChildGet(square, 0);
 }
 
+/*Returns v if e is c + k*v^2 for positive numbers c and k, setting them, otherwise NULL*/
+static pcas_ast_t *match_positive_square_sum(pcas_ast_t *e, mp_rat *c, mp_rat *k) {
+	pcas_ast_t *square;
+	unsigned i;
+
+	if (!isoptype(e, OP_ADD) || ast_ChildLength(e) != 2)
+		return NULL;
+
+	for (i = 0; i < 2; i++) {
+		*c = number_value(ast_ChildGet(e, i));
+		square = ast_ChildGet(e, 1 - i);
+
+		if (*c == NULL)
+			continue;
+
+		if (isoptype(square, OP_MULT) && ast_ChildLength(square) == 2 &&
+			(*k = number_value(ast_ChildGet(square, 0))) != NULL) {
+			square = ast_ChildGet(square, 1);
+		} else {
+			*k = num_FromInt(1);
+		}
+
+		if (mp_rat_compare_zero(*c) > 0 && mp_rat_compare_zero(*k) > 0 && isoptype(square, OP_POW) &&
+			is_ast_int(ast_ChildGet(square, 1), 2))
+			return ast_ChildGet(square, 0);
+
+		num_Cleanup(*c);
+		num_Cleanup(*k);
+	}
+
+	return NULL;
+}
+
 /*Takes ownership of F. Divides F by the slope of u, or returns NULL if u is not linear in x.*/
 static pcas_ast_t *over_slope(pcas_ast_t *F, pcas_ast_t *u, pcas_ast_t *x) {
 	pcas_ast_t *slope = linear_slope(u, x);
@@ -244,6 +277,7 @@ static pcas_ast_t *over_slope(pcas_ast_t *F, pcas_ast_t *u, pcas_ast_t *x) {
 /*Antiderivatives of u^n where u is not linear*/
 static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t *x) {
 	pcas_ast_t *v, *F;
+	mp_rat c, k;
 
 	if (is_ast_fraction(n, 2, 1) && (isoptype(u, OP_SIN) || isoptype(u, OP_COS))) {
 		v = ast_ChildGet(u, 0);
@@ -271,6 +305,28 @@ static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t 
 
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != NULL)
 		return over_slope(ast_MakeUnary(OP_TAN_INV, ast_Copy(v)), v, x);
+
+	if (is_ast_fraction(n, -1, 1) && (v = match_positive_square_sum(u, &c, &k)) != NULL) {
+		F = ast_MakeNumber(num_Copy(k));
+		F = power(quotient(F, ast_MakeNumber(num_Copy(c))), ast_MakeNumber(num_FromFraction(1, 2)));
+		F = ast_MakeUnary(OP_TAN_INV, mul(F, ast_Copy(v)));
+		mp_rat_mul(c, k, c);
+		F = quotient(F, power(ast_MakeNumber(c), ast_MakeNumber(num_FromFraction(1, 2))));
+		num_Cleanup(k);
+		return over_slope(F, v, x);
+	}
+
+	if (is_ast_fraction(n, -1, 1) && u->type == NODE_OPERATOR && (optype(u) == OP_COS || optype(u) == OP_SIN)) {
+		v = ast_ChildGet(u, 0);
+		F = power(ast_Copy(u), integer(-1));
+
+		if (optype(u) == OP_COS)
+			F = ln(ast_MakeUnary(OP_ABS, add(F, ast_MakeUnary(OP_TAN, ast_Copy(v)))));
+		else
+			F = negate(ln(ast_MakeUnary(OP_ABS, add(F, power(ast_MakeUnary(OP_TAN, ast_Copy(v)), integer(-1))))));
+
+		return over_slope(F, v, x);
+	}
 
 	if (is_ast_fraction(n, -1, 2)) {
 		if ((v = match_square_sum(u, 1, -1)) != NULL)
