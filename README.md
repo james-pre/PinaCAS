@@ -1,7 +1,4 @@
 <h2 align="center"><b>PinaCAS</b></h2>
-<p align="center">
-<a href="https://github.com/james-pre/PinaCAS/actions/workflows/ci.yaml" alt="Build Status"><img src="https://github.com/james-pre/PinaCAS/actions/workflows/ci.yaml/badge.svg"></a>
-</p>
 <p>
 PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that shows its work. It is a fork of <a href="https://github.com/nathanfarlow/PineappleCAS">PineappleCAS</a> by Nathan Farlow, which provides the simplifier, identities, derivatives, and the calculator GUI. PinaCAS adds integration and differential equations, in addition to aforementioned showing of work. Both use the <a href="https://github.com/creachadair/imath">imath library</a> for arbitrary precision math.
 </p>
