@@ -12,7 +12,7 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Step-by-step work for derivatives and integrals, shown in a scrollable viewer with fractions, exponents, roots, and integral signs drawn as in print
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
 - Checking that a function solves a differential equation and its initial conditions
-- Solving first order equations (separable, linear, exact, Bernoulli, homogeneous, and y' = f(ax + by)), linear equations with constant coefficients, and second order equations by reduction of order, with initial value problems
+- Solving first order equations (separable, linear, exact, Bernoulli, homogeneous, and y' = f(ax + by)), linear equations with constant coefficients by undetermined coefficients or variation of parameters, and second order equations by reduction of order, with initial value problems
 - Integral and Solve DE functions in the GUI
 - Much faster simplification, especially when showing work
 - Runs as a Flash app named PinaCAS, so it is not limited to the 64 KB size of a program, and uses spare RAM for a larger heap
@@ -27,7 +27,7 @@ Add initial conditions after the equation, separated by commas: y'' + 16y = 0, y
 
 Solve DE classifies the equation and solves it when it can, writing the solution to the output variable. First order equations are solved by separating variables, with an integrating factor when linear, as exact equations (with an integrating factor of x or y alone when needed), or by the Bernoulli, homogeneous, or y' = f(ax + by) substitutions. An initial condition determines the constant, and the solution is solved for the function when each inverse step is unambiguous, so `Y'=X²e^(6Y),Y(8)=0` gives `-ln(1025-2X³)/6`. Otherwise the implicit solution is written as an equation, like `Y²=X²+C`.
 
-Homogeneous linear equations with constant coefficients are solved from the roots of the characteristic equation, such as `Y''+16Y=0` giving `Acos(4X)+Bsin(4X)`. The arbitrary constants are A, B, C, and so on, skipping letters in the equation, and initial conditions determine them. To use reduction of order on a homogeneous second order linear equation, add a known solution after the equation: `4X²Y''+Y=0,Y=√(X)ln(X)`. Equations it cannot solve yet are classified, and linear ones are written in standard form.
+Linear equations with constant coefficients are solved from the roots of the characteristic equation, such as `Y''+16Y=0` giving `Acos(4X)+Bsin(4X)`. The arbitrary constants are A, B, C, and so on, skipping letters in the equation, and initial conditions determine them. A coefficient may be a letter when the equation has the form `X''+W²X=…`, which is taken as an oscillator with W positive. When the right side is not zero, a particular solution comes from undetermined coefficients if each term is a polynomial times e^(ax) times cos(bx) or sin(bx), and otherwise, for second order equations, from variation of parameters. To use reduction of order on a homogeneous second order linear equation, add a known solution after the equation: `4X²Y''+Y=0,Y=√(X)ln(X)`. Equations it cannot solve yet are classified, and linear ones are written in standard form.
 
 To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X)` or just `2cos(4X)-1/2sin(4X)`. On the Solve DE page, check "Verify solution" and choose that variable under "Solution in". PinaCAS differentiates the solution, substitutes it into both sides of the equation, and checks each initial condition.
 

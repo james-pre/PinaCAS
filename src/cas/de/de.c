@@ -2,6 +2,9 @@
 
 #include "../../work.h"
 
+/*Limits the size of the expansions that check whether an expression is zero*/
+#define MAX_EXPANDED_TERMS 4096
+
 pcas_ast_t *integer(mp_small n) {
 	return ast_MakeNumber(num_FromInt(n));
 }
@@ -361,12 +364,18 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 		}
 	} else if (isoptype(e, OP_ADD)) {
 		pcas_ast_t *nums = ast_MakeOperator(OP_ADD), *dens = ast_MakeOperator(OP_MULT);
-		pcas_ast_t *n, *d, *other;
+		pcas_ast_t *distinct = ast_MakeOperator(OP_MULT), *n, *d, *other;
+		bool skipped;
 
 		for (child = opbase(e); child != NULL; child = child->next) {
 			rational_parts(child, &n, &d);
 			ast_ChildAppend(nums, n);
 			ast_ChildAppend(dens, d);
+
+			for (other = opbase(distinct); other != NULL && !ast_Compare(other, d); other = other->next)
+				;
+			if (other == NULL)
+				ast_ChildAppend(distinct, ast_Copy(d));
 		}
 
 		*num = ast_MakeOperator(OP_ADD);
@@ -375,8 +384,11 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 			pcas_ast_t *term = ast_MakeOperator(OP_MULT);
 
 			ast_ChildAppend(term, ast_Copy(n));
-			for (other = opbase(dens); other != NULL; other = other->next) {
-				if (other != d)
+			skipped = false;
+			for (other = opbase(distinct); other != NULL; other = other->next) {
+				if (!skipped && ast_Compare(other, d))
+					skipped = true;
+				else
 					ast_ChildAppend(term, ast_Copy(other));
 			}
 
@@ -384,7 +396,8 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 		}
 
 		ast_Cleanup(nums);
-		*den = dens;
+		ast_Cleanup(dens);
+		*den = distinct;
 	} else if (isoptype(e, OP_POW) && opbase(e)->next->type == NODE_NUMBER) {
 		pcas_ast_t *n, *d;
 		mp_rat exponent = num_Copy(opbase(e)->next->op.num);
@@ -401,19 +414,114 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 	}
 }
 
-/*True if the numerator of e over a common denominator expands to zero after simplifying e with flags*/
+/*Rewrites each tan(u) in e as sin(u)/cos(u)*/
+static void tangents_to_sines(pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (e->type != NODE_OPERATOR)
+		return;
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		tangents_to_sines(child);
+
+	if (isoptype(e, OP_TAN))
+		replace_node(
+			e,
+			ast_MakeBinary(
+				OP_DIV, ast_MakeUnary(OP_SIN, ast_Copy(opbase(e))), ast_MakeUnary(OP_COS, ast_Copy(opbase(e)))
+			)
+		);
+}
+
+/*Returns how many terms e has once expanded, or more than limit if that is over limit*/
+static unsigned long expanded_terms(const pcas_ast_t *e, unsigned long limit) {
+	pcas_ast_t *child;
+	unsigned long terms, base;
+	mp_small n;
+
+	if (isoptype(e, OP_ADD) || isoptype(e, OP_MULT)) {
+		terms = isoptype(e, OP_ADD) ? 0 : 1;
+
+		for (child = opbase(e); child != NULL && terms <= limit; child = child->next) {
+			base = expanded_terms(child, limit);
+			terms = isoptype(e, OP_ADD) ? terms + base : terms * base;
+		}
+
+		return terms;
+	}
+
+	if (isoptype(e, OP_POW) && opbase(e)->next->type == NODE_NUMBER && mp_rat_is_integer(opbase(e)->next->op.num) &&
+		mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &n) == MP_OK && n > 1) {
+		base = expanded_terms(opbase(e), limit);
+
+		for (terms = 1; n-- > 0 && terms <= limit;)
+			terms *= base;
+
+		return terms;
+	}
+
+	return 1;
+}
+
+/*Replaces each sin(u)^n with n at least 2 by (1 - cos(u)^2)sin(u)^(n - 2), returning whether it changed e*/
+static bool reduce_sine_powers(pcas_ast_t *e) {
+	pcas_ast_t *child, *sine;
+	mp_small n;
+	bool changed = false;
+
+	if (e->type != NODE_OPERATOR)
+		return false;
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		changed |= reduce_sine_powers(child);
+
+	if (isoptype(e, OP_POW) && isoptype(opbase(e), OP_SIN) && opbase(e)->next->type == NODE_NUMBER &&
+		mp_rat_is_integer(opbase(e)->next->op.num) && mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &n) == MP_OK &&
+		n >= 2) {
+		sine = opbase(e);
+		replace_node(
+			e,
+			ast_MakeBinary(
+				OP_MULT,
+				difference(
+					integer(1), ast_MakeBinary(OP_POW, ast_MakeUnary(OP_COS, ast_Copy(opbase(sine))), integer(2))
+				),
+				ast_MakeBinary(OP_POW, ast_Copy(sine), integer(n - 2))
+			)
+		);
+		changed = true;
+	}
+
+	return changed;
+}
+
+/*True if the numerator of e over a common denominator expands to zero after simplifying e with flags, giving up when it would expand past MAX_EXPANDED_TERMS*/
 static bool numerator_vanishes(const pcas_ast_t *e, unsigned short flags) {
 	pcas_ast_t *copy = ast_Copy(e), *numerator, *denominator;
 	bool zero;
 
 	simplify(copy, flags);
+	tangents_to_sines(copy);
 	split_exponentials(copy);
 	rational_parts(copy, &numerator, &denominator);
+
+	if (expanded_terms(numerator, MAX_EXPANDED_TERMS) > MAX_EXPANDED_TERMS) {
+		ast_Cleanup(copy);
+		ast_Cleanup(numerator);
+		ast_Cleanup(denominator);
+		return false;
+	}
 
 	expand(numerator, EXP_ALL);
 	simplify(numerator, SIMP_BASIC);
 	expand(numerator, EXP_ALL);
 	simplify(numerator, SIMP_BASIC);
+
+	while (!is_ast_int(numerator, 0) && reduce_sine_powers(numerator) &&
+		   expanded_terms(numerator, MAX_EXPANDED_TERMS) <= MAX_EXPANDED_TERMS) {
+		expand(numerator, EXP_ALL);
+		simplify(numerator, SIMP_BASIC);
+	}
 
 	if (!is_ast_int(numerator, 0)) {
 		simplify_canonical_form(numerator, CANONICAL_COMBINE_POWERS);

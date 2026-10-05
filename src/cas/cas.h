@@ -210,6 +210,8 @@ bool has_imaginary_node(const pcas_ast_t *e);
 bool contains_symbol(const pcas_ast_t *e, Symbol symbol);
 /*Returns a symbol that does not appear in e, or SYM_INVALID if every candidate does*/
 Symbol fresh_symbol(const pcas_ast_t *e);
+/*Makes fresh_symbol also avoid the symbols in e until it is called again with NULL*/
+void fresh_Reserve(const pcas_ast_t *e);
 /*Returns C, or K, or another symbol that does not appear in e, to name an arbitrary constant*/
 Symbol constant_symbol(const pcas_ast_t *e);
 unsigned node_count(const pcas_ast_t *e);

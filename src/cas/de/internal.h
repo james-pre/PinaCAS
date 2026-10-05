@@ -91,7 +91,7 @@ pcas_ast_t *basis_function(const pcas_de_t *de, unsigned j, const pcas_ast_t *r,
 /*Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are*/
 unsigned fill_basis(const pcas_de_t *de, const root_t *roots, unsigned count, pcas_ast_t **basis);
 
-/*Solves a homogeneous linear equation with constant coefficients from the roots of its characteristic polynomial*/
+/*Solves a linear equation with constant coefficients from the roots of its characteristic polynomial, finding a particular solution by undetermined coefficients or variation of parameters when it is not homogeneous*/
 pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution);
 
 /*Finds a second solution of a homogeneous second order linear equation from the known solution with the reduction of order formula*/

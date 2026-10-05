@@ -222,12 +222,19 @@ bool contains_symbol(const pcas_ast_t *e, Symbol symbol) {
 	return false;
 }
 
+static const pcas_ast_t *reserved = NULL;
+
+void fresh_Reserve(const pcas_ast_t *e) {
+	reserved = e;
+}
+
 Symbol fresh_symbol(const pcas_ast_t *e) {
 	const char *candidates = "UVWTSRQPNMKJHGFDCBA";
 	unsigned i;
 
 	for (i = 0; candidates[i] != '\0'; i++) {
-		if (!contains_symbol(e, (Symbol)candidates[i]))
+		if (!contains_symbol(e, (Symbol)candidates[i]) &&
+			(reserved == NULL || !contains_symbol(reserved, (Symbol)candidates[i])))
 			return (Symbol)candidates[i];
 	}
 

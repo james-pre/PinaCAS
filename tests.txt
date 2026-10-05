@@ -493,3 +493,15 @@ solve; 4X^2Y''+Y=0,Y=sqrt(X)ln(X); Y=Asqrt(X)ln(X)_Bsqrt(X); X
 solve; X^2Y''+XY'_Y=0,Y=X; Y=AX_B/(2X); X
 solve; X^2Y''_3XY'+4Y=0,Y=X^2,Y(1)=0,Y'(1)=1; Y=X^2ln(abs(X)); X
 solve; (1_2X_X^2)Y''+2(1+X)Y'_2Y=0,Y=X+1; Y=A(X+1)_B(X^2+X+2); X
+
+#Differential equations: undetermined coefficients and variation of parameters
+solve; 1/4Y''+Y'+Y=X^2_2X; Y=Ae^(-2X)+BXe^(-2X)+X^2_4X+7/2; X
+solve; Y''_2Y'+5Y=e^Xcos(2X); Y=Ae^Xcos(2X)+Be^Xsin(2X)+Xe^Xsin(2X)/4; X
+solve; Y''+Y=1/cos(X)^2; Y=Acos(X)+Bsin(X)+sin(X)ln(abs(1/cos(X)+tan(X)))_1; X
+solve; Y''_2Y'+Y=e^Tatan(T); Y=Ae^T+BTe^T+e^T(T/2_T^2atan(T)/2_atan(T)/2)+Te^T(Tatan(T)_ln(abs(T^2+1))/2); T
+solve; X''+W^2X=Fcos(GT),X(0)=0,X'(0)=0; X=Fcos(GT)/(W^2_G^2)_Fcos(WT)/(W^2_G^2); T
+solve; 1/2Q''+10Q'+100Q=150,Q(0)=1,Q'(0)=1; Q=3/2_e^(-10T)cos(10T)/2_2e^(-10T)sin(10T)/5; T
+solve; Y''_Y=e^X; Y=Ae^X+Be^(-X)+Xe^X/2; X
+solve; Y'''_Y'=X; Y=A+Be^X+Ce^(-X)_X^2/2; X
+solve; Y''+4Y=sin(2X); Y=Acos(2X)+Bsin(2X)_Xcos(2X)/4; X
+solve; Y''_3Y'+2Y=e^(2X)+X; Y=Ae^(2X)+Be^X+Xe^(2X)+X/2+3/4; X

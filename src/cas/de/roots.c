@@ -503,7 +503,8 @@ static pcas_error_t oscillator_roots(pcas_de_t *de, const pcas_ast_t *m, root_t 
 		return E_DE_UNSOLVED;
 
 	left = ast_MakeBinary(
-		OP_ADD, ast_MakeBinary(OP_MULT, ast_Copy(de->a[2]), ast_MakeBinary(OP_POW, ast_Copy(m), integer(2))),
+		OP_ADD,
+		ast_MakeBinary(OP_MULT, ast_Copy(de->a[2]), ast_MakeBinary(OP_POW, ast_Copy(m), integer(2))),
 		ast_Copy(de->a[0])
 	);
 	zero = integer(0);
