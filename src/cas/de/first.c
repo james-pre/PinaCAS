@@ -187,45 +187,6 @@ static pcas_error_t solve_separable(pcas_de_t *de, pcas_ast_t **solution) {
 	return E_SUCCESS;
 }
 
-/*Replaces each |u| in e with u*/
-static void drop_absolute_values(pcas_ast_t *e) {
-	pcas_ast_t *child;
-
-	if (e->type != NODE_OPERATOR)
-		return;
-
-	for (child = opbase(e); child != NULL; child = child->next)
-		drop_absolute_values(child);
-
-	if (isoptype(e, OP_ABS))
-		replace_node(e, ast_Copy(opbase(e)));
-}
-
-/*Returns e^(integral of P dv) without absolute values, recording the integral, or NULL if it cannot be found. Takes ownership of P.*/
-static pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v) {
-	pcas_ast_t *G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(v)), *power, *mu;
-
-	eval_integrals(G);
-
-	if (contains_integral(G)) {
-		ast_Cleanup(G);
-		return NULL;
-	}
-
-	work_Pause();
-	simplify(G, SIMP_BASIC);
-	power = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
-	drop_absolute_values(G);
-	mu = exponential(opbase(power), G);
-	simplify(mu, SIMP_BASIC);
-	work_Resume();
-
-	work_Step(STEP_EQUATION, NULL, power, mu);
-	ast_Cleanup(power);
-
-	return mu;
-}
-
 /*Solves y' + Py = Q by multiplying by the integrating factor e^(integral of P)*/
 static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
 	pcas_ast_t *P, *Q, *left, *mu, *product, *right;

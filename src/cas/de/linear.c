@@ -512,7 +512,7 @@ static unsigned fill_basis(const pcas_de_t *de, const root_t *roots, unsigned co
 	return n;
 }
 
-/*Fills constants with n letters that do not appear in the equation or m. Returns false if there are not enough.*/
+/*Fills constants with n letters that do not appear in the equation or in m unless it is NULL. Returns false if there are not enough.*/
 static bool choose_constants(const pcas_de_t *de, const pcas_ast_t *m, pcas_ast_t **constants, unsigned n) {
 	const char *candidates = "ABCDFGHJKLNPQRSUVW";
 	pcas_ast_t *scope = ast_MakeOperator(OP_ADD);
@@ -520,7 +520,8 @@ static bool choose_constants(const pcas_de_t *de, const pcas_ast_t *m, pcas_ast_
 
 	ast_ChildAppend(scope, ast_Copy(de->equation));
 	ast_ChildAppend(scope, ast_Copy(de->x));
-	ast_ChildAppend(scope, ast_Copy(m));
+	if (m != NULL)
+		ast_ChildAppend(scope, ast_Copy(m));
 
 	for (; *candidates != '\0' && count < n; candidates++) {
 		if (!contains_symbol(scope, (Symbol)*candidates))
@@ -719,11 +720,48 @@ static pcas_error_t apply_conditions(
 	return E_SUCCESS;
 }
 
+/*Records y as a combination of the basis with arbitrary constants that are not m, and finds the constants from the initial conditions. Takes ownership of the basis.*/
+static pcas_error_t solve_with_basis(
+	pcas_de_t *de,
+	pcas_ast_t **basis,
+	unsigned size,
+	const pcas_ast_t *m,
+	pcas_ast_t **solution
+) {
+	pcas_ast_t *constants[DE_MAX_ORDER], *general;
+	pcas_error_t err = E_SUCCESS;
+	unsigned i;
+
+	if (!choose_constants(de, m, constants, size)) {
+		for (i = 0; i < size; i++)
+			ast_Cleanup(basis[i]);
+		return E_DE_UNSOLVED;
+	}
+
+	general = ast_MakeOperator(OP_ADD);
+	for (i = 0; i < size; i++)
+		ast_ChildAppend(general, ast_MakeBinary(OP_MULT, ast_Copy(constants[i]), basis[i]));
+	tidy(general);
+
+	if (de->condition_count > 0) {
+		work_Step(STEP_EQUATION, "General solution", de->y, general);
+		err = apply_conditions(de, general, constants, size, solution);
+	} else {
+		work_Step(STEP_EQUATION, "Solution", de->y, general);
+		*solution = ast_MakeBinary(OP_EQUALS, ast_Copy(de->y), general);
+	}
+
+	for (i = 0; i < size; i++)
+		ast_Cleanup(constants[i]);
+
+	return err;
+}
+
 pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 	mp_rat p[DE_MAX_ORDER + 1], one;
 	root_t roots[DE_MAX_ORDER];
-	pcas_ast_t *basis[DE_MAX_ORDER], *constants[DE_MAX_ORDER], *m, *left, *zero, *general;
-	unsigned n = de->order, count = 0, size, i, k;
+	pcas_ast_t *basis[DE_MAX_ORDER], *m, *left, *zero;
+	unsigned n = de->order, count = 0, i, k;
 	pcas_error_t err = E_SUCCESS;
 
 	if (!de->linear || !is_ast_int(de->g, 0))
@@ -762,31 +800,8 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 
 	canonical_SetFunction(de->y->op.symbol);
 
-	if (err == E_SUCCESS) {
-		size = fill_basis(de, roots, count, basis);
-
-		if (choose_constants(de, m, constants, size)) {
-			general = ast_MakeOperator(OP_ADD);
-			for (i = 0; i < size; i++)
-				ast_ChildAppend(general, ast_MakeBinary(OP_MULT, ast_Copy(constants[i]), basis[i]));
-			tidy(general);
-
-			if (de->condition_count > 0) {
-				work_Step(STEP_EQUATION, "General solution", de->y, general);
-				err = apply_conditions(de, general, constants, size, solution);
-			} else {
-				work_Step(STEP_EQUATION, "Solution", de->y, general);
-				*solution = ast_MakeBinary(OP_EQUALS, ast_Copy(de->y), general);
-			}
-
-			for (i = 0; i < size; i++)
-				ast_Cleanup(constants[i]);
-		} else {
-			err = E_DE_UNSOLVED;
-			for (i = 0; i < size; i++)
-				ast_Cleanup(basis[i]);
-		}
-	}
+	if (err == E_SUCCESS)
+		err = solve_with_basis(de, basis, fill_basis(de, roots, count, basis), m, solution);
 
 	for (k = 0; k <= de->order; k++)
 		num_Cleanup(p[k]);
@@ -802,4 +817,130 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 	ast_Cleanup(zero);
 
 	return err;
+}
+
+/*Returns a/b simplified as one fraction with common factors cancelled and an expanded denominator*/
+static pcas_ast_t *quotient(const pcas_ast_t *a, const pcas_ast_t *b) {
+	pcas_ast_t *q = ast_MakeBinary(OP_DIV, ast_Copy(a), ast_Copy(b));
+
+	work_Pause();
+	simplify(q, SIMP_BASIC);
+	factor_cancel(q);
+
+	if (isoptype(q, OP_DIV)) {
+		expand(opbase(q)->next, EXP_ALL);
+		simplify(opbase(q)->next, SIMP_BASIC);
+	}
+	work_Resume();
+
+	return q;
+}
+
+/*Returns a times b, expanded term by term when that leaves fewer nodes*/
+static pcas_ast_t *distribute(const pcas_ast_t *a, const pcas_ast_t *b) {
+	pcas_ast_t *product = ast_MakeBinary(OP_MULT, ast_Copy(a), ast_Copy(b)), *sum, *term;
+
+	work_Pause();
+	simplify(product, SIMP_BASIC);
+
+	if (isoptype(b, OP_ADD)) {
+		sum = ast_MakeOperator(OP_ADD);
+
+		for (term = opbase(b); term != NULL; term = term->next) {
+			ast_ChildAppend(sum, ast_MakeBinary(OP_MULT, ast_Copy(a), ast_Copy(term)));
+			simplify(ast_ChildGetLast(sum), SIMP_BASIC);
+		}
+
+		expand(sum, EXP_ALL);
+
+		simplify(sum, SIMP_BASIC);
+
+		if (node_count(sum) < node_count(product)) {
+			ast_Cleanup(product);
+			product = sum;
+		} else {
+			ast_Cleanup(sum);
+		}
+	}
+	work_Resume();
+
+	return product;
+}
+
+pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_ast_t *y1 = de->known, *P, *Q, *left, *right, *mu, *integrand, *integral, *basis[2];
+	pcas_error_t err;
+	bool satisfied;
+
+	if (de->order != 2 || !de->linear || !is_ast_int(de->g, 0))
+		return E_DE_UNSOLVED;
+
+	de->method = "Reduction of order";
+
+	if ((err = check_solution(de, y1, "Known solution", false, &satisfied)) != E_SUCCESS)
+		return err;
+	if (!satisfied)
+		return E_DE_NOT_SOLUTION;
+
+	P = quotient(de->a[1], de->a[2]);
+	Q = quotient(de->a[0], de->a[2]);
+
+	if (!is_ast_int(de->a[2], 1)) {
+		left = ast_MakeOperator(OP_ADD);
+		ast_ChildAppend(left, de_Derivative(de->y, 2));
+		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, ast_Copy(P), de_Derivative(de->y, 1)));
+		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, Q, ast_Copy(de->y)));
+		right = integer(0);
+		work_Step(STEP_EQUATION, "Standard form", tidy(left), right);
+		ast_Cleanup(left);
+		ast_Cleanup(right);
+	} else {
+		ast_Cleanup(Q);
+	}
+
+	left = substitution_symbol(de, SYM_P);
+	work_Step(STEP_EQUATION, NULL, left, P);
+	ast_Cleanup(left);
+
+	work_Text("Reduction of order");
+
+	work_Pause();
+	P = negate(P);
+	simplify(P, SIMP_BASIC);
+	work_Resume();
+
+	if ((mu = exponential_of_integral(P, de->x)) == NULL)
+		return E_DE_INTEGRAL;
+
+	integrand = ast_MakeBinary(OP_DIV, mu, ast_MakeBinary(OP_POW, ast_Copy(y1), integer(2)));
+	left = ast_MakeBinary(OP_MULT, ast_Copy(y1), ast_MakeBinary(OP_INTEGRAL, ast_Copy(integrand), ast_Copy(de->x)));
+	single_fraction(integrand);
+	integral = ast_MakeBinary(OP_INTEGRAL, integrand, ast_Copy(de->x));
+	right = ast_MakeBinary(OP_MULT, ast_Copy(y1), ast_Copy(integral));
+	work_Step(STEP_EQUATION, NULL, left, right);
+	ast_Cleanup(left);
+	ast_Cleanup(right);
+
+	eval_integrals(integral);
+
+	if (contains_integral(integral)) {
+		ast_Cleanup(integral);
+		return E_DE_INTEGRAL;
+	}
+
+	basis[0] = ast_Copy(y1);
+	basis[1] = distribute(y1, integral);
+	left = ast_MakeBinary(OP_MULT, ast_Copy(y1), integral);
+
+	work_Pause();
+	simplify(left, SIMP_NORMALIZE);
+	work_Resume();
+
+	if (ast_Compare(left, basis[1]))
+		work_Step(STEP_STATE, "Second solution", NULL, basis[1]);
+	else
+		work_Step(STEP_EQUATION, "Second solution", left, basis[1]);
+	ast_Cleanup(left);
+
+	return solve_with_basis(de, basis, 2, NULL, solution);
 }

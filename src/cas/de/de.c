@@ -137,6 +137,7 @@ pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t
 	de->linear = false;
 	de->g = NULL;
 	de->condition_count = 0;
+	de->known = NULL;
 	de->method = NULL;
 	de->nested = false;
 	for (k = 0; k <= DE_MAX_ORDER; k++)
@@ -191,6 +192,7 @@ void de_Cleanup(pcas_de_t *de) {
 	ast_Cleanup(de->x);
 	ast_Cleanup(de->y);
 	ast_Cleanup(de->g);
+	ast_Cleanup(de->known);
 
 	for (k = 0; k <= DE_MAX_ORDER; k++)
 		ast_Cleanup(de->a[k]);
@@ -237,10 +239,29 @@ pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, cons
 
 	err = de_Load(de, items[0], x);
 
-	for (i = 1; i < count && err == E_SUCCESS; i++)
-		err = de_AddCondition(de, items[i]);
+	for (i = 1; i < count && err == E_SUCCESS; i++) {
+		if (isoptype(items[i], OP_EQUALS) && ast_Compare(opbase(items[i]), de->y))
+			err = de_AddKnownSolution(de, items[i]);
+		else
+			err = de_AddCondition(de, items[i]);
+	}
 
 	return err;
+}
+
+pcas_error_t de_AddKnownSolution(pcas_de_t *de, const pcas_ast_t *solution) {
+	const pcas_ast_t *f = opbase(solution)->next;
+
+	if (de->known != NULL || involves(f, de->y))
+		return E_DE_BAD_CONDITION;
+
+	de->known = ast_Copy(f);
+
+	work_Pause();
+	simplify(de->known, SIMP_BASIC);
+	work_Resume();
+
+	return E_SUCCESS;
 }
 
 pcas_error_t de_AddCondition(pcas_de_t *de, const pcas_ast_t *condition) {
@@ -492,6 +513,18 @@ static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **der
 	return holds;
 }
 
+void expand_if_smaller(pcas_ast_t *e) {
+	pcas_ast_t *expanded = ast_Copy(e);
+
+	expand(expanded, EXP_ALL);
+	simplify(expanded, SIMP_BASIC);
+
+	if (node_count(expanded) < node_count(e))
+		replace_node(e, expanded);
+	else
+		ast_Cleanup(expanded);
+}
+
 pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v) {
 	pcas_ast_t *node = ast_MakeOperator(OP_DERIV);
 
@@ -500,6 +533,50 @@ pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v) {
 	ast_ChildAppend(node, ast_Copy(v));
 
 	return node;
+}
+
+/*Replaces each |u| in e with u*/
+static void drop_absolute_values(pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (e->type != NODE_OPERATOR)
+		return;
+
+	for (child = opbase(e); child != NULL; child = child->next)
+		drop_absolute_values(child);
+
+	if (isoptype(e, OP_ABS))
+		replace_node(e, ast_Copy(opbase(e)));
+}
+
+pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v) {
+	pcas_ast_t *G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(v)), *power, *mu;
+
+	eval_integrals(G);
+
+	if (contains_integral(G)) {
+		ast_Cleanup(G);
+		return NULL;
+	}
+
+	work_Pause();
+	simplify(G, SIMP_BASIC);
+	power = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
+	drop_absolute_values(G);
+	mu = exponential(opbase(power), G);
+	simplify(mu, SIMP_BASIC);
+	G = ast_Copy(power);
+	simplify(G, SIMP_BASIC);
+	work_Resume();
+
+	if (ast_Compare(G, mu))
+		work_Step(STEP_STATE, NULL, NULL, mu);
+	else
+		work_Step(STEP_EQUATION, NULL, power, mu);
+	ast_Cleanup(power);
+	ast_Cleanup(G);
+
+	return mu;
 }
 
 pcas_ast_t *tidy(pcas_ast_t *e) {
@@ -539,7 +616,13 @@ pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred) {
 	return ast_MakeSymbol(symbol);
 }
 
-pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfied) {
+pcas_error_t check_solution(
+	pcas_de_t *de,
+	const pcas_ast_t *solution,
+	const char *text,
+	bool conditions,
+	bool *satisfied
+) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
 	pcas_ast_t *left, *right, *remainder;
 	const pcas_ast_t *f = solution;
@@ -551,7 +634,7 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 	if (involves(f, de->y))
 		return E_DE_IMPLICIT;
 
-	work_Step(STEP_EQUATION, "Solution", de->y, f);
+	work_Step(STEP_EQUATION, text, de->y, f);
 
 	derivatives[0] = ast_Copy(f);
 
@@ -567,6 +650,7 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 		work_Pause();
 		derivative(d, de->x, de->x);
 		simplify(d, SIMP_BASIC);
+		expand_if_smaller(d);
 		work_Resume();
 
 		chain = ast_MakeBinary(OP_EQUALS, derivative_node(ast_Copy(derivatives[k - 1]), de->x), ast_Copy(d));
@@ -588,7 +672,7 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 
 	work_Step(STEP_EQUATION, *satisfied ? "Satisfies the equation" : "Does not satisfy the equation", left, right);
 
-	for (k = 0; k < de->condition_count; k++)
+	for (k = 0; conditions && k < de->condition_count; k++)
 		*satisfied &= check_condition(de, &de->conditions[k], derivatives);
 
 	work_Text(*satisfied ? "It is a solution" : "It is not a solution");
@@ -599,6 +683,10 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 	ast_Cleanup(right);
 
 	return E_SUCCESS;
+}
+
+pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfied) {
+	return check_solution(de, solution, "Solution", true, satisfied);
 }
 
 pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
@@ -616,6 +704,9 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 
 	if (de->order == 1)
 		return solve_first_order(de, solution);
+
+	if (de->known != NULL)
+		return solve_reduction_of_order(de, solution);
 
 	return solve_constant_coefficients(de, solution);
 }

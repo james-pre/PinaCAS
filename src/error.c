@@ -25,4 +25,5 @@ const char *error_text[AMOUNT_ERRORS] = {
 	"Unable to integrate",
 	"Unable to find the roots",
 	"No solution meets the conditions",
+	"Given function is not a solution",
 };

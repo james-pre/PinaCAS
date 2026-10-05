@@ -28,8 +28,14 @@ bool is_zero(const pcas_ast_t *e);
 
 bool involves(const pcas_ast_t *e, const pcas_ast_t *v);
 
+/*Expands e when that leaves fewer nodes*/
+void expand_if_smaller(pcas_ast_t *e);
+
 /*Returns d/dv(e) as an unevaluated derivative node*/
 pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v);
+
+/*Returns e^(integral of P dv) without absolute values, recording the integral, or NULL if it cannot be found. Takes ownership of P.*/
+pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v);
 
 /*Simplifies e lightly for display and returns it*/
 pcas_ast_t *tidy(pcas_ast_t *e);
@@ -39,6 +45,15 @@ void single_fraction(pcas_ast_t *e);
 
 /*Returns preferred, or a symbol that does not appear in the equation if preferred does*/
 pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred);
+
+/*Checks whether solution, written as y = f or as f, satisfies the equation, and the initial conditions if conditions, recording the check under text*/
+pcas_error_t check_solution(
+	pcas_de_t *de,
+	const pcas_ast_t *solution,
+	const char *text,
+	bool conditions,
+	bool *satisfied
+);
 
 /*Returns e with the point of the initial condition substituted*/
 pcas_ast_t *at_condition(pcas_de_t *de, const pcas_ast_t *e, pcas_condition_t *c);
@@ -60,3 +75,6 @@ pcas_error_t solve_first_order(pcas_de_t *de, pcas_ast_t **solution);
 
 /*Solves a homogeneous linear equation with constant coefficients from the roots of its characteristic polynomial*/
 pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution);
+
+/*Finds a second solution of a homogeneous second order linear equation from the known solution with the reduction of order formula*/
+pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution);
