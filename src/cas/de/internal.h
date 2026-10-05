@@ -4,6 +4,13 @@
 
 #define SIMP_BASIC (SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS)
 
+/*A root re, or the pair re ± im*i when im is not NULL. value is the root when it is rational, otherwise NULL.*/
+typedef struct {
+	pcas_ast_t *re, *im;
+	mp_rat value;
+	unsigned multiplicity;
+} root_t;
+
 pcas_ast_t *integer(mp_small n);
 
 pcas_ast_t *negate(pcas_ast_t *a);
@@ -72,6 +79,17 @@ void conclude(
 void finish(pcas_de_t *de, pcas_ast_t *lhs, pcas_ast_t *antiderivative, pcas_ast_t **solution);
 
 pcas_error_t solve_first_order(pcas_de_t *de, pcas_ast_t **solution);
+
+/*Finds the roots of the characteristic polynomial in m with their multiplicities, recording the work*/
+pcas_error_t characteristic_roots(pcas_de_t *de, const pcas_ast_t *m, root_t *roots, unsigned *count);
+
+void free_roots(root_t *roots, unsigned count);
+
+/*Returns x^j e^(rx) f, leaving out f when it is NULL. Takes ownership of f.*/
+pcas_ast_t *basis_function(const pcas_de_t *de, unsigned j, const pcas_ast_t *r, pcas_ast_t *f);
+
+/*Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are*/
+unsigned fill_basis(const pcas_de_t *de, const root_t *roots, unsigned count, pcas_ast_t **basis);
 
 /*Solves a homogeneous linear equation with constant coefficients from the roots of its characteristic polynomial*/
 pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution);
