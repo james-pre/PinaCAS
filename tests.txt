@@ -412,6 +412,7 @@ order; Y'''+3Y''_4Y'_12Y=0; X; 3
 linear; Y''_2Y'+Y=e^Tatan(T); T; Y''_2Y'+Y=e^Tatan(T)
 linear; X''+W^2X=Fcos(GT); T; X''+W^2X=Fcos(GT)
 linear; Y''+16Y; X; Y''+16Y=0
+linear; Y''''+2Y''+Y=0; X; Y''''+2Y''+Y=0
 
 #Differential equations: verifying solutions
 solves; Y'+2Y=e^(-X),Y(0)=3; e^(-X)+2e^(-2X); X
@@ -469,3 +470,19 @@ solve; Y'=tan(X+Y)^2; 2Y_2X+sin(2X+2Y)=C; X
 solve; Y'=(Y_X+1)/(Y_X); (Y_X)^2=2X+C; X
 solve; Y'=(Y_X+1)/(Y_X),Y(0)=1; Y=X+sqrt(2X+1); X
 solve; Y'=(X+Y)^2; Y=tan(X+C)_X; X
+
+#Differential equations: constant coefficients
+solve; Y''_36Y=0; Y=Ae^(6X)+Be^(-6X); X
+solve; Y''_10Y'+25Y=0; Y=Ae^(5X)+BXe^(5X); X
+solve; 3Y''+2Y'+Y=0; Y=Ae^(-X/3)cos(sqrt(2)X/3)+Be^(-X/3)sin(sqrt(2)X/3); X
+solve; Y'''+3Y''_4Y'_12Y=0; Y=Ae^(2X)+Be^(-2X)+Ce^(-3X); X
+solve; Y''+16Y=0,Y(0)=2,Y'(0)=-2; Y=2cos(4X)_sin(4X)/2; X
+solve; 9Y''_12Y'+4Y=0; Y=Ae^(2X/3)+BXe^(2X/3); X
+solve; 5/32X''+10X=0,X(0)=1/4,X'(0)=-6; X=cos(8T)/4_3sin(8T)/4; T
+solve; Y''''+2Y''+Y=0; Y=Acos(X)+Bsin(X)+CXcos(X)+DXsin(X); X
+solve; Y'''+Y'=0; Y=A+Bcos(X)+Csin(X); X
+solve; Y''_2Y'_Y=0; Y=Ae^((1+sqrt(2))X)+Be^((1_sqrt(2))X); X
+solve; Y'''_Y''=0,Y(0)=1,Y'(0)=0,Y''(0)=1; Y=e^X_X; X
+solve; Y''+Y=0,Y(pi/2)=1,Y'(pi/2)=0; Y=sin(X); X
+solve; Y''+Y=0,Y(0)=1; Y=cos(X)+Bsin(X); X
+solve; Y''_Y=0,Y(0)=1,Y'(1)=0; Y=e^X/(e^2+1)+e^(2_X)/(e^2+1); X

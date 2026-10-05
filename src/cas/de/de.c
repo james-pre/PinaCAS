@@ -75,7 +75,7 @@ void derivatives_to_symbols(pcas_de_t *de, pcas_ast_t *f, pcas_ast_t **symbols) 
 		pcas_ast_t *derivative = de_Derivative(de->y, k);
 
 		symbols[k] = ast_MakeSymbol(fresh_symbol(scope));
-		substitute(scope, derivative, symbols[k]);
+		ast_ChildAppend(scope, ast_Copy(symbols[k]));
 		substitute(f, derivative, symbols[k]);
 
 		ast_Cleanup(derivative);
@@ -502,6 +502,43 @@ pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v) {
 	return node;
 }
 
+pcas_ast_t *tidy(pcas_ast_t *e) {
+	work_Pause();
+	simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_EVAL);
+	work_Resume();
+
+	return e;
+}
+
+void single_fraction(pcas_ast_t *e) {
+	pcas_ast_t *numerator, *denominator, *cancelled;
+
+	work_Pause();
+	simplify(e, SIMP_BASIC);
+	rational_parts(e, &numerator, &denominator);
+	expand(numerator, EXP_ALL);
+	replace_node(e, ast_MakeBinary(OP_DIV, numerator, denominator));
+	simplify(e, SIMP_BASIC);
+
+	cancelled = ast_Copy(e);
+	factor_cancel(cancelled);
+	work_Resume();
+
+	if (isoptype(e, OP_DIV) && isoptype(cancelled, OP_DIV) && ast_Compare(opbase(e)->next, opbase(cancelled)->next))
+		ast_Cleanup(cancelled);
+	else
+		replace_node(e, cancelled);
+}
+
+pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred) {
+	pcas_ast_t *scope = ast_MakeBinary(OP_ADD, ast_Copy(de->equation), ast_Copy(de->x));
+	Symbol symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
+
+	ast_Cleanup(scope);
+
+	return ast_MakeSymbol(symbol);
+}
+
 pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfied) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
 	pcas_ast_t *left, *right, *remainder;
@@ -580,5 +617,5 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 	if (de->order == 1)
 		return solve_first_order(de, solution);
 
-	return E_DE_UNSOLVED;
+	return solve_constant_coefficients(de, solution);
 }

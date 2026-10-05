@@ -23,4 +23,6 @@ const char *error_text[AMOUNT_ERRORS] = {
 	"Solution must be explicit",
 	"No method for this DE yet",
 	"Unable to integrate",
+	"Unable to find the roots",
+	"No solution meets the conditions",
 };

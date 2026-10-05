@@ -31,6 +31,15 @@ bool involves(const pcas_ast_t *e, const pcas_ast_t *v);
 /*Returns d/dv(e) as an unevaluated derivative node*/
 pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v);
 
+/*Simplifies e lightly for display and returns it*/
+pcas_ast_t *tidy(pcas_ast_t *e);
+
+/*Writes e as one fraction with an expanded numerator and cancels common factors*/
+void single_fraction(pcas_ast_t *e);
+
+/*Returns preferred, or a symbol that does not appear in the equation if preferred does*/
+pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred);
+
 /*Returns e with the point of the initial condition substituted*/
 pcas_ast_t *at_condition(pcas_de_t *de, const pcas_ast_t *e, pcas_condition_t *c);
 
@@ -48,3 +57,6 @@ void conclude(
 void finish(pcas_de_t *de, pcas_ast_t *lhs, pcas_ast_t *antiderivative, pcas_ast_t **solution);
 
 pcas_error_t solve_first_order(pcas_de_t *de, pcas_ast_t **solution);
+
+/*Solves a homogeneous linear equation with constant coefficients from the roots of its characteristic polynomial*/
+pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution);

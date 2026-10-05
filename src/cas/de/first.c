@@ -280,45 +280,6 @@ static pcas_error_t solve_linear_first(pcas_de_t *de, pcas_ast_t **solution) {
 	return E_SUCCESS;
 }
 
-static pcas_ast_t *tidy(pcas_ast_t *e) {
-	work_Pause();
-	simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_EVAL);
-	work_Resume();
-
-	return e;
-}
-
-/*Writes e as one fraction with an expanded numerator and cancels common factors*/
-static void combine(pcas_ast_t *e) {
-	pcas_ast_t *numerator, *denominator, *cancelled;
-
-	work_Pause();
-	simplify(e, SIMP_BASIC);
-	rational_parts(e, &numerator, &denominator);
-	expand(numerator, EXP_ALL);
-	replace_node(e, ast_MakeBinary(OP_DIV, numerator, denominator));
-	simplify(e, SIMP_BASIC);
-
-	cancelled = ast_Copy(e);
-	factor_cancel(cancelled);
-	work_Resume();
-
-	if (isoptype(e, OP_DIV) && isoptype(cancelled, OP_DIV) && ast_Compare(opbase(e)->next, opbase(cancelled)->next))
-		ast_Cleanup(cancelled);
-	else
-		replace_node(e, cancelled);
-}
-
-/*Returns preferred, or a symbol that does not appear in the equation if preferred does*/
-static pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred) {
-	pcas_ast_t *scope = ast_MakeBinary(OP_ADD, ast_Copy(de->equation), ast_Copy(de->x));
-	Symbol symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
-
-	ast_Cleanup(scope);
-
-	return ast_MakeSymbol(symbol);
-}
-
 typedef pcas_error_t (*solver_t)(pcas_de_t *de, pcas_ast_t **solution);
 
 /*Solves equation, a first order equation in u = back, with solver, then substitutes back and solves for y. Takes ownership of back and equation.*/
@@ -551,7 +512,7 @@ static pcas_error_t solve_homogeneous(pcas_de_t *de, pcas_ast_t **solution) {
 	ast_Cleanup(one);
 	work_Resume();
 
-	combine(G);
+	single_fraction(G);
 
 	left = de_Derivative(de->y, 1);
 	work_Step(STEP_EQUATION, "Homogeneous", left, F);
@@ -566,7 +527,7 @@ static pcas_error_t solve_homogeneous(pcas_de_t *de, pcas_ast_t **solution) {
 	ast_Cleanup(ux);
 
 	right = ast_MakeBinary(OP_DIV, difference(G, ast_Copy(u)), ast_Copy(de->x));
-	combine(right);
+	single_fraction(right);
 	left = de_Derivative(u, 1);
 	ast_Cleanup(u);
 
@@ -676,7 +637,7 @@ static pcas_error_t solve_linear_argument(pcas_de_t *de, pcas_ast_t **solution) 
 
 	right = ast_MakeBinary(OP_ADD, a, ast_MakeBinary(OP_MULT, b, G));
 	work_Step(STEP_EQUATION, NULL, left, tidy(right));
-	combine(right);
+	single_fraction(right);
 	ast_Cleanup(u);
 
 	return solve_substituted(de, sum, ast_MakeBinary(OP_EQUALS, left, right), solve_separable, solution);
@@ -731,7 +692,7 @@ static pcas_ast_t *factor_rate(
 	pcas_ast_t *rate = ast_MakeBinary(OP_DIV, difference(partial(a, w), partial(b, v)), ast_Copy(c));
 	const pcas_ast_t *other = ast_Compare(v, de->x) ? de->y : de->x;
 
-	combine(rate);
+	single_fraction(rate);
 
 	if (involves(rate, other)) {
 		ast_Cleanup(rate);

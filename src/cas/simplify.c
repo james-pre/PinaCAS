@@ -315,6 +315,51 @@ static unsigned function_rank(pcas_ast_t *e) {
 	return rank;
 }
 
+static bool is_function(const pcas_ast_t *e) {
+	return e->type == NODE_SYMBOL && function_symbol != SYM_INVALID && e->op.symbol == function_symbol;
+}
+
+/*Returns k if e is a number times the unknown function to the positive integer power k, 0 if e is a number, otherwise -1*/
+static int function_degree(const pcas_ast_t *e) {
+	mp_small k;
+	int degree;
+
+	if (e->type == NODE_NUMBER)
+		return 0;
+
+	if (is_function(e))
+		return 1;
+
+	if (isoptype(e, OP_POW) && is_function(opbase(e)) && opbase(e)->next->type == NODE_NUMBER &&
+		mp_rat_is_integer(opbase(e)->next->op.num) && mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &k) == MP_OK &&
+		k > 0 && k <= DE_MAX_ORDER)
+		return (int)k;
+
+	if (isoptype(e, OP_MULT) && ast_ChildLength(e) == 2 && opbase(e)->type == NODE_NUMBER) {
+		degree = function_degree(opbase(e)->next);
+		return degree > 0 ? degree : -1;
+	}
+
+	return -1;
+}
+
+/*Returns e if it is a symbol, the first symbol factor if it is a product, otherwise SYM_INVALID*/
+static Symbol leading_symbol(const pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (e->type == NODE_SYMBOL)
+		return e->op.symbol;
+
+	if (isoptype(e, OP_MULT)) {
+		for (child = opbase(e); child != NULL; child = child->next) {
+			if (child->type == NODE_SYMBOL)
+				return child->op.symbol;
+		}
+	}
+
+	return SYM_INVALID;
+}
+
 static pcas_ast_t *factors_or_self(pcas_ast_t *e) {
 	return isoptype(e, OP_MULT) ? ast_Copy(e) : ast_MakeUnary(OP_MULT, ast_Copy(e));
 }
@@ -425,6 +470,25 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
 	/*Highest derivatives first in sums, and the unknown function last in products*/
 	if (rank_a != rank_b)
 		return add ? rank_b - rank_a : rank_a - rank_b;
+
+	if (add) {
+		int degree_a = function_degree(a), degree_b = function_degree(b);
+		bool imaginary_a = contains_symbol(a, SYM_IMAG), imaginary_b = contains_symbol(b, SYM_IMAG);
+		Symbol symbol_a = leading_symbol(a), symbol_b = leading_symbol(b);
+
+		/*Polynomials in the unknown function by descending degree*/
+		if (degree_a >= 0 && degree_b >= 0 && degree_a != degree_b)
+			return degree_b - degree_a;
+
+		/*Imaginary parts after real parts*/
+		if (imaginary_a != imaginary_b)
+			return imaginary_a ? 1 : -1;
+
+		/*A symbol and a product alphabetically*/
+		if ((a->type == NODE_SYMBOL) != (b->type == NODE_SYMBOL) && symbol_a != SYM_INVALID &&
+			symbol_b != SYM_INVALID && symbol_a != symbol_b)
+			return (int)symbol_a - (int)symbol_b;
+	}
 
 	if (isoptype(b, OP_MULT)) {
 		temp = a;
