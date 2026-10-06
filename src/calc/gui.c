@@ -77,7 +77,7 @@ void draw_background(void) {
 	draw_string_centered("Options", 10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 50 + 10);
 }
 
-typedef enum { GUI_LABEL, GUI_CHECKBOX, GUI_CHARSELECT, GUI_DROPDOWN, GUI_BUTTON } GuiType;
+typedef enum { GUI_LABEL, GUI_CHECKBOX, GUI_CHARSELECT, GUI_DIGITSELECT, GUI_DROPDOWN, GUI_BUTTON } GuiType;
 
 /*I miss oop so much*/
 typedef struct {
@@ -111,7 +111,7 @@ char *dropdown_entries[NUM_DROPDOWN_ENTRIES] = {"Y1",   "Y2",   "Y3",   "Y4",   
 #define NUM_EXPAND 3
 #define NUM_DERIVATIVE 3
 #define NUM_INTEGRAL 3
-#define NUM_DE 5
+#define NUM_DE 7
 #define NUM_ABOUT 0
 
 view_t *io_context[NUM_IO];
@@ -214,7 +214,8 @@ void view_draw(view_t *v) {
 		case GUI_CHECKBOX: draw_checkbox(v); break;
 		case GUI_DROPDOWN: draw_dropdown(v); break;
 		case GUI_BUTTON: draw_button(v); break;
-		case GUI_CHARSELECT: draw_charselect(v); break;
+		case GUI_CHARSELECT:
+		case GUI_DIGITSELECT: draw_charselect(v); break;
 		default: return;
 	}
 
@@ -258,6 +259,29 @@ view_t *view_create_dropdown(int x, int y, unsigned index) {
 
 view_t *view_create_label(int x, int y, char *text) {
 	return view_create(GUI_LABEL, x, y, 0, 8, text);
+}
+
+view_t *view_create_digitselect(int x, int y, char digit) {
+	view_t *v;
+	v = view_create(GUI_DIGITSELECT, x, y, 16, 16, NULL);
+	v->character = digit;
+	return v;
+}
+
+/*Returns the digit 1 to 9 of key, or 0 for other keys*/
+char digit_key(uint8_t key) {
+	switch (key) {
+		case sk_1: return '1';
+		case sk_2: return '2';
+		case sk_3: return '3';
+		case sk_4: return '4';
+		case sk_5: return '5';
+		case sk_6: return '6';
+		case sk_7: return '7';
+		case sk_8: return '8';
+		case sk_9: return '9';
+		default: return 0;
+	}
 }
 
 view_t *view_create_charselect(int x, int y) {
@@ -490,9 +514,9 @@ void handle_input(uint8_t key) {
 				}
 
 			} else {
-				if (v->type == GUI_CHARSELECT) {
+				if (v->type == GUI_CHARSELECT || v->type == GUI_DIGITSELECT) {
 					char val;
-					val = alpha_table[key];
+					val = v->type == GUI_CHARSELECT ? alpha_table[key] : digit_key(key);
 
 					if (val != 0) {
 						v->character = val;
@@ -553,7 +577,9 @@ void gui_Init(void) {
 	de_context[1] = view_create_checkbox(124, 104, "Show work", true);
 	de_context[2] = view_create_checkbox(124, 124, "Verify solution", false);
 	de_context[3] = view_create_dropdown(124 + 90, 136, 2);
-	de_context[4] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
+	de_context[4] = view_create_checkbox(124, 162, "Power series, terms:", false);
+	de_context[5] = view_create_digitselect(124 + 140, 158, '0' + DE_DEFAULT_TERMS);
+	de_context[6] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
 
 	console_button = view_create_button(LCD_WIDTH / 2, LCD_HEIGHT - LCD_HEIGHT / 6 - 20, "Close");
 
@@ -944,6 +970,8 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 	unsigned count;
 	bool show_work = context[1]->checked;
 	bool verify = kind == CALCULUS_DE && context[2]->checked;
+	bool series = kind == CALCULUS_DE && context[4]->checked;
+	unsigned terms = kind == CALCULUS_DE ? (unsigned)(context[5]->character - '0') : 0;
 	bool satisfied = false;
 
 	compile_derivative();
@@ -982,7 +1010,7 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 				: kind == CALCULUS_INTEGRAL ? "Integrating..."
 											: "Solving..."
 			);
-			err = calculus_Run(kind, items, count, respect_to, buffer);
+			err = calculus_Run(kind, items, count, respect_to, series, terms, buffer);
 
 			if (err == E_SUCCESS && kind == CALCULUS_DE)
 				console_write(buffer);

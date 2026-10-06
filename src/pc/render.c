@@ -92,9 +92,8 @@ static void draw_summation(int x, int y, int height) {
 	put(x, y, 0x03A3);
 }
 
-static const ts_renderer_t renderer = {
-	draw_text, draw_bar, draw_overline, draw_delimiter, draw_radical, draw_integral, draw_summation
-};
+static const ts_renderer_t renderer =
+	{draw_text, draw_bar, draw_overline, draw_delimiter, draw_radical, draw_integral, draw_summation};
 
 static void print_utf8(uint32_t c) {
 	if (c < 0x80) {

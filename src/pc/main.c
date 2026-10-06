@@ -38,6 +38,10 @@ void display_help(void) {
 	printf("\tintegral [expression] [respect to]\n");
 	printf("\tde [equation,conditions] [(optional) respect to]\tClassifies and solves a differential equation\n");
 	printf(
+		"\tseries [equation,conditions] [(optional) respect to] [(optional) terms]\tSolves a differential equation "
+		"with a power series\n"
+	);
+	printf(
 		"\tverify [equation,conditions] [solution] [(optional) respect to]\tChecks a solution of a differential "
 		"equation\n"
 	);
@@ -552,6 +556,10 @@ int run_de(int argc, char **argv) {
 		err = de_LoadList(&de, items, count, x);
 
 		if (err == E_SUCCESS) {
+			de.series = !strcmp(argv[1], "series");
+			if (argc >= 5 && atoi(argv[4]) > 0)
+				de.terms = (unsigned)atoi(argv[4]);
+
 			de_Classify(&de);
 
 			printf("Order: %u\n", de.order);
@@ -677,7 +685,7 @@ int main(int argc, char **argv) {
 			ret = run_derivative(argc, argv);
 		else if (!strcmp(argv[1], "integral"))
 			ret = run_integral(argc, argv);
-		else if (!strcmp(argv[1], "de"))
+		else if (!strcmp(argv[1], "de") || !strcmp(argv[1], "series"))
 			ret = run_de(argc, argv);
 		else if (!strcmp(argv[1], "verify"))
 			ret = run_verify(argc, argv);

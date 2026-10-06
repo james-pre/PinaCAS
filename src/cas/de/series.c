@@ -381,7 +381,9 @@ static void record_recurrence(series_t *s) {
 		if ((n = degree_of(P)) >= 0) {
 			ast_ChildAppend(
 				left,
-				ast_MakeBinary(OP_MULT, factored_polynomial(s, P, (unsigned)n), coefficient(s, tidy(index_plus(s, shift))))
+				ast_MakeBinary(
+					OP_MULT, factored_polynomial(s, P, (unsigned)n), coefficient(s, tidy(index_plus(s, shift)))
+				)
 			);
 
 			if (shift < (int)order) {
@@ -399,10 +401,10 @@ static void record_recurrence(series_t *s) {
 						ast_ChildAppend(denominator, index_plus(s, (int)d));
 				}
 
-				e = ast_MakeBinary(OP_DIV, factored_polynomial(s, P, (unsigned)n), denominator);
-				ast_ChildAppend(
-					right, negate(ast_MakeBinary(OP_MULT, e, coefficient(s, tidy(index_plus(s, shift)))))
+				e = ast_MakeBinary(
+					OP_MULT, factored_polynomial(s, P, (unsigned)n), coefficient(s, tidy(index_plus(s, shift)))
 				);
+				ast_ChildAppend(right, negate(ast_MakeBinary(OP_DIV, e, denominator)));
 			}
 		}
 
@@ -448,6 +450,31 @@ static pcas_ast_t *combination_of(mp_rat *c, pcas_ast_t **constants, unsigned fr
 	return sum;
 }
 
+/*Returns c times the base to the power i, keeping a factor of 1 on a sum so that it stays one term*/
+static pcas_ast_t *series_term(const series_t *s, mp_rat c, unsigned i) {
+	pcas_ast_t *power = i == 0 ? NULL : i == 1 ? ast_Copy(s->base) : base_power(s, integer((int)i));
+
+	if (power == NULL)
+		return ast_MakeNumber(num_Copy(c));
+
+	return num_IsInt(c, 1) && power->type != NODE_OPERATOR
+			   ? power
+			   : ast_MakeBinary(OP_MULT, ast_MakeNumber(num_Copy(c)), power);
+}
+
+/*Returns the only term of sum if it has one, otherwise sum. Takes ownership of sum.*/
+static pcas_ast_t *unwrap_sum(pcas_ast_t *sum) {
+	pcas_ast_t *only;
+
+	if (ast_ChildLength(sum) != 1)
+		return sum;
+
+	only = ast_ChildRemoveIndex(sum, 0);
+	ast_Cleanup(sum);
+
+	return only;
+}
+
 pcas_error_t solve_power_series(pcas_de_t *de, pcas_ast_t **solution) {
 	series_t s;
 	pcas_ast_t *center, *scope, *constants[DE_MAX_ORDER], *e, *chain, *answer, *part;
@@ -462,7 +489,7 @@ pcas_error_t solve_power_series(pcas_de_t *de, pcas_ast_t **solution) {
 	if (!de->linear)
 		return E_DE_UNSOLVED;
 
-	center = de->center != NULL ? ast_Copy(de->center)
+	center = de->center != NULL        ? ast_Copy(de->center)
 			 : de->condition_count > 0 ? ast_Copy(de->conditions[0].at)
 									   : integer(0);
 
@@ -523,6 +550,7 @@ pcas_error_t solve_power_series(pcas_de_t *de, pcas_ast_t **solution) {
 			s.start = s.terms[i].j;
 	}
 
+	canonical_SetSeries(s.base);
 	record_substitution(&s);
 	record_recurrence(&s);
 
@@ -659,31 +687,30 @@ pcas_error_t solve_power_series(pcas_de_t *de, pcas_ast_t **solution) {
 		if (!active[b])
 			continue;
 
-		part = ast_MakeOperator(OP_ADD);
+		part = b < free_count ? ast_MakeOperator(OP_ADD) : answer;
 		for (i = 0; i <= last[b] && i < computed; i++) {
 			if (mp_rat_compare_zero(coefficients[i][b]) != 0)
-				ast_ChildAppend(
-					part, ast_MakeBinary(OP_MULT, ast_MakeNumber(num_Copy(coefficients[i][b])), base_power(&s, integer((int)i)))
-				);
+				ast_ChildAppend(part, series_term(&s, coefficients[i][b], i));
 		}
 
-		if (ast_ChildLength(part) == 0) {
-			ast_Cleanup(part);
+		if (part == answer)
 			continue;
-		}
 
-		work_Pause();
-		simplify(part, SIMP_BASIC);
-		work_Resume();
-
-		ast_ChildAppend(answer, b < free_count ? ast_MakeBinary(OP_MULT, ast_Copy(constants[b]), part) : part);
+		if (ast_ChildLength(part) == 0)
+			ast_Cleanup(part);
+		else
+			ast_ChildAppend(answer, ast_MakeBinary(OP_MULT, ast_Copy(constants[b]), unwrap_sum(part)));
 	}
 
 	if (ast_ChildLength(answer) == 0)
 		ast_ChildAppend(answer, integer(0));
 
+	answer = unwrap_sum(answer);
+
 	if (err == E_SUCCESS) {
-		tidy(answer);
+		work_Pause();
+		simplify(answer, SIMP_NORMALIZE | SIMP_RATIONAL);
+		work_Resume();
 		work_Step(STEP_EQUATION, "Solution", de->y, answer);
 		*solution = ast_MakeBinary(OP_EQUALS, ast_Copy(de->y), answer);
 	} else {

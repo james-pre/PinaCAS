@@ -15,8 +15,8 @@ void ti_debug(const char *format, ...) {
 #endif
 #endif
 
-const char *operators[AMOUNT_OPS] = {"+",   "*",    "/",    "^",     "root", "log",   "deriv", "integ", "=",
-									 "'",   "at",   "sum",  "sub",  "!",    "int",   "abs",  "sin",   "asin",  "cos",   "acos",
+const char *operators[AMOUNT_OPS] = {"+",   "*",    "/",    "^",     "root", "log",   "deriv", "integ", "=",   "'",
+									 "at",  "sum",  "sub",  "!",     "int",  "abs",   "sin",   "asin",  "cos", "acos",
 									 "tan", "atan", "sinh", "asinh", "cosh", "acosh", "tanh",  "atanh"};
 
 const char *symbols[SYM_THETA - SYM_IMAG + 1] = {"i", "pi", "e", "theta"};

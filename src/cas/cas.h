@@ -131,6 +131,8 @@ bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags);
 
 /*Sorts the unknown function of a differential equation after its coefficients. SYM_INVALID clears it.*/
 void canonical_SetFunction(Symbol symbol);
+/*Makes the canonical form write sums of numbers times powers of base in ascending order, until called with NULL*/
+void canonical_SetSeries(const pcas_ast_t *base);
 
 /*Factor A + A to A(1 + 1) where at least one part of the
 resulting multiplication can be evauated numerically*/

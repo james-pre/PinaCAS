@@ -23,6 +23,8 @@ typedef enum {
 	TEST_DE_SOLVES,
 	TEST_DE_NOT_SOLVES,
 	TEST_DE_SOLVE,
+	/*Like TEST_DE_SOLVE with the power series method*/
+	TEST_DE_SERIES,
 
 	TEST_INVALID
 } TestType;

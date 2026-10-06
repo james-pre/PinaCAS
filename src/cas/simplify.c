@@ -298,6 +298,81 @@ void canonical_SetFunction(Symbol symbol) {
 	function_symbol = symbol;
 }
 
+static pcas_ast_t *series_base = NULL;
+
+void canonical_SetSeries(const pcas_ast_t *base) {
+	ast_Cleanup(series_base);
+	series_base = base != NULL ? ast_Copy(base) : NULL;
+}
+
+/*Returns k if e is a number times the series base to the integer power k, 0 if e is a number, otherwise -1*/
+static int series_degree(const pcas_ast_t *e) {
+	pcas_ast_t *child;
+	mp_small k;
+	int degree = 0, found;
+
+	if (series_base == NULL)
+		return -1;
+
+	if (e->type == NODE_NUMBER)
+		return 0;
+
+	if (ast_Compare(e, series_base))
+		return 1;
+
+	if (isoptype(e, OP_POW) && ast_Compare(opbase(e), series_base) && opbase(e)->next->type == NODE_NUMBER &&
+		mp_rat_is_integer(opbase(e)->next->op.num) && mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &k) == MP_OK &&
+		k > 0 && k < 1000)
+		return (int)k;
+
+	if (isoptype(e, OP_DIV))
+		return opbase(e)->next->type == NODE_NUMBER ? series_degree(opbase(e)) : -1;
+
+	if (isoptype(e, OP_MULT)) {
+		for (child = opbase(e); child != NULL; child = child->next) {
+			if (child->type == NODE_NUMBER || (isoptype(child, OP_DIV) && opbase(child)->type == NODE_NUMBER &&
+											   opbase(child)->next->type == NODE_NUMBER))
+				continue;
+			if (degree > 0 || (found = series_degree(child)) <= 0)
+				return -1;
+			degree = found;
+		}
+		return degree;
+	}
+
+	return -1;
+}
+
+static bool ascending_series = false;
+
+/*True if e is a sum with a term that is a number times a positive power of the series base*/
+static bool is_series_sum(const pcas_ast_t *e) {
+	pcas_ast_t *child;
+
+	if (!isoptype(e, OP_ADD))
+		return false;
+
+	for (child = opbase(e); child != NULL; child = child->next) {
+		if (series_degree(child) > 0)
+			return true;
+	}
+
+	return false;
+}
+
+/*Orders factors of a product: numbers, symbols, sums, subscripts, then the rest*/
+static int factor_class(const pcas_ast_t *e) {
+	if (e->type == NODE_NUMBER)
+		return 0;
+	if (e->type == NODE_SYMBOL)
+		return 1;
+	if (isoptype(e, OP_ADD))
+		return 2;
+	if (isoptype(e, OP_SUBSCRIPT))
+		return 3;
+	return 4;
+}
+
 /*0 if e does not involve the unknown function, otherwise one more than the highest derivative of it in e*/
 static unsigned function_rank(pcas_ast_t *e) {
 	pcas_ast_t *child;
@@ -478,10 +553,20 @@ int compare(pcas_ast_t *a, pcas_ast_t *b, bool add) {
 	if (rank_a != rank_b)
 		return add ? rank_b - rank_a : rank_a - rank_b;
 
+	if (!add && (isoptype(a, OP_SUBSCRIPT) || isoptype(b, OP_SUBSCRIPT)) && factor_class(a) != factor_class(b))
+		return factor_class(a) - factor_class(b);
+
 	if (add) {
 		int degree_a = function_degree(a), degree_b = function_degree(b);
+		int series_a = ascending_series ? series_degree(a) : -1, series_b = ascending_series ? series_degree(b) : -1;
 		bool imaginary_a = contains_symbol(a, SYM_IMAG), imaginary_b = contains_symbol(b, SYM_IMAG);
 		Symbol symbol_a = leading_symbol(a), symbol_b = leading_symbol(b);
+
+		/*Power series after the other terms, by ascending degree*/
+		if ((series_a >= 0) != (series_b >= 0))
+			return series_a >= 0 ? 1 : -1;
+		if (series_a != series_b)
+			return series_a - series_b;
 
 		/*Polynomials in the unknown function by descending degree*/
 		if (degree_a >= 0 && degree_b >= 0 && degree_a != degree_b)
@@ -738,6 +823,8 @@ static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
 		}
 
 		if (flags & CANONICAL_SORT) {
+			ascending_series = is_series_sum(e);
+
 			/*Order addition and multiplication: C*A*D becomes A*C*D */
 			for (i = 0; i < ast_ChildLength(e); i++) {
 				pcas_ast_t *child = ast_ChildGet(e, i);
@@ -759,6 +846,8 @@ static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
 					}
 				}
 			}
+
+			ascending_series = false;
 		}
 
 		for (i = 0; i < ast_ChildLength(e); i++) {

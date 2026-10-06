@@ -505,3 +505,16 @@ solve; Y''_Y=e^X; Y=Ae^X+Be^(-X)+Xe^X/2; X
 solve; Y'''_Y'=X; Y=A+Be^X+Ce^(-X)_X^2/2; X
 solve; Y''+4Y=sin(2X); Y=Acos(2X)+Bsin(2X)_Xcos(2X)/4; X
 solve; Y''_3Y'+2Y=e^(2X)+X; Y=Ae^(2X)+Be^X+Xe^(2X)+X/2+3/4; X
+
+#Differential equations: power series
+series; Y''+XY'+Y=0; Y=A(1_X^2/2+X^4/8_X^6/48)+B(X_X^3/3+X^5/15_X^7/105); X
+series; Y''+XY=0; Y=A(1_X^3/6+X^6/180_X^9/12960)+B(X_X^4/12+X^7/504_X^10/45360); X
+series; (X^2+1)Y''+XY'_Y=0; Y=A(1+X^2/2_X^4/8+X^6/16)+BX; X
+series; Y''_2XY'+8Y=0,Y(0)=3,Y'(0)=0; Y=3_12X^2+4X^4; X
+series; Y''+(X_1)Y=0,Y(1)=2,Y'(1)=0; Y=2_(X_1)^3/3+(X_1)^6/90_(X_1)^9/6480; X
+series; Y''+(X_1)Y=0,X=1; Y=A(1_(X_1)^3/6+(X_1)^6/180_(X_1)^9/12960)+B(X_1_(X_1)^4/12+(X_1)^7/504_(X_1)^10/45360); X
+series; Y''_XY=1; Y=A(1+X^3/6+X^6/180+X^9/12960)+B(X+X^4/12+X^7/504+X^10/45360)+X^2/2+X^5/40+X^8/2240+X^11/246400; X
+series; Y''+Y=0,Y(0)=1,Y'(0)=0; Y=1_X^2/2+X^4/24_X^6/720; X
+series; Y'_XY=0; Y=A(1+X^2/2+X^4/8+X^6/48); X
+series; (1_X^2)Y''_2XY'+6Y=0; Y=A(1_3X^2)+B(X_2X^3/3_X^5/5_4X^7/35); X
+solve; Y''+XY'+Y=0; Y=A(1_X^2/2+X^4/8_X^6/48)+B(X_X^3/3+X^5/15_X^7/105); X

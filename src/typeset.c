@@ -85,7 +85,8 @@ static bool is_atom(pcas_ast_t *e) {
 		case NODE_NUMBER: return mp_rat_is_integer(e->op.num) && mp_rat_compare_zero(e->op.num) >= 0;
 		case NODE_SYMBOL: return true;
 		case NODE_OPERATOR:
-			return optype(e) == OP_PRIME || optype(e) == OP_LOG || optype(e) == OP_SUBSCRIPT || is_op_function(optype(e));
+			return optype(e) == OP_PRIME || optype(e) == OP_LOG || optype(e) == OP_SUBSCRIPT ||
+				   is_op_function(optype(e));
 	}
 
 	return false;

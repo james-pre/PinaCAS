@@ -56,6 +56,8 @@ TestType resolve_type(char *type) {
 		return TEST_DE_NOT_SOLVES;
 	if (!strcmp(type, "solve"))
 		return TEST_DE_SOLVE;
+	if (!strcmp(type, "series"))
+		return TEST_DE_SERIES;
 
 	return TEST_INVALID;
 }
@@ -219,6 +221,11 @@ static void simplify_solution(pcas_ast_t *e) {
 	simplify_canonical_form(e, CANONICAL_ALL);
 }
 
+static pcas_error_t solve_test(pcas_de_t *de, const test_t *t, pcas_ast_t **solution) {
+	de->series = t->type == TEST_DE_SERIES;
+	return de_Solve(de, solution);
+}
+
 /*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable. An explicit solution must also pass verification.*/
 static bool run_solve(test_t *t) {
 	pcas_ast_t *items[MAX_ITEMS], *expected, *x, *solution = NULL;
@@ -234,7 +241,7 @@ static bool run_solve(test_t *t) {
 	if (count == 0 || items[0] == NULL || expected == NULL || x == NULL) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
 	} else if (
-		(err = de_LoadList(&de, items, count, x)) != E_SUCCESS || (err = de_Solve(&de, &solution)) != E_SUCCESS
+		(err = de_LoadList(&de, items, count, x)) != E_SUCCESS || (err = solve_test(&de, t, &solution)) != E_SUCCESS
 	) {
 		printf("Test failed on line %u. %s\n", t->line, error_text[err]);
 		de_Cleanup(&de);
@@ -243,7 +250,7 @@ static bool run_solve(test_t *t) {
 		simplify_solution(expected);
 		passed = check(t, solution, expected);
 
-		if (passed && ast_Compare(opbase(solution), de.y)) {
+		if (passed && strcmp(de.method, "Power series") != 0 && ast_Compare(opbase(solution), de.y)) {
 			err = de_Verify(&de, solution, &satisfied);
 			passed = err == E_SUCCESS && satisfied;
 			if (!passed)
@@ -269,7 +276,7 @@ bool test_Run(test_t *t) {
 
 	if (t->type == TEST_DE_SOLVES || t->type == TEST_DE_NOT_SOLVES)
 		return run_verify(t);
-	if (t->type == TEST_DE_SOLVE)
+	if (t->type == TEST_DE_SOLVE || t->type == TEST_DE_SERIES)
 		return run_solve(t);
 
 	a = parse((uint8_t *)t->arg1, strlen(t->arg1), str_table, &err);

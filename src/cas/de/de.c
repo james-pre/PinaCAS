@@ -210,6 +210,7 @@ void de_Cleanup(pcas_de_t *de) {
 	}
 
 	canonical_SetFunction(SYM_INVALID);
+	canonical_SetSeries(NULL);
 }
 
 pcas_ast_t *de_StandardForm(pcas_de_t *de) {
@@ -844,5 +845,7 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 	if ((err = solve_constant_coefficients(de, solution)) != E_DE_UNSOLVED || !de->linear)
 		return err;
 
-	return solve_power_series(de, solution);
+	err = solve_power_series(de, solution);
+
+	return err == E_DE_SINGULAR ? E_DE_UNSOLVED : err;
 }

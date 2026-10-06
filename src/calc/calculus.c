@@ -6,7 +6,15 @@
 
 #include "../cas/cas.h"
 
-pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pcas_ast_t *respect_to, char *summary) {
+pcas_error_t calculus_Run(
+	Calculus kind,
+	pcas_ast_t **items,
+	unsigned count,
+	pcas_ast_t *respect_to,
+	bool series,
+	unsigned terms,
+	char *summary
+) {
 	pcas_ast_t *e = items[0];
 	pcas_error_t err = E_SUCCESS;
 	pcas_de_t de;
@@ -29,6 +37,8 @@ pcas_error_t calculus_Run(Calculus kind, pcas_ast_t **items, unsigned count, pca
 			if (err == E_SUCCESS) {
 				pcas_ast_t *solution;
 
+				de.series = series;
+				de.terms = terms;
 				de_Classify(&de);
 				err = de_Solve(&de, &solution);
 

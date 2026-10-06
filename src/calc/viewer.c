@@ -134,9 +134,8 @@ static void draw_summation(int x, int y, int height) {
 	gfx_HorizLine(x + 1, y + height - 1, 7);
 }
 
-static const ts_renderer_t renderer = {
-	draw_text, draw_bar, draw_bar, draw_delimiter, draw_radical, draw_integral, draw_summation
-};
+static const ts_renderer_t renderer =
+	{draw_text, draw_bar, draw_bar, draw_delimiter, draw_radical, draw_integral, draw_summation};
 
 typedef struct {
 	const char *label;
