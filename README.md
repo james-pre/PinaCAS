@@ -75,7 +75,7 @@ cd PinaCAS
 make
 ```
 
-This builds the app, `bin/PinaCAS.8ek`, splits it into the `bin/PinaCAS.*.8xv` AppVars, builds the installer `bin/PINACAS.8xp` from [app_tools](https://github.com/commandblockguy/app_tools), and bundles them into `bin/PinaCAS.b84`. `make debug` builds the same files without optimization into `bin/debug`, with `dbg_printf` output shown in CEmu's console.
+This builds the app, `bin/PinaCAS.8ek`, splits it into the `bin/PinaCAS.*.8xv` AppVars, builds the installer `bin/PINACAS.8xp` from [app_tools](https://github.com/CE-Programming/app_tools), and bundles them into `bin/PinaCAS.b84`. `make debug` builds the same files without optimization into `bin/debug`, with `dbg_printf` output shown in CEmu's console.
 
 The calculator program compiles consistently on Ubuntu, but Windows has a problem with it. Executing make on Windows many times seems to work for some reason. (I blame the compiler!)
 
