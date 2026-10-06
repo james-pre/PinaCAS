@@ -628,82 +628,47 @@ void gui_Run(void) {
 	gui_Cleanup();
 }
 
-void compile_general(void) {
-	static bool compiled = false;
+typedef enum {
+	CID_GENERAL = 1 << 0,
+	CID_TRIG = 1 << 1,
+	CID_TRIG_CONSTANTS = 1 << 2,
+	CID_TRIG_INV_CONSTANTS = 1 << 3,
+	CID_HYPERBOLIC = 1 << 4,
+	CID_COMPLEX = 1 << 5,
+	CID_DERIVATIVE = 1 << 6
+} compile_ids_mask;
 
-	if (!compiled) {
-		console_write("Compiling basic ids...");
-		id_LoadTable(id_general);
-		compiled = true;
+/*Entry i is the table for bit i of compile_ids_mask*/
+static struct compile_info {
+	const char *label;
+	pcas_id_t *const table;
+	bool compiled;
+} compile_info[] = {
+	{"basic", id_general, false},
+	{"trig", id_trig_identities, false},
+	{"constant trig", id_trig_constants, false},
+	{"inverse trig", id_trig_inv_constants, false},
+	{"hyperbolic", id_hyperbolic, false},
+	{"complex", id_complex, false},
+	{"derivative", id_derivative, false}
+};
+
+#define NUM_COMPILE_INFO (sizeof(compile_info) / sizeof(compile_info[0]))
+#define CID_ALL ((1 << NUM_COMPILE_INFO) - 1)
+
+/*Loads the identity tables in mask that are not loaded yet*/
+static void compile_ids(unsigned mask) {
+	char buffer[50];
+
+	for (unsigned i = 0; i < NUM_COMPILE_INFO; i++) {
+		if (!(mask & (1 << i)) || compile_info[i].compiled)
+			continue;
+
+		sprintf(buffer, "Compiling %s ids...", compile_info[i].label);
+		console_write(buffer);
+		id_LoadTable(compile_info[i].table);
+		compile_info[i].compiled = true;
 	}
-}
-
-void compile_trig(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling trig ids...");
-		id_LoadTable(id_trig_identities);
-		compiled = true;
-	}
-}
-
-void compile_trig_constants(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling trig const ids...");
-		id_LoadTable(id_trig_constants);
-		compiled = true;
-	}
-}
-
-void compile_trig_inv_constants(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling inv trig const ids...");
-		id_LoadTable(id_trig_inv_constants);
-		compiled = true;
-	}
-}
-
-void compile_hyperbolic(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling hyperbolic ids...");
-		id_LoadTable(id_hyperbolic);
-		compiled = true;
-	}
-}
-
-void compile_complex(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling complex ids...");
-		id_LoadTable(id_complex);
-		compiled = true;
-	}
-}
-
-void compile_derivative(void) {
-	static bool compiled = false;
-
-	if (!compiled) {
-		console_write("Compiling derivative ids...");
-		id_LoadTable(id_derivative);
-		compiled = true;
-	}
-}
-
-void compile_all(void) {
-	compile_general();
-	compile_trig();
-	compile_trig_constants();
-	compile_hyperbolic();
-	compile_complex();
 }
 
 static const char *const token_table[21] = {OS_VAR_Y1,   OS_VAR_Y2,   OS_VAR_Y3,   OS_VAR_Y4,   OS_VAR_Y5,
@@ -727,31 +692,34 @@ void execute_simplify(void) {
 	pcas_error_t err;
 
 	unsigned short flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
+	unsigned ids = 0;
 
 	if (simplify_context[0]->checked) {
-		compile_general();
+		ids |= CID_GENERAL;
 		flags |= SIMP_ID_GENERAL;
 	}
 	if (simplify_context[1]->checked) {
-		compile_trig();
+		ids |= CID_TRIG;
 		flags |= SIMP_ID_TRIG;
 	}
 	if (simplify_context[2]->checked) {
-		compile_hyperbolic();
+		ids |= CID_HYPERBOLIC;
 		flags |= SIMP_ID_HYPERBOLIC;
 	}
 	if (simplify_context[3]->checked) {
-		compile_complex();
+		ids |= CID_COMPLEX;
 		flags |= SIMP_ID_COMPLEX;
 	}
 	if (simplify_context[4]->checked) {
-		compile_trig_constants();
+		ids |= CID_TRIG_CONSTANTS;
 		flags |= SIMP_ID_TRIG_CONSTANTS;
 	}
 	if (simplify_context[5]->checked) {
-		compile_trig_inv_constants();
+		ids |= CID_TRIG_INV_CONSTANTS;
 		flags |= SIMP_ID_TRIG_INV_CONSTANTS;
 	}
+
+	compile_ids(ids);
 
 	console_write("Parsing input...");
 
@@ -974,7 +942,7 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 	unsigned terms = kind == CALCULUS_DE ? (unsigned)(context[5]->character - '0') : 0;
 	bool satisfied = false;
 
-	compile_derivative();
+	compile_ids(CID_DERIVATIVE);
 
 	console_write("Parsing input...");
 
