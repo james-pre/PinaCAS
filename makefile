@@ -2,9 +2,11 @@
 # Calculator app (CE C toolchain)
 # ----------------------------
 
+VERSION      := $(shell scripts/version.sh)
+
 NAME         = PinaCAS
 ICON         = iconc.png
-DESCRIPTION  = "PinaCAS"
+DESCRIPTION  = "PinaCAS v$(VERSION)"
 APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
@@ -18,13 +20,14 @@ OBJDIR       = obj/debug
 BINDIR       = bin/debug
 endif
 
-$(shell scripts/version.sh)
-
 CEDEV_MAKEFILE := $(shell cedev-config --makefile 2>/dev/null)
 
 ifneq ($(CEDEV_MAKEFILE),)
 .DEFAULT_GOAL := package
 include $(CEDEV_MAKEFILE)
+
+# The description holds the version, which the installer shows when updating
+$(OBJDIR)/icon.obj: src/version.h
 
 # The app is installed on the calculator by running the installer program, which reads the app from AppVars
 INSTALLER    = PINACAS

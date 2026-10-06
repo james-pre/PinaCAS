@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Writes src/version.h with the version from the latest git tag and the build date, leaving it untouched when nothing changed.
+# Writes src/version.h with the version from the latest git tag and the build date, leaving it untouched when nothing changed, and prints the version.
 # On a tag vX.Y.Z the version is X.Y.Z. After it, the commit count and hash are added as build metadata: X.Y.Z+N.gHASH[.dirty].
 set -euo pipefail
 
@@ -36,3 +36,5 @@ content="#pragma once
 if [[ ! -f src/version.h || $(<src/version.h) != "$content" ]]; then
 	printf '%s\n' "$content" >src/version.h
 fi
+
+echo "$version"
