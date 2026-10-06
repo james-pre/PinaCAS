@@ -3,4 +3,5 @@
 	url = https://github.com/creachadair/imath
 [submodule "lib/app_tools"]
 	path = lib/app_tools
-	url = https://github.com/CE-Programming/app_tools
+	url = https://github.com/james-pre/app_tools
+	branch = update
