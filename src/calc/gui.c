@@ -102,11 +102,11 @@ static char digit_key(uint8_t key);
 #define VARIABLE(text, state) {ELEMENT_VARIABLE, text, .variable = (state)}
 #define LETTER(text, state)                                                                                            \
 	{                                                                                                                  \
-		ELEMENT_CHARACTER, text, .character = {(state), letter_key}                                                    \
+		ELEMENT_CHARACTER, text, .character = {(state), letter_key }                                                   \
 	}
 #define DIGIT(text, state)                                                                                             \
 	{                                                                                                                  \
-		ELEMENT_CHARACTER, text, .character = {(state), digit_key}                                                     \
+		ELEMENT_CHARACTER, text, .character = {(state), digit_key }                                                    \
 	}
 #define BUTTON(text, function) {ELEMENT_BUTTON, text, .action = (function)}
 #define CONTENT(...) ((const element_t[]){__VA_ARGS__, END})
