@@ -6,6 +6,7 @@
 #include <keypadc.h>
 #include <tice.h>
 
+#include "glyph.h"
 #include "gui.h"
 
 #define TITLE_HEIGHT 16
@@ -18,22 +19,12 @@
 #define SCROLL_Y 16
 #define SCROLL_X 48
 
-typedef struct {
-	uint8_t width;
-	uint8_t rows[8];
-} glyph_t;
-
-static const glyph_t pi_glyph = {8, {0x00, 0x00, 0x7E, 0x24, 0x24, 0x24, 0x24, 0x00}};
-static const glyph_t theta_glyph = {7, {0x38, 0x44, 0x44, 0x7C, 0x44, 0x44, 0x38, 0x00}};
-static const glyph_t dot_glyph = {4, {0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00}};
-static const glyph_t infinity_glyph = {9, {0x00, 0x00, 0x66, 0x99, 0x99, 0x66, 0x00, 0x00}};
-
 static const glyph_t *special_glyph(char c) {
 	switch (c) {
-		case TS_PI: return &pi_glyph;
-		case TS_THETA: return &theta_glyph;
-		case TS_DOT: return &dot_glyph;
-		case TS_INFINITY: return &infinity_glyph;
+		case TS_PI: return &glyph_pi;
+		case TS_THETA: return &glyph_theta;
+		case TS_DOT: return &glyph_dot;
+		case TS_INFINITY: return &glyph_infinity;
 		default: return NULL;
 	}
 }
@@ -67,26 +58,12 @@ static int integral_width(int height) {
 static const ts_metrics_t metrics =
 	{text_width, 7, 1, 3, 1, 1, 2, 3, 3, delimiter_width, radical_width, integral_width, 10};
 
-static void draw_glyph(int x, int y, const glyph_t *g) {
-	int row, column;
-
-	for (row = 0; row < 8; row++) {
-		for (column = 0; column < 8; column++) {
-			int px = x + column, py = y + row;
-
-			if ((g->rows[row] & (0x80 >> column)) && px >= VIEW_LEFT && px < VIEW_RIGHT && py >= VIEW_TOP &&
-				py < VIEW_BOTTOM)
-				gfx_SetPixel(px, py);
-		}
-	}
-}
-
 static void draw_text(int x, int y, const char *text) {
 	for (; *text != '\0'; text++) {
 		const glyph_t *g = special_glyph(*text);
 
 		if (g != NULL) {
-			draw_glyph(x, y, g);
+			glyph_draw(x, y, g, VIEW_LEFT, VIEW_TOP, VIEW_RIGHT, VIEW_BOTTOM);
 			x += g->width;
 		} else {
 			gfx_SetTextXY(x, y);

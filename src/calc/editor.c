@@ -14,6 +14,7 @@
 #include "../typeset.h"
 
 #include "calculus.h"
+#include "glyph.h"
 #include "gui.h"
 #include "vars.h"
 #include "viewer.h"
@@ -29,6 +30,8 @@
 #define PREVIEW_SPACING 6
 #define MENU_ROWS 8
 #define MENU_WIDTH 120
+/*Deeper expressions are not previewed, since simplifying and laying them out can overflow the stack*/
+#define MAX_PREVIEW_DEPTH 24
 
 typedef enum { MODE_NORMAL, MODE_SECOND, MODE_ALPHA, MODE_ALPHA_LOCK } key_mode_t;
 
@@ -37,43 +40,19 @@ static const struct key_tokens {
 	uint8_t key;
 	uint16_t normal, second, alpha;
 } key_tokens[] = {
-	{sk_0, '0', 0, 0},
-	{sk_1, '1', 0, 'Y'},
-	{sk_2, '2', 0, 'Z'},
-	{sk_3, '3', 0, 0x5B},
-	{sk_4, '4', 0, 'T'},
-	{sk_5, '5', 0, 'U'},
-	{sk_6, '6', 0, 'V'},
-	{sk_7, '7', 0, 'O'},
-	{sk_8, '8', 0, 'P'},
-	{sk_9, '9', 0, 'Q'},
-	{sk_DecPnt, 0x3A, 0x2C, 0},
-	{sk_Chs, 0xB0, 0, 0},
-	{sk_Add, 0x70, 0, 0},
-	{sk_Sub, 0x71, 0, 'W'},
-	{sk_Mul, 0x82, 0, 'R'},
-	{sk_Div, 0x83, 0xBB31, 'M'},
-	{sk_Power, 0xF0, 0xAC, 'H'},
-	{sk_Square, 0x0D, 0xBC, 'I'},
-	{sk_Recip, 0x0C, 0, 'D'},
-	{sk_LParen, 0x10, 0, 'K'},
-	{sk_RParen, 0x11, 0, 'L'},
-	{sk_Comma, 0x2B, 0x3B, 'J'},
-	{sk_Sin, 0xC2, 0xC3, 'E'},
-	{sk_Cos, 0xC4, 0xC5, 'F'},
-	{sk_Tan, 0xC6, 0xC7, 'G'},
-	{sk_Ln, 0xBE, 0xBF, 'S'},
-	{sk_Log, 0xC0, 0xC1, 'N'},
-	{sk_GraphVar, 'X', 0, 0},
-	{sk_Store, 0, 0, 'X'},
-	{sk_Math, 0, 0x6A, 'A'},
-	{sk_Apps, 0, 0xAE, 'B'},
-	{sk_Prgm, 0, 0, 'C'}
+	{sk_0, '0', 0, 0},           {sk_1, '1', 0, 'Y'},          {sk_2, '2', 0, 'Z'},        {sk_3, '3', 0, 0x5B},
+	{sk_4, '4', 0, 'T'},         {sk_5, '5', 0, 'U'},          {sk_6, '6', 0, 'V'},        {sk_7, '7', 0, 'O'},
+	{sk_8, '8', 0, 'P'},         {sk_9, '9', 0, 'Q'},          {sk_DecPnt, 0x3A, 0x2C, 0}, {sk_Chs, 0xB0, 0, 0},
+	{sk_Add, 0x70, 0, 0},        {sk_Sub, 0x71, 0, 'W'},       {sk_Mul, 0x82, 0, 'R'},     {sk_Div, 0x83, 0xBB31, 'M'},
+	{sk_Power, 0xF0, 0xAC, 'H'}, {sk_Square, 0x0D, 0xBC, 'I'}, {sk_Recip, 0x0C, 0, 'D'},   {sk_LParen, 0x10, 0, 'K'},
+	{sk_RParen, 0x11, 0, 'L'},   {sk_Comma, 0x2B, 0x3B, 'J'},  {sk_Sin, 0xC2, 0xC3, 'E'},  {sk_Cos, 0xC4, 0xC5, 'F'},
+	{sk_Tan, 0xC6, 0xC7, 'G'},   {sk_Ln, 0xBE, 0xBF, 'S'},     {sk_Log, 0xC0, 0xC1, 'N'},  {sk_GraphVar, 'X', 0, 0},
+	{sk_Store, 0, 0, 'X'},       {sk_Math, 0, 0x6A, 'A'},      {sk_Apps, 0, 0xAE, 'B'},    {sk_Prgm, 0, 0, 'C'}
 };
 
 /*Tokens without a key of their own, chosen from the menu*/
-static const uint16_t menu_tokens[] = {0x6A, 0xAE, 0xB2, 0x2D, 0xB1, 0x25, 0x24, 0xEF34, 0x0F,
-									   0xBD, 0xF1, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0x5B};
+static const uint16_t menu_tokens[] =
+	{0x6A, 0xAE, 0xB2, 0x2D, 0xB1, 0x25, 0x24, 0xEF34, 0x0F, 0xBD, 0xF1, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0x5B};
 
 static uint8_t data[MAX_LENGTH];
 static unsigned length, cursor;
@@ -81,7 +60,8 @@ static key_mode_t mode;
 
 static ts_box_t *previews[MAX_ITEMS];
 static unsigned preview_count;
-static pcas_error_t preview_error;
+/*Why there is no preview, or NULL*/
+static const char *preview_message;
 
 /*Returns the display text of the token at token, and sets size to its length in bytes*/
 static const char *token_text(const uint8_t *token, unsigned *size) {
@@ -91,6 +71,58 @@ static const char *token_text(const uint8_t *token, unsigned *size) {
 
 	*size = token_length;
 	return text;
+}
+
+static const glyph_t *os_glyph(uint8_t c) {
+	switch (c) {
+		case 0x0E: return &glyph_cube;
+		case 0x10: return &glyph_root;
+		case 0x11: return &glyph_inverse;
+		case 0x12: return &glyph_square;
+		case 0x1A: return &glyph_negative;
+		case 0x5B: return &glyph_theta;
+		case 0xC4: return &glyph_pi;
+		default: return NULL;
+	}
+}
+
+/*Returns how to print a character of the OS character set that has no glyph*/
+static const char *os_char(uint8_t c) {
+	static char ascii[2];
+
+	switch (c) {
+		case 0x1B: return "E";
+		case 0x1D: return "10";
+		case 0xD7: return "i";
+		case 0xDB: return "e";
+		default: ascii[0] = c >= 0x20 && c < 0x7F ? (char)c : '?'; return ascii;
+	}
+}
+
+/*Prints text in the OS character set at x, y if draw is true. Returns its width.*/
+static int print_os_text(const char *text, int x, int y, bool draw) {
+	int start = x;
+
+	if (draw)
+		gfx_SetColor(COLOR_TEXT);
+
+	for (; *text != '\0'; text++) {
+		const glyph_t *g = os_glyph(*text);
+
+		if (g != NULL) {
+			if (draw)
+				glyph_draw(x, y, g, 0, 0, LCD_WIDTH, LCD_HEIGHT);
+			x += g->width;
+		} else {
+			const char *ascii = os_char(*text);
+
+			if (draw)
+				gfx_PrintStringXY(ascii, x, y);
+			x += gfx_GetStringWidth(ascii);
+		}
+	}
+
+	return x - start;
 }
 
 static unsigned token_size(unsigned offset) {
@@ -149,6 +181,20 @@ static void show_condition(pcas_ast_t *e) {
 		optype(left) = OP_AT;
 }
 
+static bool too_deep(const pcas_ast_t *e, unsigned depth) {
+	const pcas_ast_t *child;
+
+	if (depth > MAX_PREVIEW_DEPTH)
+		return true;
+
+	if (e->type == NODE_OPERATOR)
+		for (child = opbase(e); child != NULL; child = child->next)
+			if (too_deep(child, depth + 1))
+				return true;
+
+	return false;
+}
+
 static void clear_preview(void) {
 	while (preview_count > 0)
 		ts_Cleanup(previews[--preview_count]);
@@ -156,19 +202,32 @@ static void clear_preview(void) {
 
 static void update_preview(void) {
 	pcas_ast_t *items[MAX_ITEMS];
+	pcas_error_t err;
 	unsigned count, i;
 
 	clear_preview();
-	preview_error = E_SUCCESS;
+	preview_message = NULL;
 
 	if (length == 0)
 		return;
 
-	count = parse_list(data, length, ti_table, items, MAX_ITEMS, &preview_error);
+	count = parse_list(data, length, ti_table, items, MAX_ITEMS, &err);
+
+	if (count == 0 && err != E_SUCCESS)
+		preview_message = error_text[err];
+
+	for (i = 0; i < count; i++)
+		if (items[i] != NULL && too_deep(items[i], 0))
+			preview_message = "Too deeply nested to preview";
 
 	for (i = 0; i < count; i++) {
 		if (items[i] == NULL)
 			continue;
+
+		if (preview_message != NULL) {
+			ast_Cleanup(items[i]);
+			continue;
+		}
 
 		if (i > 0)
 			show_condition(items[i]);
@@ -196,7 +255,7 @@ static int layout_tokens(int first_line, bool draw) {
 
 		if (offset < length) {
 			text = token_text(data + offset, &size);
-			width = gfx_GetStringWidth(text);
+			width = print_os_text(text, 0, 0, false);
 
 			if (x + width > LCD_WIDTH - MARGIN && x > MARGIN) {
 				x = MARGIN;
@@ -220,7 +279,7 @@ static int layout_tokens(int first_line, bool draw) {
 			return cursor_line;
 
 		if (visible)
-			gfx_PrintStringXY(text, x, y + 2);
+			print_os_text(text, x, y + 2, true);
 
 		x += width;
 		offset += size;
@@ -255,9 +314,9 @@ static void draw(const char *name) {
 
 	draw_rule(PREVIEW_TOP - 3);
 
-	if (preview_count == 0 && preview_error != E_SUCCESS) {
+	if (preview_message != NULL) {
 		gfx_SetTextFGColor(COLOR_PURPLE);
-		gfx_PrintStringXY(error_text[preview_error], MARGIN, y + 2);
+		gfx_PrintStringXY(preview_message, MARGIN, y + 2);
 	}
 
 	gfx_SetClipRegion(MARGIN, PREVIEW_TOP, LCD_WIDTH - MARGIN, PREVIEW_BOTTOM);
@@ -309,7 +368,7 @@ static uint16_t choose_menu_token(const char *name) {
 			if (i == selected)
 				gfx_PrintStringXY(">", left + 6, y);
 			gfx_SetTextFGColor(COLOR_TEXT);
-			gfx_PrintStringXY(token_text(token[0] != 0 ? token : token + 1, &size), left + 18, y);
+			print_os_text(token_text(token[0] != 0 ? token : token + 1, &size), left + 18, y, true);
 		}
 
 		gfx_SwapDraw();
@@ -397,9 +456,7 @@ bool editor_Run(const char *name, const char *tok) {
 				length = cursor = 0;
 				changed = true;
 				break;
-			case sk_Left:
-				cursor = second ? 0 : previous_token(cursor);
-				break;
+			case sk_Left: cursor = second ? 0 : previous_token(cursor); break;
 			case sk_Right:
 				if (second)
 					cursor = length;
