@@ -2,7 +2,7 @@
 
 #include "../work.h"
 
-static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
+static bool eval_commutative(pcas_ast_t *e, eval_flags flags) {
 	/*How many numbers were accumulated. If <= 1, nothing changed*/
 	unsigned num_changed = false;
 	unsigned i;
@@ -115,9 +115,9 @@ static bool eval_commutative(pcas_ast_t *e, unsigned short flags) {
 	return num_changed > 1;
 }
 
-static bool eval_div(pcas_ast_t *e, unsigned short flags);
+static bool eval_div(pcas_ast_t *e, eval_flags flags);
 
-static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, unsigned short flags) {
+static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, eval_flags flags) {
 	pcas_ast_t *temp_num, *temp_den, *temp_div;
 
 	bool changed = false;
@@ -202,7 +202,7 @@ static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, unsigned short flags
 	return changed;
 }
 
-static bool eval_div(pcas_ast_t *e, unsigned short flags) {
+static bool eval_div(pcas_ast_t *e, eval_flags flags) {
 	pcas_ast_t *num, *den;
 
 	bool changed = false;
@@ -336,7 +336,7 @@ static bool power_in_small_range(pcas_ast_t *a, pcas_ast_t *b) {
 	return (mp_small)mp_int_count_bits(&a->op.num->num) * exponent <= 64;
 }
 
-static bool eval_pow(pcas_ast_t *e, unsigned short flags) {
+static bool eval_pow(pcas_ast_t *e, eval_flags flags) {
 	/*a^b*/
 	pcas_ast_t *a, *b;
 	bool changed = false;
@@ -484,7 +484,7 @@ static bool eval_pow(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-static bool eval_int(pcas_ast_t *e, unsigned short flags) {
+static bool eval_int(pcas_ast_t *e, eval_flags flags) {
 	bool changed = false;
 	mp_rat res;
 	pcas_ast_t *a;
@@ -535,7 +535,7 @@ static bool eval_int(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-static bool eval_abs(pcas_ast_t *e, unsigned short flags) {
+static bool eval_abs(pcas_ast_t *e, eval_flags flags) {
 	bool changed = false;
 	pcas_ast_t *a = ast_ChildGet(e, 0);
 
@@ -550,7 +550,7 @@ static bool eval_abs(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-static bool eval_log(pcas_ast_t *e, unsigned short flags) {
+static bool eval_log(pcas_ast_t *e, eval_flags flags) {
 	pcas_ast_t *base, *val;
 
 	base = ast_ChildGet(e, 0);
@@ -590,7 +590,7 @@ static bool eval_log(pcas_ast_t *e, unsigned short flags) {
 
 #define factorial_in_small_range(a) (mp_rat_compare_value((a)->op.num, 10, 1) <= 0)
 
-static bool eval_factorial(pcas_ast_t *e, unsigned short flags) {
+static bool eval_factorial(pcas_ast_t *e, eval_flags flags) {
 	pcas_ast_t *a = ast_ChildGet(e, 0);
 
 	if (a->type == NODE_NUMBER) {
@@ -629,7 +629,7 @@ static bool eval_factorial(pcas_ast_t *e, unsigned short flags) {
 }
 
 /*Simplifies expressions like 5 + 5 to 10*/
-static bool _eval(pcas_ast_t *e, unsigned short flags) {
+static bool _eval(pcas_ast_t *e, eval_flags flags) {
 	bool changed = false;
 	pcas_ast_t *current;
 
@@ -662,7 +662,7 @@ static bool _eval(pcas_ast_t *e, unsigned short flags) {
 	return changed;
 }
 
-bool eval(pcas_ast_t *e, unsigned short flags) {
+bool eval(pcas_ast_t *e, eval_flags flags) {
 	bool changed;
 	work_Enter(e);
 	changed = _eval(e, flags);

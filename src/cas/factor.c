@@ -209,7 +209,7 @@ static bool same_symbolic_part(pcas_ast_t *a, pcas_ast_t *b) {
 	return same;
 }
 
-bool factor_addition(pcas_ast_t *e, unsigned char flags) {
+bool factor_addition(pcas_ast_t *e, factor_flags flags) {
 	pcas_ast_t *child;
 	bool changed = false;
 
@@ -280,7 +280,7 @@ bool factor_addition(pcas_ast_t *e, unsigned char flags) {
 	return changed;
 }
 
-static bool _factor(pcas_ast_t *e, unsigned char flags) {
+static bool _factor(pcas_ast_t *e, factor_flags flags) {
 	bool changed = false;
 
 	if (flags & (FAC_SIMPLE_ADDITION_EVALUATEABLE | FAC_SIMPLE_ADDITION_NONEVALUATEABLE))
@@ -289,7 +289,7 @@ static bool _factor(pcas_ast_t *e, unsigned char flags) {
 	return changed;
 }
 
-bool factor(pcas_ast_t *e, unsigned char flags) {
+bool factor(pcas_ast_t *e, factor_flags flags) {
 	bool changed;
 	work_Enter(e);
 	changed = _factor(e, flags);

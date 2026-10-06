@@ -691,7 +691,7 @@ void execute_simplify(void) {
 	pcas_ast_t *expression;
 	pcas_error_t err;
 
-	unsigned short flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
+	simplify_flags flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
 	compile_ids_mask ids = 0;
 
 	if (simplify_context[0]->checked) {
@@ -860,7 +860,7 @@ void execute_expand(void) {
 	pcas_ast_t *expression;
 	pcas_error_t err;
 
-	unsigned short flags = 0;
+	expand_flags flags = 0;
 
 	if (expand_context[0]->checked) {
 		flags |= EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION;

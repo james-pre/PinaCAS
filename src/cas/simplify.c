@@ -713,7 +713,7 @@ static bool exponentials_to_numerator(pcas_ast_t *e) {
 
     Sorting for addition and multiplication is O(n^2) by insertion sort
 */
-static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
+static bool _simplify_canonical_form(pcas_ast_t *e, canonical_flags flags) {
 	bool changed = false, intermediate_change;
 	unsigned i;
 
@@ -862,7 +862,7 @@ static bool _simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
 	return changed;
 }
 
-bool simplify_canonical_form(pcas_ast_t *e, unsigned char flags) {
+bool simplify_canonical_form(pcas_ast_t *e, canonical_flags flags) {
 	bool changed;
 	work_Pause();
 	changed = _simplify_canonical_form(e, flags);
@@ -1069,7 +1069,7 @@ bool simplify_periodic(pcas_ast_t *e) {
 	return changed;
 }
 
-bool simplify_identities(pcas_ast_t *e, unsigned short flags) {
+bool simplify_identities(pcas_ast_t *e, simplify_flags flags) {
 	bool changed = false;
 
 	if (flags & SIMP_ID_GENERAL)
@@ -1104,7 +1104,7 @@ bool simplify_identities(pcas_ast_t *e, unsigned short flags) {
 
     Returns true if ast was changed
 */
-static bool _simplify(pcas_ast_t *e, unsigned short flags) {
+static bool _simplify(pcas_ast_t *e, simplify_flags flags) {
 	bool did_change = false, intermediate_change, expand_changed;
 
 	do {
@@ -1179,7 +1179,7 @@ static bool _simplify(pcas_ast_t *e, unsigned short flags) {
 	return did_change;
 }
 
-bool simplify(pcas_ast_t *e, unsigned short flags) {
+bool simplify(pcas_ast_t *e, simplify_flags flags) {
 	bool changed;
 	work_Enter(e);
 	changed = _simplify(e, flags);

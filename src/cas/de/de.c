@@ -518,7 +518,7 @@ static bool reduce_sine_powers(pcas_ast_t *e) {
 }
 
 /*True if the numerator of e over a common denominator expands to zero after simplifying e with flags, giving up when it would expand past MAX_EXPANDED_TERMS*/
-static bool numerator_vanishes(const pcas_ast_t *e, unsigned short flags) {
+static bool numerator_vanishes(const pcas_ast_t *e, simplify_flags flags) {
 	pcas_ast_t *copy = ast_Copy(e), *numerator, *denominator;
 	bool zero;
 

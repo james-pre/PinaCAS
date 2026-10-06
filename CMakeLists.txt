@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(PinaCAS C)
 
-set(CMAKE_C_FLAGS "-std=c17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DCOMPILE_PC -DUSE_32BIT_WORDS")
+set(CMAKE_C_FLAGS "-std=c23 -Wall -Wextra -Werror -Wno-missing-field-initializers -DCOMPILE_PC -DUSE_32BIT_WORDS")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG")
 

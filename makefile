@@ -62,7 +62,7 @@ endif
 
 PC_TARGET  = bin/pinacas
 PC_CC      = gcc
-PC_CFLAGS  = -std=c17 -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
+PC_CFLAGS  = -std=c23 -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
 PC_LFLAGS  = -lm
 PC_OBJDIR  = obj/pc
 PC_SOURCES := $(wildcard src/*.c src/*/*.c src/*/*/*.c) lib/imath/imath.c lib/imath/imrat.c

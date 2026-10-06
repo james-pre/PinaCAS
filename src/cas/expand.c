@@ -24,7 +24,7 @@ pcas_ast_t *combine(pcas_ast_t *add, pcas_ast_t *b) {
 	return expanded;
 }
 
-static bool _expand(pcas_ast_t *e, unsigned char flags) {
+static bool _expand(pcas_ast_t *e, expand_flags flags) {
 	unsigned i, j;
 
 	bool did_change = false;
@@ -177,7 +177,7 @@ static bool _expand(pcas_ast_t *e, unsigned char flags) {
 	return did_change;
 }
 
-bool expand(pcas_ast_t *e, unsigned char flags) {
+bool expand(pcas_ast_t *e, expand_flags flags) {
 	bool changed = false;
 	work_Enter(e);
 	/*Expand powers first to make things faster*/
