@@ -84,7 +84,8 @@ static bool is_atom(pcas_ast_t *e) {
 	switch (e->type) {
 		case NODE_NUMBER: return mp_rat_is_integer(e->op.num) && mp_rat_compare_zero(e->op.num) >= 0;
 		case NODE_SYMBOL: return true;
-		case NODE_OPERATOR: return optype(e) == OP_PRIME || optype(e) == OP_LOG || is_op_function(optype(e));
+		case NODE_OPERATOR:
+			return optype(e) == OP_PRIME || optype(e) == OP_LOG || optype(e) == OP_SUBSCRIPT || is_op_function(optype(e));
 	}
 
 	return false;
@@ -273,6 +274,13 @@ static ts_box_t *operator_box(const pcas_ast_t *e) {
 		case OP_EQUALS: return ts_Append(row2(convert(a), ts_Text(" = ")), convert(b));
 		case OP_PRIME: return row2(parenthesized(a, !is_atom(a)), ts_Text("'"));
 		case OP_AT: return row2(parenthesized(a, !is_atom(a)), delimited(convert(b), '(', ')'));
+		case OP_SUM: {
+			char infinity[2] = {TS_INFINITY, '\0'};
+			ts_box_t *under = row2(convert(b), ts_Text("="));
+			ts_Append(under, convert(b->next));
+			return row2(pair(BOX_SUMMATION, under, ts_Text(infinity)), parenthesized(a, isoptype(a, OP_ADD)));
+		}
+		case OP_SUBSCRIPT: return pair(BOX_SUBSCRIPT, convert(a), convert(b));
 		case OP_FACTORIAL: return row2(parenthesized(a, !is_atom(a)), ts_Text("!"));
 		case OP_ABS: return delimited(convert(a), '|', '|');
 		default: return function_box(e);
@@ -373,6 +381,11 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
 			b->descent = first->descent + 2 * m->gap;
 			b->width = m->integral_width(height(b)) + first->width;
 			break;
+		case BOX_SUMMATION:
+			b->width = max(m->summation_width, max(first->width, second->width));
+			b->ascent = m->ascent + m->gap + height(second);
+			b->descent = m->descent + m->gap + height(first);
+			break;
 	}
 }
 
@@ -425,6 +438,13 @@ void ts_Draw(ts_box_t *b, int x, int baseline, const ts_metrics_t *m, const ts_r
 			r->integral(x, top, height(b));
 			ts_Draw(first, x + m->integral_width(height(b)), baseline, m, r);
 			break;
+		case BOX_SUMMATION: {
+			int sign_top = baseline - m->ascent - m->gap, sign_bottom = baseline + m->descent + m->gap;
+			r->summation(x + (b->width - m->summation_width) / 2, sign_top, sign_bottom - sign_top);
+			ts_Draw(second, x + (b->width - second->width) / 2, sign_top - second->descent, m, r);
+			ts_Draw(first, x + (b->width - first->width) / 2, sign_bottom + first->ascent, m, r);
+			break;
+		}
 	}
 }
 

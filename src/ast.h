@@ -40,6 +40,10 @@ typedef enum {
 	OP_PRIME,
 	/*1st child = function, 2nd child = point it is evaluated at*/
 	OP_AT,
+	/*Shown in work only: 1st child = term, 2nd child = index, 3rd child = lower limit of a sum to infinity*/
+	OP_SUM,
+	/*Shown in work only: 1st child = name, 2nd child = subscript*/
+	OP_SUBSCRIPT,
 
 	/*Unary*/
 	OP_FACTORIAL,

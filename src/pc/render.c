@@ -20,6 +20,7 @@ static uint32_t symbol(char c) {
 		case TS_PI: return 0x03C0;
 		case TS_THETA: return 0x03B8;
 		case TS_DOT: return 0x00B7;
+		case TS_INFINITY: return 0x221E;
 		default: return (unsigned char)c;
 	}
 }
@@ -38,7 +39,7 @@ static int integral_width(int height) {
 	return 2;
 }
 
-static const ts_metrics_t metrics = {text_width, 1, 0, 0, 1, 0, 0, 0, 1, one, one, integral_width};
+static const ts_metrics_t metrics = {text_width, 1, 0, 0, 1, 0, 0, 0, 1, one, one, integral_width, 2};
 
 static void draw_text(int x, int y, const char *text) {
 	for (; *text != '\0'; text++)
@@ -86,7 +87,14 @@ static void draw_integral(int x, int y, int height) {
 	column(x, y, height, 0x222B, 0x2320, 0x23AE, 0x2321);
 }
 
-static const ts_renderer_t renderer = {draw_text, draw_bar, draw_overline, draw_delimiter, draw_radical, draw_integral};
+static void draw_summation(int x, int y, int height) {
+	(void)height;
+	put(x, y, 0x03A3);
+}
+
+static const ts_renderer_t renderer = {
+	draw_text, draw_bar, draw_overline, draw_delimiter, draw_radical, draw_integral, draw_summation
+};
 
 static void print_utf8(uint32_t c) {
 	if (c < 0x80) {

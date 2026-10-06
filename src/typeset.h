@@ -6,6 +6,7 @@
 #define TS_PI '\x01'
 #define TS_THETA '\x02'
 #define TS_DOT '\x03'
+#define TS_INFINITY '\x04'
 
 typedef enum {
 	BOX_TEXT,
@@ -20,7 +21,9 @@ typedef enum {
 	/*Child surrounded by left and right delimiters*/
 	BOX_DELIMITED,
 	/*Child preceded by an integral sign*/
-	BOX_INTEGRAL
+	BOX_INTEGRAL,
+	/*Summation sign with the first child below it and the second above it*/
+	BOX_SUMMATION
 } BoxType;
 
 typedef struct _ts_Box {
@@ -54,6 +57,8 @@ typedef struct {
 	int (*delimiter_width)(int height);
 	int (*radical_width)(int height);
 	int (*integral_width)(int height);
+	/*Width of a summation sign, including its spacing*/
+	int summation_width;
 } ts_metrics_t;
 
 /*Coordinates are the top left of the area to draw*/
@@ -64,6 +69,7 @@ typedef struct {
 	void (*delimiter)(int x, int y, int height, char kind);
 	void (*radical)(int x, int y, int height);
 	void (*integral)(int x, int y, int height);
+	void (*summation)(int x, int y, int height);
 } ts_renderer_t;
 
 /*Copies text*/

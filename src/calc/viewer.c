@@ -26,12 +26,14 @@ typedef struct {
 static const glyph_t pi_glyph = {8, {0x00, 0x00, 0x7E, 0x24, 0x24, 0x24, 0x24, 0x00}};
 static const glyph_t theta_glyph = {7, {0x38, 0x44, 0x44, 0x7C, 0x44, 0x44, 0x38, 0x00}};
 static const glyph_t dot_glyph = {4, {0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00}};
+static const glyph_t infinity_glyph = {9, {0x00, 0x00, 0x66, 0x99, 0x99, 0x66, 0x00, 0x00}};
 
 static const glyph_t *special_glyph(char c) {
 	switch (c) {
 		case TS_PI: return &pi_glyph;
 		case TS_THETA: return &theta_glyph;
 		case TS_DOT: return &dot_glyph;
+		case TS_INFINITY: return &infinity_glyph;
 		default: return NULL;
 	}
 }
@@ -63,7 +65,7 @@ static int integral_width(int height) {
 }
 
 static const ts_metrics_t metrics =
-	{text_width, 7, 1, 3, 1, 1, 2, 3, 3, delimiter_width, radical_width, integral_width};
+	{text_width, 7, 1, 3, 1, 1, 2, 3, 3, delimiter_width, radical_width, integral_width, 10};
 
 static void draw_glyph(int x, int y, const glyph_t *g) {
 	int row, column;
@@ -125,7 +127,16 @@ static void draw_integral(int x, int y, int height) {
 	gfx_Line(x + 2, y + height - 2, x + 1, y + height - 1);
 }
 
-static const ts_renderer_t renderer = {draw_text, draw_bar, draw_bar, draw_delimiter, draw_radical, draw_integral};
+static void draw_summation(int x, int y, int height) {
+	gfx_HorizLine(x + 1, y, 7);
+	gfx_Line(x + 1, y, x + 4, y + height / 2);
+	gfx_Line(x + 4, y + height / 2, x + 1, y + height - 1);
+	gfx_HorizLine(x + 1, y + height - 1, 7);
+}
+
+static const ts_renderer_t renderer = {
+	draw_text, draw_bar, draw_bar, draw_delimiter, draw_radical, draw_integral, draw_summation
+};
 
 typedef struct {
 	const char *label;
