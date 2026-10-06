@@ -11,14 +11,19 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Checking that a function solves a differential equation and its initial conditions
 - Solving first order equations (separable, linear, exact, Bernoulli, homogeneous, and y' = f(ax + by)), linear equations with constant coefficients by undetermined coefficients or variation of parameters, second order equations by reduction of order, and linear equations with polynomial coefficients by power series about an ordinary point, with initial value problems
 - Integral and Solve DE functions in the GUI
+- An editor for the input and output variables inside the app, with a live preview of the expression
 - Much faster simplification, especially when showing work
 - Runs as a Flash app named PinaCAS, so it is not limited to the 64 KB size of a program, and uses spare RAM for a larger heap
 - The TI-Basic interface is removed
 - Builds with the LLVM-based CE C toolchain, with imath and app_tools as git submodules
 
+## Editing variables
+
+Expressions are read from and written to the Y= variables, strings, and Ans. To edit one without leaving PinaCAS, select its box, such as Input, and press [y=]. The editor works like the OS: 2nd and alpha select the second function or letter of a key, and 2nd alpha locks alpha. [math] opens a menu of tokens without a key of their own, such as `=`, `'`, and `abs(`, and 2nd [math] and 2nd [apps] type `=` and `'` directly. Under the tokens is a preview of the expression, or why it cannot be parsed. [enter] saves, [mode] cancels, and [clear] empties the line. Ans cannot be edited.
+
 ## Entering differential equations
 
-Type the equation into a Y= variable or string. Write derivatives of the unknown function with primes from the ANGLE menu (2nd, APPS), and the equals sign from the TEST menu (2nd, MATH). For example, y'' + 16y = 0 is `Y''+16Y=0`. Choose the independent variable with "Respect to", which is X by default. Any letter can be the unknown function, so x'' + w²x = F cos(gt) is `X''+W²X=Fcos(GT)` with respect to T.
+Type the equation into a Y= variable or string, in the editor or the OS. Write derivatives of the unknown function with primes from the ANGLE menu (2nd, APPS), and the equals sign from the TEST menu (2nd, MATH). For example, y'' + 16y = 0 is `Y''+16Y=0`. Choose the independent variable with "Respect to", which is X by default. Any letter can be the unknown function, so x'' + w²x = F cos(gt) is `X''+W²X=Fcos(GT)` with respect to T.
 
 Add initial conditions after the equation, separated by commas: y'' + 16y = 0, y(0) = 2, y'(0) = -2 is `Y''+16Y=0,Y(0)=2,Y'(0)=-2`. Enter a differential form M dx + N dy = 0 divided by dx, as `M+NY'=0`.
 

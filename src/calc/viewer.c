@@ -137,6 +137,14 @@ static void draw_summation(int x, int y, int height) {
 static const ts_renderer_t renderer =
 	{draw_text, draw_bar, draw_bar, draw_delimiter, draw_radical, draw_integral, draw_summation};
 
+void viewer_Measure(ts_box_t *b) {
+	ts_Measure(b, &metrics);
+}
+
+void viewer_Draw(ts_box_t *b, int x, int baseline) {
+	ts_Draw(b, x, baseline, &metrics, &renderer);
+}
+
 typedef struct {
 	const char *label;
 	ts_box_t *box;

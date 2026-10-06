@@ -18,6 +18,7 @@
 #include "../version.h"
 
 #include "calculus.h"
+#include "editor.h"
 #include "vars.h"
 #include "viewer.h"
 #include "../work.h"
@@ -624,10 +625,24 @@ static void handle_options(uint8_t key) {
 	}
 }
 
+/*Opens the editor for a variable element other than Ans*/
+static void edit(const element_t *e) {
+	if (e->type != ELEMENT_VARIABLE || is_ans(*e->variable))
+		return;
+
+	editor_Run(variables[*e->variable].name, variables[*e->variable].token);
+	draw_screen();
+}
+
 static void handle_input(uint8_t key) {
 	if (console_drawn) {
 		if (console_done && key == sk_Enter)
 			activate(&console_content[0], 1);
+		return;
+	}
+
+	if (key == sk_Yequ && focus != FOCUS_MENUS) {
+		edit(focus == FOCUS_HEADER ? &header[item] : &menus[menu].content[item]);
 		return;
 	}
 

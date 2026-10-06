@@ -3,6 +3,8 @@
 #include "vars.h"
 
 #include <fileioc.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "../parser.h"
 
@@ -35,31 +37,57 @@ pcas_ast_t *parse_from_tok(const char *tok, pcas_error_t *err) {
 	return parse_list_from_tok(tok, &result, 1, err) == 1 ? result : NULL;
 }
 
-void write_to_tok(const char *tok, const pcas_ast_t *expression, pcas_error_t *err) {
+unsigned read_tokens_from_tok(const char *tok, uint8_t *data, unsigned max) {
+	ti_var_t var = ti_OpenVar(tok, "r", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
+	unsigned length = 0;
+
+	if (var == 0)
+		return 0;
+
+	if (ti_GetSize(var) <= max) {
+		length = ti_GetSize(var);
+		memcpy(data, ti_GetDataPtr(var), length);
+	}
+
+	ti_Close(var);
+
+	return length;
+}
+
+void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, pcas_error_t *err) {
 	ti_var_t var = ti_OpenVar(tok, "w", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
 
-	if (var != 0) {
-		unsigned bin_len;
-		/*Write to var*/
-		uint8_t *bin = export_to_binary(expression, &bin_len, ti_table, err);
-		ti_Write(bin, bin_len, 1, var);
-
-		/*If var is a yvar, enable it*/
-		if (var <= 9) {
-			/*Thanks Mateo: https://www.cemetech.net/forum/viewtopic.php?t=15947*/
-			uint8_t *status;
-			status = ti_GetVATPtr(var);
-			status--;
-			*status |= 1;
-		}
-
-		ti_Close(var);
-	} else {
+	if (var == 0) {
 		*err = E_GENERIC;
 		return;
 	}
 
+	if (length > 0)
+		ti_Write(data, length, 1, var);
+
+	/*If var is a yvar, enable it*/
+	if (var <= 9) {
+		/*Thanks Mateo: https://www.cemetech.net/forum/viewtopic.php?t=15947*/
+		uint8_t *status;
+		status = ti_GetVATPtr(var);
+		status--;
+		*status |= 1;
+	}
+
+	ti_Close(var);
+
 	*err = E_SUCCESS;
+}
+
+void write_to_tok(const char *tok, const pcas_ast_t *expression, pcas_error_t *err) {
+	unsigned length;
+	uint8_t *data = export_to_binary(expression, &length, ti_table, err);
+
+	if (data == NULL)
+		return;
+
+	write_tokens_to_tok(tok, data, length, err);
+	free(data);
 }
 
 #else
