@@ -1,50 +1,41 @@
 name: CI/CD
 
 on:
-  push:
-  pull_request:
-  workflow_dispatch:
+    push:
+    pull_request:
+    workflow_dispatch:
 
 env:
-  CEDEV_VERSION: v15.0
+    CEDEV_VERSION: v15.0
 
 jobs:
-  pc:
-    name: PC
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: true
+    ci:
+        runs-on: ubuntu-latest
+        container: fedora:latest
+        steps:
+            - name: Install build dependencies
+              run: dnf install -y git make tar gzip zlib
 
-      - name: Build
-        run: make pc
+            - uses: actions/checkout@v7
+              with:
+                  submodules: true
+                  fetch-depth: 0
 
-      - name: Test
-        run: make check
+            - name: Install CE toolchain
+              run: |
+                  scripts/install-toolchain.sh "$CEDEV_VERSION"
+                  echo /opt/CEdev/bin >> "$GITHUB_PATH"
 
-      - name: Build with CMake (-Werror)
-        run: |
-          cmake -S . -B build
-          cmake --build build
+            - name: Build for PC
+              run: make pc
 
-  calculator:
-    name: TI-84 Plus CE
-    runs-on: ubuntu-latest
-    container: fedora:latest
-    steps:
-      - name: Install build dependencies
-        run: dnf install -y git make tar gzip zlib
+            - name: Test
+              run: make check
 
-      - uses: actions/checkout@v7
-        with:
-          submodules: true
-          fetch-depth: 0
+            - name: Build for calculator
+              run: make
 
-      - name: Install CE toolchain
-        run: |
-          scripts/install-toolchain.sh "$CEDEV_VERSION"
-          echo /opt/CEdev/bin >> "$GITHUB_PATH"
-
-      - name: Build
-        run: make
+            - name: Build with CMake
+              run: |
+                  cmake -S . -B build
+                  cmake --build build
