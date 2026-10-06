@@ -1,5 +1,7 @@
 #include "ast.h"
 
+#define RADIX 10
+
 mp_rat num_FromString(const char *str) {
 	mp_rat n = mp_rat_alloc();
 	mp_rat_init(n);
@@ -247,8 +249,7 @@ pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child) {
 	return E_SUCCESS;
 }
 
-pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, LSIZE index) {
-	LSIZE i;
+pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, size_t index) {
 	pcas_ast_t *current;
 
 	if (parent->type != NODE_OPERATOR)
@@ -256,7 +257,7 @@ pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, LSIZE index) {
 
 	current = opbase(parent);
 
-	for (i = 0; i <= index && current != NULL; i++) {
+	for (size_t i = 0; i <= index && current != NULL; i++) {
 		if (i == index)
 			return current;
 		current = current->next;
@@ -281,8 +282,8 @@ pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent) {
 	return NULL;
 }
 
-pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, LSIZE index) {
-	LSIZE i;
+pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, size_t index) {
+	size_t i;
 	pcas_ast_t *current;
 
 	if (parent->type != NODE_OPERATOR)
@@ -324,8 +325,8 @@ pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child) {
 	return ast_ChildRemoveIndex(parent, ast_ChildIndexOf(parent, child));
 }
 
-LSIZE ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
-	LSIZE i;
+size_t ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
+	size_t i;
 	pcas_ast_t *current;
 
 	if (parent->type != NODE_OPERATOR)
@@ -342,8 +343,8 @@ LSIZE ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
 	return -1;
 }
 
-pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index) {
-	LSIZE i;
+pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, size_t index) {
+	size_t i;
 	pcas_ast_t *current;
 
 	if (parent->type != NODE_OPERATOR)
@@ -380,8 +381,8 @@ pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index) {
 	return NULL;
 }
 
-LSIZE ast_ChildLength(const pcas_ast_t *parent) {
-	LSIZE i;
+size_t ast_ChildLength(const pcas_ast_t *parent) {
+	size_t i;
 	pcas_ast_t *current;
 
 	if (parent->type != NODE_OPERATOR)

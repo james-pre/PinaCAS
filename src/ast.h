@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define LSIZE unsigned
-#define RADIX 10
-
 typedef enum { NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR } NodeType;
 
 #define is_op_commutative(op) ((op) == OP_ADD || (op) == OP_MULT)
@@ -163,13 +160,13 @@ void ast_Cleanup(pcas_ast_t *e);
 
 /*Functions dealing with the children of operator asts*/
 pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child);
-pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, LSIZE index);
+pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, size_t index);
 
-pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, LSIZE index);
+pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, size_t index);
 pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent);
 
 /*returns -1 (unsigned) if not found*/
-LSIZE ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child);
+size_t ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child);
 
 /*
 Returns the removed node, null if none
@@ -177,6 +174,6 @@ Currently, removeIndex() is much faster, so please
 use that if possible.
 */
 pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child);
-pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, LSIZE index);
+pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, size_t index);
 
-LSIZE ast_ChildLength(const pcas_ast_t *parent);
+size_t ast_ChildLength(const pcas_ast_t *parent);
