@@ -106,7 +106,6 @@ The version shown on the calculator comes from the latest `vX.Y.Z` git tag. Buil
 - James Prevett: PinaCAS
 - Nathan Farlow: PineappleCAS, which PinaCAS is built on
 - Michael J. Fromberger: the imath library
-- commandblockguy: app_tools, which installs the app
 - Adriweb and Mateo: help and contributions to PineappleCAS
 
 ## Licensing
