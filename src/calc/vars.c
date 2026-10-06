@@ -37,21 +37,25 @@ pcas_ast_t *parse_from_tok(const char *tok, pcas_error_t *err) {
 	return parse_list_from_tok(tok, &result, 1, err) == 1 ? result : NULL;
 }
 
-unsigned read_tokens_from_tok(const char *tok, uint8_t *data, unsigned max) {
+bool read_tokens_from_tok(const char *tok, uint8_t *data, unsigned max, unsigned *length) {
 	ti_var_t var = ti_OpenVar(tok, "r", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
-	unsigned length = 0;
+	bool fits = true;
+
+	*length = 0;
 
 	if (var == 0)
-		return 0;
+		return true;
 
 	if (ti_GetSize(var) <= max) {
-		length = ti_GetSize(var);
-		memcpy(data, ti_GetDataPtr(var), length);
+		*length = ti_GetSize(var);
+		memcpy(data, ti_GetDataPtr(var), *length);
+	} else {
+		fits = false;
 	}
 
 	ti_Close(var);
 
-	return length;
+	return fits;
 }
 
 void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, pcas_error_t *err) {

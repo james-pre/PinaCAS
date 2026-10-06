@@ -345,7 +345,9 @@ bool editor_Run(const char *name, const char *tok) {
 	pcas_error_t err;
 	bool saved = false, done = false, changed = true;
 
-	length = read_tokens_from_tok(tok, data, sizeof(data));
+	if (!read_tokens_from_tok(tok, data, sizeof(data), &length))
+		return false;
+
 	cursor = length;
 	mode = MODE_NORMAL;
 
