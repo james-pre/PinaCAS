@@ -14,7 +14,7 @@ jobs:
         container: fedora:latest
         steps:
             - name: Install build dependencies
-              run: dnf install -y git make tar gzip zlib
+              run: dnf install -y git make gcc cmake tar gzip zlib
 
             - uses: actions/checkout@v7
               with:
