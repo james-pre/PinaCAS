@@ -30,6 +30,7 @@ typedef enum {
 	E_DE_ROOTS,
 	E_DE_NO_SOLUTION,
 	E_DE_NOT_SOLUTION,
+	E_DE_SINGULAR,
 
 	AMOUNT_ERRORS
 } pcas_error_t;

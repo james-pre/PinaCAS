@@ -4,6 +4,7 @@
 #include "../error.h"
 
 #define DE_MAX_ORDER 8
+#define DE_DEFAULT_TERMS 4
 #define DE_MAX_CONDITIONS DE_MAX_ORDER
 
 /*The order-th derivative of the unknown function at the point at equals value*/
@@ -29,6 +30,13 @@ typedef struct {
 	/*A solution given with the equation for reduction of order, or NULL*/
 	pcas_ast_t *known;
 
+	/*Point to expand a power series about, or NULL*/
+	pcas_ast_t *center;
+	/*True to solve with a power series, which de_Solve also uses when no other method applies*/
+	bool series;
+	/*Number of nonzero terms of each power series solution*/
+	unsigned terms;
+
 	/*Name of the method de_Solve used*/
 	const char *method;
 	/*True for the equation of a substitution, whose solution de_Solve does not label as final*/
@@ -47,11 +55,14 @@ void de_Cleanup(pcas_de_t *de);
 /*Returns the left side of the linear standard form*/
 pcas_ast_t *de_StandardForm(pcas_de_t *de);
 
-/*Loads the equation in items[0] and the initial conditions and known solution in the rest, as parse_list returns them*/
+/*Loads the equation in items[0] and the initial conditions, known solution and center in the rest, as parse_list returns them*/
 pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, const pcas_ast_t *x);
 
 /*Adds an initial condition written like Y(0)=1 or Y'(2)=-3, as parsed and before simplification*/
 pcas_error_t de_AddCondition(pcas_de_t *de, const pcas_ast_t *condition);
+
+/*Sets the point to expand a power series about, written like X=1, as parsed and before simplification*/
+pcas_error_t de_AddCenter(pcas_de_t *de, const pcas_ast_t *center);
 
 /*Adds a known solution written like Y=e^X, as parsed and before simplification*/
 pcas_error_t de_AddKnownSolution(pcas_de_t *de, const pcas_ast_t *solution);

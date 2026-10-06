@@ -141,6 +141,9 @@ pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t
 	de->g = NULL;
 	de->condition_count = 0;
 	de->known = NULL;
+	de->center = NULL;
+	de->series = false;
+	de->terms = DE_DEFAULT_TERMS;
 	de->method = NULL;
 	de->nested = false;
 	for (k = 0; k <= DE_MAX_ORDER; k++)
@@ -196,6 +199,7 @@ void de_Cleanup(pcas_de_t *de) {
 	ast_Cleanup(de->y);
 	ast_Cleanup(de->g);
 	ast_Cleanup(de->known);
+	ast_Cleanup(de->center);
 
 	for (k = 0; k <= DE_MAX_ORDER; k++)
 		ast_Cleanup(de->a[k]);
@@ -245,11 +249,28 @@ pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, cons
 	for (i = 1; i < count && err == E_SUCCESS; i++) {
 		if (isoptype(items[i], OP_EQUALS) && ast_Compare(opbase(items[i]), de->y))
 			err = de_AddKnownSolution(de, items[i]);
+		else if (isoptype(items[i], OP_EQUALS) && ast_Compare(opbase(items[i]), de->x))
+			err = de_AddCenter(de, items[i]);
 		else
 			err = de_AddCondition(de, items[i]);
 	}
 
 	return err;
+}
+
+pcas_error_t de_AddCenter(pcas_de_t *de, const pcas_ast_t *center) {
+	const pcas_ast_t *x0 = opbase(center)->next;
+
+	if (de->center != NULL || involves(x0, de->x) || involves(x0, de->y))
+		return E_DE_BAD_CONDITION;
+
+	de->center = ast_Copy(x0);
+
+	work_Pause();
+	simplify(de->center, SIMP_BASIC);
+	work_Resume();
+
+	return E_SUCCESS;
 }
 
 pcas_error_t de_AddKnownSolution(pcas_de_t *de, const pcas_ast_t *solution) {
@@ -798,6 +819,7 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 }
 
 pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
+	pcas_error_t err;
 	unsigned k;
 
 	*solution = NULL;
@@ -810,11 +832,17 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 			return E_DE_BAD_CONDITION;
 	}
 
+	if (de->series)
+		return solve_power_series(de, solution);
+
 	if (de->order == 1)
 		return solve_first_order(de, solution);
 
 	if (de->known != NULL)
 		return solve_reduction_of_order(de, solution);
 
-	return solve_constant_coefficients(de, solution);
+	if ((err = solve_constant_coefficients(de, solution)) != E_DE_UNSOLVED || !de->linear)
+		return err;
+
+	return solve_power_series(de, solution);
 }
