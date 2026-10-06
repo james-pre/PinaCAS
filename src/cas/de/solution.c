@@ -1,3 +1,4 @@
+#include <stdcountof.h>
 #include "internal.h"
 
 #include "../../work.h"
@@ -155,7 +156,7 @@ static const OperatorType inverse_pairs[][2] = {
 static OperatorType inverse_of(OperatorType op) {
 	unsigned i;
 
-	for (i = 0; i < sizeof(inverse_pairs) / sizeof(inverse_pairs[0]); i++) {
+	for (i = 0; i < countof(inverse_pairs); i++) {
 		if (inverse_pairs[i][0] == op)
 			return inverse_pairs[i][1];
 		if (inverse_pairs[i][1] == op)

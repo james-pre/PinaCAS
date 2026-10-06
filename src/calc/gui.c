@@ -9,6 +9,7 @@
 #include <keypadc.h>
 
 #include <string.h>
+#include <stdcountof.h>
 
 #include "../parser.h"
 #include "../cas/cas.h"
@@ -21,31 +22,238 @@
 #include "viewer.h"
 #include "../work.h"
 
-void draw_string_centered(char *text, int x, int y) {
-	unsigned len;
-	len = gfx_GetStringWidth(text);
+#define LINE_HEIGHT 10
+#define MENU_ROW 16
+#define CHECKBOX_SIZE 8
+#define CHECKBOX_ROW 12
+#define SELECT_ROW 18
+#define BOX_HEIGHT 16
+#define BUTTON_HEIGHT 20
+#define VARIABLE_WIDTH 50
+#define GAP 6
+#define MARKER_OFFSET 10
 
-	gfx_SetTextBGColor(COLOR_TRANSPARENT);
-	gfx_SetTextFGColor(COLOR_TEXT);
+typedef struct {
+	int x, y, w, h;
+} rect_t;
 
-	gfx_PrintStringXY(text, x - len / 2, y);
+static const rect_t header_area = {40, 10, 240, 40};
+static const rect_t menus_area = {14, 70, 96, 136};
+static const rect_t options_area = {112, 70, 195, 138};
+static const rect_t console_area = {LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH * 2 / 3, LCD_HEIGHT * 2 / 3};
+
+static rect_t inset(rect_t r, int x, int y) {
+	return (rect_t){r.x + x, r.y + y, r.w - 2 * x, r.h - 2 * y};
 }
 
-#define ABOUT_WIDTH 190
+static const struct variable {
+	const char *name;
+	const char *token;
+} variables[] = {{"Y1", OS_VAR_Y1},     {"Y2", OS_VAR_Y2},     {"Y3", OS_VAR_Y3},     {"Y4", OS_VAR_Y4},
+				 {"Y5", OS_VAR_Y5},     {"Y6", OS_VAR_Y6},     {"Y7", OS_VAR_Y7},     {"Y8", OS_VAR_Y8},
+				 {"Y9", OS_VAR_Y9},     {"Y0", OS_VAR_Y0},     {"Str1", OS_VAR_STR1}, {"Str2", OS_VAR_STR2},
+				 {"Str3", OS_VAR_STR3}, {"Str4", OS_VAR_STR4}, {"Str5", OS_VAR_STR5}, {"Str6", OS_VAR_STR6},
+				 {"Str7", OS_VAR_STR7}, {"Str8", OS_VAR_STR8}, {"Str9", OS_VAR_STR9}, {"Str0", OS_VAR_STR0},
+				 {"Ans", OS_VAR_ANS}};
 
-static const char *about_lines[] = {
-	"github.com/",
-	"james-pre/PinaCAS",
-	"",
-	"Credits:",
-	"James Prevett",
-	"Nathan Farlow",
-	"(PineappleCAS)",
-	"Michael Fromberger",
-	"(imath)"
+static bool is_ans(unsigned variable) {
+	return strcmp(variables[variable].name, "Ans") == 0;
+}
+
+typedef enum {
+	ELEMENT_END,
+	ELEMENT_TEXT,
+	ELEMENT_CHECKBOX,
+	ELEMENT_VARIABLE,
+	ELEMENT_CHARACTER,
+	ELEMENT_BUTTON
+} element_type;
+
+typedef struct {
+	element_type type;
+	const char *text;
+
+	union {
+		bool *checked;
+		/*Index in variables*/
+		unsigned *variable;
+		struct {
+			char *value;
+			/*Returns the character for a key, or 0 if the key does not set one*/
+			char (*from_key)(uint8_t key);
+		} character;
+		void (*action)(void);
+	};
+} element_t;
+
+typedef struct {
+	const char *label;
+	/*Ends with an ELEMENT_END*/
+	const element_t *content;
+} menu_t;
+
+static char letter_key(uint8_t key);
+static char digit_key(uint8_t key);
+
+#define END {ELEMENT_END, NULL}
+#define TEXT(text) {ELEMENT_TEXT, text}
+#define CHECKBOX(text, state) {ELEMENT_CHECKBOX, text, .checked = (state)}
+#define VARIABLE(text, state) {ELEMENT_VARIABLE, text, .variable = (state)}
+#define LETTER(text, state)                                                                                            \
+	{                                                                                                                  \
+		ELEMENT_CHARACTER, text, .character = {(state), letter_key}                                                    \
+	}
+#define DIGIT(text, state)                                                                                             \
+	{                                                                                                                  \
+		ELEMENT_CHARACTER, text, .character = {(state), digit_key}                                                     \
+	}
+#define BUTTON(text, function) {ELEMENT_BUTTON, text, .action = (function)}
+#define CONTENT(...) ((const element_t[]){__VA_ARGS__, END})
+
+typedef struct {
+	char respect_to;
+	bool show_work;
+	bool verify;
+	unsigned solution;
+	bool series;
+	char terms;
+} calculus_options_t;
+
+static unsigned input = 0, output = 1;
+
+static struct {
+	bool general, trig, hyperbolic, complex, trig_constants, trig_inv_constants;
+} simplify_options = {true, true, true, true, true, true};
+
+static struct {
+	bool constants, substitute;
+	unsigned from, to;
+} evaluate_options = {true, false, 10, 11};
+
+static struct {
+	bool multiplication, powers;
+} expand_options = {true, true};
+
+static calculus_options_t derivative_options = {.respect_to = 'X', .show_work = true};
+static calculus_options_t integral_options = {.respect_to = 'X', .show_work = true};
+static calculus_options_t de_options =
+	{.respect_to = 'X', .show_work = true, .solution = 2, .terms = '0' + DE_DEFAULT_TERMS};
+
+static void execute_simplify(void);
+static void execute_evaluate(void);
+static void execute_expand(void);
+static void execute_derivative(void);
+static void execute_integral(void);
+static void execute_de(void);
+static void close_console(void);
+
+static const element_t header[] = {VARIABLE("Input", &input), VARIABLE("Output", &output), END};
+
+static const menu_t menus[] = {
+	{"Simplify",
+	 CONTENT(
+		 CHECKBOX("Basic identities", &simplify_options.general),
+		 CHECKBOX("Trig identities", &simplify_options.trig),
+		 CHECKBOX("Hyperbolic identities", &simplify_options.hyperbolic),
+		 CHECKBOX("Complex identities", &simplify_options.complex),
+		 CHECKBOX("Evaluate trig", &simplify_options.trig_constants),
+		 CHECKBOX("Evaluate inverse trig", &simplify_options.trig_inv_constants),
+		 BUTTON("Simplify", execute_simplify)
+	 )},
+	{"Evaluate",
+	 CONTENT(
+		 CHECKBOX("Evaluate constants", &evaluate_options.constants),
+		 CHECKBOX("Substitute expression:", &evaluate_options.substitute),
+		 VARIABLE("From:", &evaluate_options.from),
+		 VARIABLE("To:", &evaluate_options.to),
+		 BUTTON("Evaluate", execute_evaluate)
+	 )},
+	{"Expand",
+	 CONTENT(
+		 CHECKBOX("Expand multiplication", &expand_options.multiplication),
+		 CHECKBOX("Expand powers", &expand_options.powers),
+		 BUTTON("Expand", execute_expand)
+	 )},
+	{"Derivative",
+	 CONTENT(
+		 LETTER("Respect to:", &derivative_options.respect_to),
+		 CHECKBOX("Show work", &derivative_options.show_work),
+		 BUTTON("Differentiate", execute_derivative)
+	 )},
+	{"Integral",
+	 CONTENT(
+		 LETTER("Respect to:", &integral_options.respect_to),
+		 CHECKBOX("Show work", &integral_options.show_work),
+		 BUTTON("Integrate", execute_integral)
+	 )},
+	{"Solve DE",
+	 CONTENT(
+		 LETTER("Respect to:", &de_options.respect_to),
+		 CHECKBOX("Show work", &de_options.show_work),
+		 CHECKBOX("Verify solution", &de_options.verify),
+		 VARIABLE("Solution in:", &de_options.solution),
+		 CHECKBOX("Power series", &de_options.series),
+		 DIGIT("Series terms:", &de_options.terms),
+		 BUTTON("Solve", execute_de)
+	 )},
+	{"About",
+	 CONTENT(
+		 TEXT("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE),
+		 TEXT("github.com/james-pre/PinaCAS"),
+		 TEXT(""),
+		 TEXT("Credits:"),
+		 TEXT("James Prevett"),
+		 TEXT("Nathan Farlow (PineappleCAS)"),
+		 TEXT("Michael Fromberger (imath)")
+	 )}
 };
 
-void draw_background(void) {
+static const element_t console_content[] = {BUTTON("Close", close_console), END};
+
+typedef enum { FOCUS_HEADER, FOCUS_MENUS, FOCUS_OPTIONS } focus_t;
+
+static focus_t focus = FOCUS_MENUS;
+static unsigned menu = 0;
+/*Index of the focused element in the header or the options*/
+static int item = 0;
+
+static bool console_drawn = false;
+static bool console_done = false;
+static int console_index = 0;
+
+/*the key lookup table for os_GetCSC()*/
+static const char alpha_table[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x00, 0x57,
+								   0x52, 0x4D, 0x48, 0x00, 0x00, 0x00, 0x40, 0x56, 0x51, 0x4C, 0x47, 0x00,
+								   0x00, 0x00, 0x5A, 0x55, 0x50, 0x4B, 0x46, 0x43, 0x00, 0x00, 0x59, 0x54,
+								   0x4F, 0x4A, 0x45, 0x42, 0x58, 0x00, 0x58, 0x53, 0x4E, 0x49, 0x44, 0x41,
+								   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+static char letter_key(uint8_t key) {
+	return key < countof(alpha_table) ? alpha_table[key] : 0;
+}
+
+static char digit_key(uint8_t key) {
+	switch (key) {
+		case sk_1: return '1';
+		case sk_2: return '2';
+		case sk_3: return '3';
+		case sk_4: return '4';
+		case sk_5: return '5';
+		case sk_6: return '6';
+		case sk_7: return '7';
+		case sk_8: return '8';
+		case sk_9: return '9';
+		default: return 0;
+	}
+}
+
+static void draw_string_centered(const char *text, int x, int y) {
+	gfx_SetTextBGColor(COLOR_TRANSPARENT);
+	gfx_SetTextFGColor(COLOR_TEXT);
+	gfx_PrintStringXY(text, x - (int)gfx_GetStringWidth(text) / 2, y);
+}
+
+static void draw_background(void) {
 	gfx_SetMonospaceFont(0);
 
 	gfx_FillScreen(COLOR_BACKGROUND);
@@ -64,554 +272,377 @@ void draw_background(void) {
 	else
 		draw_string_centered("PinaCAS v" PCAS_VERSION, LCD_WIDTH / 2, LCD_HEIGHT - 14);
 
-	draw_string_centered("Input", LCD_WIDTH / 4 + 20, 14);
-	draw_string_centered("Output", LCD_WIDTH / 4 * 3 - 20, 14);
-
 	/*Outer selection border*/
 	gfx_Rectangle(10, 50, LCD_WIDTH - 20, 160);
 
 	/*Function rectangle*/
 	gfx_Rectangle(10 + 2, 50 + 2, 100, 160 - 4);
-	draw_string_centered("Function", 10 + 2 + 100 / 2, 50 + 10);
-
-	draw_string_centered("Options", 10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 50 + 10);
+	draw_string_centered("Function", menus_area.x + menus_area.w / 2, 50 + 10);
+	draw_string_centered("Options", options_area.x + options_area.w / 2, 50 + 10);
 }
 
-typedef enum { GUI_LABEL, GUI_CHECKBOX, GUI_CHARSELECT, GUI_DIGITSELECT, GUI_DROPDOWN, GUI_BUTTON } GuiType;
-
-/*I miss oop so much*/
-typedef struct {
-	GuiType type;
-
-	int x, y, w, h;
-	bool active;
-
-	char *text;
-
-	/*For checkboxes*/
-	bool checked;
-	/*For dropdowns*/
-	unsigned index;
-	/*for char select*/
-	char character;
-
-	/*For dropdowns*/
-	unsigned selected_index;
-} view_t;
-
-#define NUM_DROPDOWN_ENTRIES 21
-char *dropdown_entries[NUM_DROPDOWN_ENTRIES] = {"Y1",   "Y2",   "Y3",   "Y4",   "Y5",   "Y6",   "Y7",
-												"Y8",   "Y9",   "Y0",   "Str1", "Str2", "Str3", "Str4",
-												"Str4", "Str6", "Str7", "Str8", "Str9", "Str0", "Ans"};
-
-#define NUM_IO 2
-#define NUM_FUNCTION 7
-#define NUM_SIMPLIFY 7
-#define NUM_EVALUATE 5
-#define NUM_EXPAND 3
-#define NUM_DERIVATIVE 3
-#define NUM_INTEGRAL 3
-#define NUM_DE 7
-#define NUM_ABOUT 0
-
-view_t *io_context[NUM_IO];
-view_t *function_context[NUM_FUNCTION];
-view_t *simplify_context[NUM_SIMPLIFY];
-view_t *evaluate_context[NUM_EVALUATE];
-view_t *expand_context[NUM_EXPAND];
-view_t *derivative_context[NUM_DERIVATIVE];
-view_t *integral_context[NUM_INTEGRAL];
-view_t *de_context[NUM_DE];
-view_t *about_context[1];
-
-view_t *from_drop, *to_drop;
-
-view_t *button_simplify;
-view_t *button_evaluate;
-view_t *button_expand;
-view_t *button_derivative;
-view_t *button_integral;
-view_t *button_de;
-
-view_t *console_button;
-
-typedef enum {
-	CONTEXT_IO,
-	CONTEXT_FUNCTION,
-	CONTEXT_SIMPLIFY,
-	CONTEXT_EVALUATE,
-	CONTEXT_EXPAND,
-	CONTEXT_DERIVATIVE,
-	CONTEXT_INTEGRAL,
-	CONTEXT_DE,
-	CONTEXT_ABOUT,
-	NUM_CONTEXTS
-} Context;
-
-unsigned elements_in_context[NUM_CONTEXTS] =
-	{NUM_IO, NUM_FUNCTION, NUM_SIMPLIFY, NUM_EVALUATE, NUM_EXPAND, NUM_DERIVATIVE, NUM_INTEGRAL, NUM_DE, NUM_ABOUT};
-
-view_t **context_lookup[NUM_CONTEXTS] = {
-	io_context,
-	function_context,
-	simplify_context,
-	evaluate_context,
-	expand_context,
-	derivative_context,
-	integral_context,
-	de_context,
-	about_context
-};
-
-Context current_context = CONTEXT_FUNCTION;
-unsigned active_index = 0;
-unsigned function_index = 0;
-
-void draw_label(view_t *v) {
-	gfx_PrintStringXY(v->text, v->x, v->y + v->h / 2 - TEXT_HEIGHT / 2);
+static void clear(rect_t r) {
+	gfx_SetColor(COLOR_BACKGROUND);
+	gfx_FillRectangle(r.x, r.y, r.w, r.h);
 }
 
-void draw_checkbox(view_t *v) {
+static void draw_marker(int x, int y, uint8_t color) {
+	gfx_SetTextFGColor(color);
+	gfx_PrintStringXY(">", x - MARKER_OFFSET, y - TEXT_HEIGHT / 2);
+	gfx_SetTextFGColor(COLOR_TEXT);
+}
+
+static void draw_box(rect_t r, const char *text) {
 	gfx_SetColor(COLOR_PURPLE);
-	gfx_Rectangle(v->x, v->y, v->w, v->h);
+	gfx_Rectangle(r.x, r.y, r.w, r.h);
+	draw_string_centered(text, r.x + r.w / 2, r.y + r.h / 2 - TEXT_HEIGHT / 2);
+}
 
-	if (v->checked) {
-		gfx_FillRectangle(v->x + 2, v->y + 2, v->w - 4, v->h - 4);
-	}
+static int button_width(const element_t *e) {
+	return (int)gfx_GetStringWidth(e->text) + 16;
+}
 
-	if (v->text != NULL) {
-		gfx_PrintStringXY(v->text, v->x + v->w + 4, v->y + v->h / 2 - TEXT_HEIGHT / 2);
+static int value_width(const element_t *e) {
+	return e->type == ELEMENT_VARIABLE ? VARIABLE_WIDTH : BOX_HEIGHT;
+}
+
+/*Draws the value of a variable or character element in r*/
+static void draw_value(const element_t *e, rect_t r) {
+	char character[2] = {0};
+
+	if (e->type == ELEMENT_VARIABLE) {
+		draw_box(r, variables[*e->variable].name);
+	} else {
+		character[0] = *e->character.value;
+		draw_box(r, character);
 	}
 }
 
-void draw_dropdown(view_t *v) {
-	gfx_SetColor(COLOR_PURPLE);
-	gfx_Rectangle(v->x, v->y, v->w, v->h);
-	draw_string_centered(dropdown_entries[v->index], v->x + v->w / 2, v->y + v->h / 2 - TEXT_HEIGHT / 2);
+/*Prints text wrapped to width, breaking at the last space that fits or else within a word. Returns the number of lines.*/
+static unsigned wrap_text(const char *text, int x, int y, int width) {
+	char line[48];
+	unsigned lines = 0, length = 0;
+
+	line[0] = '\0';
+
+	for (; *text != '\0'; text++) {
+		line[length++] = *text;
+		line[length] = '\0';
+
+		if (length > 1 && (length == sizeof(line) - 1 || (int)gfx_GetStringWidth(line) > width)) {
+			char *space = strrchr(line, ' ');
+			unsigned keep = space != NULL ? (unsigned)(space - line) : length - 1;
+			unsigned skip = space != NULL ? keep + 1 : keep;
+			char next = line[keep];
+
+			line[keep] = '\0';
+			gfx_PrintStringXY(line, x, y + LINE_HEIGHT * lines++);
+			line[keep] = next;
+
+			length -= skip;
+			memmove(line, line + skip, length + 1);
+		}
+	}
+
+	gfx_PrintStringXY(line, x, y + LINE_HEIGHT * lines);
+
+	return lines + 1;
 }
 
-void draw_button(view_t *v) {
-	gfx_SetColor(COLOR_PURPLE);
-	gfx_Rectangle(v->x, v->y, v->w, v->h);
-	draw_string_centered(v->text, v->x + v->w / 2, v->y + v->h / 2 - TEXT_HEIGHT / 2);
-}
+/* Lays content out top to bottom in area with buttons in a row along the bottom, marking the element at focused */
+static void draw_form(const element_t *content, rect_t area, int focused) {
+	const element_t *e;
+	int column = 0, buttons = -GAP, button_x, y = area.y;
 
-void draw_charselect(view_t *v) {
-	char buffer[2] = {0};
-	gfx_SetColor(COLOR_PURPLE);
-	gfx_Rectangle(v->x, v->y, v->w, v->h);
+	for (e = content; e->type != ELEMENT_END; e++) {
+		if (e->type == ELEMENT_BUTTON) {
+			buttons += button_width(e) + GAP;
+		} else if (e->type == ELEMENT_VARIABLE || e->type == ELEMENT_CHARACTER) {
+			int width = gfx_GetStringWidth(e->text);
+			if (width > column)
+				column = width;
+		}
+	}
 
-	buffer[0] = v->character;
-	draw_string_centered(buffer, v->x + v->w / 2, v->y + v->h / 2 - TEXT_HEIGHT / 2);
-}
+	column += area.x + GAP;
+	button_x = area.x + (area.w - buttons) / 2;
 
-void view_draw(view_t *v) {
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
 	gfx_SetTextFGColor(COLOR_TEXT);
 
-	switch (v->type) {
-		case GUI_LABEL: draw_label(v); break;
-		case GUI_CHECKBOX: draw_checkbox(v); break;
-		case GUI_DROPDOWN: draw_dropdown(v); break;
-		case GUI_BUTTON: draw_button(v); break;
-		case GUI_CHARSELECT:
-		case GUI_DIGITSELECT: draw_charselect(v); break;
-		default: return;
-	}
+	for (e = content; e->type != ELEMENT_END; e++) {
+		rect_t r;
+		int marker_x;
 
-	if (v->active) {
-		gfx_SetTextFGColor(COLOR_PURPLE);
-		gfx_PrintStringXY(">", v->x - 10, v->y + v->h / 2 - TEXT_HEIGHT / 2);
-	}
-}
+		switch (e->type) {
+			case ELEMENT_TEXT: y += LINE_HEIGHT * wrap_text(e->text, area.x, y, area.w); continue;
 
-view_t *view_create(GuiType type, int x, int y, int w, int h, char *text) {
-	view_t *v;
-	v = calloc(1, sizeof(view_t));
-	v->type = type;
-	v->x = x;
-	v->y = y;
-	v->w = w;
-	v->h = h;
-	v->text = text;
-	return v;
-}
+			case ELEMENT_CHECKBOX:
+				r = (rect_t){area.x, y + (CHECKBOX_ROW - CHECKBOX_SIZE) / 2, CHECKBOX_SIZE, CHECKBOX_SIZE};
+				gfx_SetColor(COLOR_PURPLE);
+				gfx_Rectangle(r.x, r.y, r.w, r.h);
+				if (*e->checked)
+					gfx_FillRectangle(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+				gfx_PrintStringXY(e->text, r.x + r.w + 4, r.y + r.h / 2 - TEXT_HEIGHT / 2);
+				marker_x = r.x;
+				y += CHECKBOX_ROW;
+				break;
 
-view_t *view_create_checkbox(int x, int y, char *text, bool checked) {
-	view_t *v;
-	v = view_create(GUI_CHECKBOX, x, y, 8, 8, text);
-	v->checked = checked;
-	return v;
-}
+			case ELEMENT_VARIABLE:
+			case ELEMENT_CHARACTER:
+				r = (rect_t){column, y + (SELECT_ROW - BOX_HEIGHT) / 2, value_width(e), BOX_HEIGHT};
+				gfx_PrintStringXY(e->text, area.x, r.y + r.h / 2 - TEXT_HEIGHT / 2);
+				draw_value(e, r);
+				marker_x = area.x;
+				y += SELECT_ROW;
+				break;
 
-view_t *view_create_button(int x, int y, char *text) {
-	int width;
-	width = gfx_GetStringWidth(text);
-	return view_create(GUI_BUTTON, x - width / 2, y - TEXT_HEIGHT / 2, width + 8, 20, text);
-}
+			case ELEMENT_BUTTON:
+				r = (rect_t){button_x, area.y + area.h - BUTTON_HEIGHT, button_width(e), BUTTON_HEIGHT};
+				draw_box(r, e->text);
+				marker_x = r.x;
+				button_x += r.w + GAP;
+				break;
 
-view_t *view_create_dropdown(int x, int y, unsigned index) {
-	view_t *v;
-	v = view_create(GUI_DROPDOWN, x, y, 50, 20, NULL);
-	v->index = index;
-	return v;
-}
-
-view_t *view_create_label(int x, int y, char *text) {
-	return view_create(GUI_LABEL, x, y, 0, 8, text);
-}
-
-view_t *view_create_digitselect(int x, int y, char digit) {
-	view_t *v;
-	v = view_create(GUI_DIGITSELECT, x, y, 16, 16, NULL);
-	v->character = digit;
-	return v;
-}
-
-/*Returns the digit 1 to 9 of key, or 0 for other keys*/
-char digit_key(uint8_t key) {
-	switch (key) {
-		case sk_1: return '1';
-		case sk_2: return '2';
-		case sk_3: return '3';
-		case sk_4: return '4';
-		case sk_5: return '5';
-		case sk_6: return '6';
-		case sk_7: return '7';
-		case sk_8: return '8';
-		case sk_9: return '9';
-		default: return 0;
-	}
-}
-
-view_t *view_create_charselect(int x, int y) {
-	view_t *v;
-	v = view_create(GUI_CHARSELECT, x, y, 16, 16, NULL);
-	v->character = 'X';
-	return v;
-}
-
-void draw_context(Context c) {
-	unsigned i;
-
-	gfx_SetColor(COLOR_BACKGROUND);
-
-	switch (c) {
-		case CONTEXT_IO: gfx_FillRectangle(5, 14 + 8, LCD_WIDTH - 10, 26); break;
-		case CONTEXT_FUNCTION: gfx_FillRectangle(10 + 4, 70, 100 - 4, 120); break;
-		default: gfx_FillRectangle(112, 70, 195, 138); break;
-	}
-
-	gfx_SetTextFGColor(COLOR_TEXT);
-	if (c == CONTEXT_DE) {
-		gfx_PrintStringXY("Solution in:", 136, 136 + 10 - TEXT_HEIGHT / 2);
-	}
-
-	if (c == CONTEXT_EVALUATE) {
-		gfx_PrintStringXY("From: ", 124 + 25, 96 + 12 + 10 - TEXT_HEIGHT / 2);
-		gfx_PrintStringXY("To: ", 124 + 25, 96 + 12 + 24 + 10 - TEXT_HEIGHT / 2);
-	} else if (c == CONTEXT_ABOUT) {
-		int line = 0;
-
-		if (gfx_GetStringWidth("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE) <= ABOUT_WIDTH) {
-			gfx_PrintStringXY("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE, 115, 80);
-		} else {
-			if (gfx_GetStringWidth("PinaCAS v" PCAS_VERSION) <= ABOUT_WIDTH) {
-				gfx_PrintStringXY("PinaCAS v" PCAS_VERSION, 115, 80);
-			} else {
-				gfx_PrintStringXY("PinaCAS", 115, 80);
-				gfx_PrintStringXY("v" PCAS_VERSION, 115, 80 + 10 * ++line);
-			}
-			gfx_PrintStringXY(PCAS_BUILD_DATE, 115, 80 + 10 * ++line);
+			default: continue;
 		}
 
-		for (i = 0; i < sizeof(about_lines) / sizeof(about_lines[0]); i++)
-			gfx_PrintStringXY(about_lines[i], about_lines[i][0] == '(' ? 125 : 115, 80 + 10 * (line + 1 + i));
-	} else if (c == CONTEXT_DERIVATIVE || c == CONTEXT_INTEGRAL || c == CONTEXT_DE) {
-		gfx_PrintStringXY("Respect to: ", 124, 80);
-	}
-
-	for (i = 0; i < elements_in_context[c]; i++) {
-		view_draw(context_lookup[c][i]);
+		if (e - content == focused)
+			draw_marker(marker_x, r.y + r.h / 2, COLOR_PURPLE);
 	}
 }
 
-bool console_drawn = false;
-int console_index = 0;
+/* Lays content out in equal columns across area, each value under its label, marking the element at focused */
+static void draw_columns(const element_t *content, rect_t area, int focused) {
+	const element_t *e;
+	int count = 0;
 
-void draw_console(void) {
+	for (e = content; e->type != ELEMENT_END; e++)
+		count++;
+
+	for (e = content; e->type != ELEMENT_END; e++) {
+		int center = area.x + area.w * (2 * (e - content) + 1) / (2 * count);
+		rect_t r = {center - value_width(e) / 2, area.y + LINE_HEIGHT + GAP, value_width(e), BUTTON_HEIGHT};
+
+		draw_string_centered(e->text, center, area.y + GAP / 2);
+		draw_value(e, r);
+
+		if (e - content == focused)
+			draw_marker(r.x, r.y + r.h / 2, COLOR_PURPLE);
+	}
+}
+
+static void draw_header(void) {
+	clear(header_area);
+	draw_columns(header, header_area, focus == FOCUS_HEADER ? item : -1);
+}
+
+static void draw_menus(void) {
+	rect_t area = inset(menus_area, 12, 10);
+
+	clear(menus_area);
+	gfx_SetTextBGColor(COLOR_TRANSPARENT);
+	gfx_SetTextFGColor(COLOR_TEXT);
+
+	for (unsigned i = 0; i < countof(menus); i++) {
+		int y = area.y + MENU_ROW * (int)i;
+
+		gfx_PrintStringXY(menus[i].label, area.x, y);
+
+		if (i == menu && focus != FOCUS_HEADER)
+			draw_marker(area.x, y + TEXT_HEIGHT / 2, focus == FOCUS_MENUS ? COLOR_PURPLE : COLOR_BLUE);
+	}
+}
+
+static void draw_options(void) {
+	clear(options_area);
+	draw_form(menus[menu].content, inset(options_area, 12, 6), focus == FOCUS_OPTIONS ? item : -1);
+}
+
+static void draw_screen(void) {
+	draw_background();
+	draw_header();
+	draw_menus();
+	draw_options();
+}
+
+static void draw_console(void) {
 	gfx_SetColor(COLOR_BACKGROUND);
-	gfx_FillRectangle(LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH - LCD_WIDTH / 3, LCD_HEIGHT - LCD_HEIGHT / 3);
+	gfx_FillRectangle(console_area.x, console_area.y, console_area.w, console_area.h);
 	gfx_SetColor(COLOR_BLUE);
-	gfx_Rectangle(LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH - LCD_WIDTH / 3, LCD_HEIGHT - LCD_HEIGHT / 3);
-	gfx_Rectangle(
-		LCD_WIDTH / 6 + 2, LCD_HEIGHT / 6 + 2, LCD_WIDTH - LCD_WIDTH / 3 - 4, LCD_HEIGHT - LCD_HEIGHT / 3 - 30
-	);
+	gfx_Rectangle(console_area.x, console_area.y, console_area.w, console_area.h);
+	gfx_Rectangle(console_area.x + 2, console_area.y + 2, console_area.w - 4, console_area.h - 30);
 
-	view_draw(console_button);
+	draw_form(console_content, inset(console_area, 6, 4), -1);
 
 	console_drawn = true;
 }
 
-void console_write(char *text) {
+static void console_write(const char *text) {
 	if (!console_drawn)
 		draw_console();
 
-	gfx_PrintStringXY(text, LCD_WIDTH / 6 + 2 + 4, LCD_HEIGHT / 6 + 2 + 4 + console_index * TEXT_HEIGHT);
+	gfx_PrintStringXY(text, console_area.x + 2 + 4, console_area.y + 2 + 4 + console_index * TEXT_HEIGHT);
 
 	console_index++;
 }
 
-/*Returns to the main screen*/
-void close_console(void) {
-	draw_background();
-	draw_context(CONTEXT_IO);
-	draw_context(CONTEXT_FUNCTION);
-	draw_context(current_context);
-
-	console_button->active = false;
-	console_drawn = false;
-	console_index = 0;
+/* Lets the user close the console */
+static void console_finish(void) {
+	draw_form(console_content, inset(console_area, 6, 4), 0);
+	console_done = true;
 }
 
-void execute_simplify(void);
-void execute_evaluate(void);
-void execute_expand(void);
-void execute_derivative(void);
-void execute_integral(void);
-void execute_de(void);
+/* Returns to the main screen */
+static void close_console(void) {
+	console_drawn = false;
+	console_done = false;
+	console_index = 0;
 
-/*the key lookup tables for os_GetCSC()*/
-const char alpha_table[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x00, 0x57, 0x52, 0x4D, 0x48,
-							0x00, 0x00, 0x00, 0x40, 0x56, 0x51, 0x4C, 0x47, 0x00, 0x00, 0x00, 0x5A, 0x55, 0x50, 0x4B,
-							0x46, 0x43, 0x00, 0x00, 0x59, 0x54, 0x4F, 0x4A, 0x45, 0x42, 0x58, 0x00, 0x58, 0x53, 0x4E,
-							0x49, 0x44, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	draw_screen();
+}
 
-void handle_input(uint8_t key) {
+/* Returns the index of the next element of content from index in the direction of step that can be focused, or -1 */
+static int next_focusable(const element_t *content, int index, int step) {
+	for (index += step; index >= 0 && content[index].type != ELEMENT_END; index += step)
+		if (content[index].type != ELEMENT_TEXT)
+			return index;
+
+	return -1;
+}
+
+/* Toggles a checkbox, steps a variable by step, or runs a button */
+static void activate(const element_t *e, int step) {
+	switch (e->type) {
+		case ELEMENT_CHECKBOX: *e->checked = !*e->checked; break;
+		case ELEMENT_VARIABLE: *e->variable = (*e->variable + countof(variables) + step) % countof(variables); break;
+		case ELEMENT_BUTTON: e->action(); break;
+		default: break;
+	}
+}
+
+static void focus_header(void) {
+	focus = FOCUS_HEADER;
+	item = 0;
+	draw_header();
+	draw_menus();
+	draw_options();
+}
+
+static void handle_header(uint8_t key) {
+	int next;
+
+	switch (key) {
+		case sk_Down:
+			focus = FOCUS_MENUS;
+			draw_header();
+			draw_menus();
+			break;
+		case sk_Left:
+		case sk_Right:
+			next = next_focusable(header, item, key == sk_Left ? -1 : 1);
+			if (next >= 0) {
+				item = next;
+				draw_header();
+			}
+			break;
+		case sk_Enter:
+		case sk_Up:
+			activate(&header[item], key == sk_Enter ? 1 : -1);
+			draw_header();
+			break;
+		default: break;
+	}
+}
+
+static void handle_menus(uint8_t key) {
+	int first;
+
+	switch (key) {
+		case sk_Up:
+			if (menu == 0) {
+				focus_header();
+				break;
+			}
+			menu--;
+			draw_menus();
+			draw_options();
+			break;
+		case sk_Down:
+			if (menu + 1 < countof(menus)) {
+				menu++;
+				draw_menus();
+				draw_options();
+			}
+			break;
+		case sk_Right:
+		case sk_Enter:
+			first = next_focusable(menus[menu].content, -1, 1);
+			if (first >= 0) {
+				focus = FOCUS_OPTIONS;
+				item = first;
+				draw_menus();
+				draw_options();
+			}
+			break;
+		default: break;
+	}
+}
+
+static void handle_options(uint8_t key) {
+	const element_t *e = &menus[menu].content[item];
+	int next;
+	char value;
+
+	switch (key) {
+		case sk_Up:
+		case sk_Down:
+			next = next_focusable(menus[menu].content, item, key == sk_Up ? -1 : 1);
+			if (next >= 0) {
+				item = next;
+				draw_options();
+			} else if (key == sk_Up) {
+				focus_header();
+			}
+			break;
+		case sk_Left:
+			focus = FOCUS_MENUS;
+			draw_menus();
+			draw_options();
+			break;
+		case sk_Enter:
+			activate(e, 1);
+			if (!console_drawn)
+				draw_options();
+			break;
+		default:
+			if (e->type == ELEMENT_CHARACTER && (value = e->character.from_key(key)) != 0) {
+				*e->character.value = value;
+				draw_options();
+			}
+			break;
+	}
+}
+
+static void handle_input(uint8_t key) {
 	if (console_drawn) {
-		if (console_button->active && key == sk_Enter)
-			close_console();
+		if (console_done && key == sk_Enter)
+			activate(&console_content[0], 1);
 		return;
 	}
 
-	switch (current_context) {
-		case CONTEXT_IO:
-			if (key == sk_Down) {
-				io_context[active_index]->active = false;
-
-				current_context = CONTEXT_FUNCTION;
-				active_index = 0;
-				function_context[0]->active = true;
-
-				draw_context(CONTEXT_IO);
-				draw_context(CONTEXT_FUNCTION);
-				draw_context(CONTEXT_SIMPLIFY);
-
-			} else if (key == sk_Left && active_index == 1) {
-				active_index = 0;
-				io_context[1]->active = false;
-				io_context[0]->active = true;
-				draw_context(CONTEXT_IO);
-			} else if (key == sk_Right && active_index == 0) {
-				active_index = 1;
-				io_context[0]->active = false;
-				io_context[1]->active = true;
-				draw_context(CONTEXT_IO);
-			} else if (key == sk_Enter) {
-				view_t *v;
-				v = context_lookup[current_context][active_index];
-				v->index = (v->index + 1) % NUM_DROPDOWN_ENTRIES;
-				draw_context(current_context);
-			} else if (key == sk_Up) {
-				view_t *v;
-				v = context_lookup[current_context][active_index];
-				if (v->index == 0)
-					v->index = NUM_DROPDOWN_ENTRIES - 1;
-				else
-					v->index--;
-				draw_context(current_context);
-			}
-
-			break;
-		case CONTEXT_FUNCTION:
-			if ((key == sk_Right || key == sk_Enter) && elements_in_context[CONTEXT_SIMPLIFY + active_index] > 0) {
-				function_index = active_index;
-
-				current_context = (Context)(CONTEXT_SIMPLIFY + active_index);
-				function_context[active_index]->active = false;
-				active_index = 0;
-				context_lookup[current_context][active_index]->active = true;
-
-				draw_context(CONTEXT_FUNCTION);
-				draw_context(current_context);
-
-				break;
-			}
-		default: {
-			view_t *v;
-			v = context_lookup[current_context][active_index];
-
-			if (key == sk_Up) {
-				if (active_index == 0) {
-					context_lookup[current_context][active_index]->active = false;
-					active_index = 0;
-					io_context[active_index]->active = true;
-					draw_context(current_context);
-					current_context = CONTEXT_IO;
-					draw_context(CONTEXT_IO);
-					break;
-				}
-
-				context_lookup[current_context][active_index]->active = false;
-				active_index--;
-				context_lookup[current_context][active_index]->active = true;
-				draw_context(current_context);
-
-				if (current_context == CONTEXT_FUNCTION)
-					draw_context((Context)(CONTEXT_SIMPLIFY + active_index));
-			} else if (key == sk_Down) {
-				if (active_index == elements_in_context[current_context] - 1)
-					break;
-				context_lookup[current_context][active_index]->active = false;
-				active_index++;
-				context_lookup[current_context][active_index]->active = true;
-				draw_context(current_context);
-
-				if (current_context == CONTEXT_FUNCTION)
-					draw_context((Context)(CONTEXT_SIMPLIFY + active_index));
-			} else if (key == sk_Left && current_context != CONTEXT_FUNCTION) {
-				context_lookup[current_context][active_index]->active = false;
-				draw_context(current_context);
-				active_index = function_index;
-				current_context = CONTEXT_FUNCTION;
-				context_lookup[current_context][active_index]->active = true;
-				draw_context(CONTEXT_FUNCTION);
-			} else if (key == sk_Enter) {
-				switch (v->type) {
-					case GUI_CHECKBOX:
-						v->checked = !v->checked;
-						draw_context(current_context);
-						break;
-					case GUI_DROPDOWN:
-						v->index = (v->index + 1) % NUM_DROPDOWN_ENTRIES;
-						draw_context(current_context);
-						break;
-					case GUI_BUTTON:
-						if (v == button_simplify)
-							execute_simplify();
-						else if (v == button_evaluate)
-							execute_evaluate();
-						else if (v == button_expand)
-							execute_expand();
-						else if (v == button_derivative)
-							execute_derivative();
-						else if (v == button_integral)
-							execute_integral();
-						else if (v == button_de)
-							execute_de();
-						break;
-					default: break;
-				}
-
-			} else {
-				if (v->type == GUI_CHARSELECT || v->type == GUI_DIGITSELECT) {
-					char val;
-					val = v->type == GUI_CHARSELECT ? alpha_table[key] : digit_key(key);
-
-					if (val != 0) {
-						v->character = val;
-						draw_context(current_context);
-					}
-				}
-			}
-		}
-
-		break;
+	switch (focus) {
+		case FOCUS_HEADER: handle_header(key); break;
+		case FOCUS_MENUS: handle_menus(key); break;
+		case FOCUS_OPTIONS: handle_options(key); break;
 	}
-}
-
-void gui_Init(void) {
-	io_context[0] = from_drop = view_create_dropdown(LCD_WIDTH / 4 + 20 - 25, 14 + 8 + 4, 0);
-	io_context[1] = to_drop = view_create_dropdown(LCD_WIDTH / 4 * 3 - 20 - 25, 14 + 8 + 4, 1);
-
-	function_context[0] = view_create_label(26, 80, "Simplify");
-	function_context[1] = view_create_label(26, 96, "Evaluate");
-	function_context[2] = view_create_label(26, 112, "Expand");
-	function_context[3] = view_create_label(26, 128, "Derivative");
-	function_context[4] = view_create_label(26, 144, "Integral");
-	function_context[5] = view_create_label(26, 160, "Solve DE");
-	function_context[6] = view_create_label(26, 176, "About");
-
-	simplify_context[0] = view_create_checkbox(124, 80 + 12 * 0, "Basic identities", true);
-	simplify_context[1] = view_create_checkbox(124, 80 + 12 * 1, "Trig identities", true);
-	simplify_context[2] = view_create_checkbox(124, 80 + 12 * 2, "Hyperbolic identities", true);
-	simplify_context[3] = view_create_checkbox(124, 80 + 12 * 3, "Complex identities", true);
-	simplify_context[4] = view_create_checkbox(124, 80 + 12 * 4, "Evaluate trig", true);
-	simplify_context[5] = view_create_checkbox(124, 80 + 12 * 5, "Evaluate inverse trig", true);
-	simplify_context[6] = button_simplify =
-		view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Simplify");
-
-	evaluate_context[0] = view_create_checkbox(124, 80, "Evaluate constants", true);
-	evaluate_context[1] = view_create_checkbox(124, 80 + 12, "Substitue expression:", false);
-	evaluate_context[2] = view_create_dropdown(124 + 80, 96 + 12, 10);
-	evaluate_context[3] = view_create_dropdown(124 + 80, 96 + 12 + 24, 11);
-	evaluate_context[4] = button_evaluate =
-		view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Evaluate");
-
-	expand_context[0] = view_create_checkbox(124, 80 + 12 * 0, "Expand multiplication", true);
-	expand_context[1] = view_create_checkbox(124, 80 + 12 * 1, "Expand powers", true);
-	expand_context[2] = button_expand =
-		view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Expand");
-
-	derivative_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
-	derivative_context[1] = view_create_checkbox(124, 104, "Show work", true);
-	derivative_context[2] = button_derivative =
-		view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Differentiate");
-
-	integral_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
-	integral_context[1] = view_create_checkbox(124, 104, "Show work", true);
-	integral_context[2] = button_integral =
-		view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Integrate");
-
-	de_context[0] = view_create_charselect(124 + 90, 80 - (16 - TEXT_HEIGHT) / 2);
-	de_context[1] = view_create_checkbox(124, 104, "Show work", true);
-	de_context[2] = view_create_checkbox(124, 124, "Verify solution", false);
-	de_context[3] = view_create_dropdown(124 + 90, 136, 2);
-	de_context[4] = view_create_checkbox(124, 162, "Power series, terms:", false);
-	de_context[5] = view_create_digitselect(124 + 140, 158, '0' + DE_DEFAULT_TERMS);
-	de_context[6] = button_de = view_create_button(10 + 2 + 100 + (LCD_WIDTH - 10 - 10 - 2 - 100) / 2, 184, "Solve");
-
-	console_button = view_create_button(LCD_WIDTH / 2, LCD_HEIGHT - LCD_HEIGHT / 6 - 20, "Close");
-
-	current_context = CONTEXT_FUNCTION;
-	active_index = 0;
-	function_context[0]->active = true;
-}
-
-void gui_Cleanup(void) {
-	unsigned i, j;
-
-	for (i = 0; i < NUM_CONTEXTS; i++) {
-		for (j = 0; j < elements_in_context[i]; j++) {
-			free(context_lookup[i][j]);
-		}
-	}
-
-	free(console_button);
-
-	id_UnloadAll();
 }
 
 void gui_Run(void) {
-	gui_Init();
-
 	os_ClrHome();
 	gfx_Begin();
 
-	draw_background();
-	draw_context(CONTEXT_IO);
-	draw_context(CONTEXT_FUNCTION);
-	draw_context(CONTEXT_SIMPLIFY);
+	draw_screen();
 
 	while (true) {
 		uint8_t key;
@@ -625,7 +656,7 @@ void gui_Run(void) {
 
 	gfx_End();
 
-	gui_Cleanup();
+	id_UnloadAll();
 }
 
 typedef enum {
@@ -635,10 +666,10 @@ typedef enum {
 	CID_TRIG_INV_CONSTANTS = 1 << 3,
 	CID_HYPERBOLIC = 1 << 4,
 	CID_COMPLEX = 1 << 5,
-	CID_DERIVATIVE = 1 << 6
+	CID_DERIVATIVE = 1 << 6,
 } compile_ids_mask;
 
-/*Entry i is the table for bit i of compile_ids_mask*/
+/* Entry i is the table for bit i of compile_ids_mask */
 static struct compile_info {
 	const char *label;
 	pcas_id_t *const table;
@@ -653,10 +684,10 @@ static struct compile_info {
 	{"derivative", id_derivative, false}
 };
 
-#define NUM_COMPILE_INFO (sizeof(compile_info) / sizeof(compile_info[0]))
+#define NUM_COMPILE_INFO countof(compile_info)
 #define CID_ALL ((1 << NUM_COMPILE_INFO) - 1)
 
-/*Loads the identity tables in mask that are not loaded yet*/
+/* Loads the identity tables in mask that are not loaded yet */
 static void compile_ids(compile_ids_mask mask) {
 	char buffer[50];
 
@@ -671,21 +702,19 @@ static void compile_ids(compile_ids_mask mask) {
 	}
 }
 
-static const char *const token_table[21] = {OS_VAR_Y1,   OS_VAR_Y2,   OS_VAR_Y3,   OS_VAR_Y4,   OS_VAR_Y5,
-											OS_VAR_Y6,   OS_VAR_Y7,   OS_VAR_Y8,   OS_VAR_Y9,   OS_VAR_Y0,
-											OS_VAR_STR1, OS_VAR_STR2, OS_VAR_STR3, OS_VAR_STR4, OS_VAR_STR5,
-											OS_VAR_STR6, OS_VAR_STR7, OS_VAR_STR8, OS_VAR_STR9, OS_VAR_STR0,
-											OS_VAR_ANS};
-
-pcas_ast_t *parse_from_dropdown_index(unsigned index, pcas_error_t *err) {
-	return parse_from_tok(token_table[index], err);
+static pcas_ast_t *parse_variable(unsigned variable, pcas_error_t *err) {
+	return parse_from_tok(variables[variable].token, err);
 }
 
-void write_to_dropdown_index(unsigned index, pcas_ast_t *expression, pcas_error_t *err) {
-	write_to_tok(token_table[index], expression, err);
+static unsigned parse_variable_list(unsigned variable, pcas_ast_t **items, pcas_error_t *err) {
+	return parse_list_from_tok(variables[variable].token, items, MAX_ITEMS, err);
 }
 
-void execute_simplify(void) {
+static void write_variable(unsigned variable, pcas_ast_t *expression, pcas_error_t *err) {
+	write_to_tok(variables[variable].token, expression, err);
+}
+
+static void execute_simplify(void) {
 	char buffer[50];
 
 	pcas_ast_t *expression;
@@ -694,27 +723,27 @@ void execute_simplify(void) {
 	simplify_flags flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
 	compile_ids_mask ids = 0;
 
-	if (simplify_context[0]->checked) {
+	if (simplify_options.general) {
 		ids |= CID_GENERAL;
 		flags |= SIMP_ID_GENERAL;
 	}
-	if (simplify_context[1]->checked) {
+	if (simplify_options.trig) {
 		ids |= CID_TRIG;
 		flags |= SIMP_ID_TRIG;
 	}
-	if (simplify_context[2]->checked) {
+	if (simplify_options.hyperbolic) {
 		ids |= CID_HYPERBOLIC;
 		flags |= SIMP_ID_HYPERBOLIC;
 	}
-	if (simplify_context[3]->checked) {
+	if (simplify_options.complex) {
 		ids |= CID_COMPLEX;
 		flags |= SIMP_ID_COMPLEX;
 	}
-	if (simplify_context[4]->checked) {
+	if (simplify_options.trig_constants) {
 		ids |= CID_TRIG_CONSTANTS;
 		flags |= SIMP_ID_TRIG_CONSTANTS;
 	}
-	if (simplify_context[5]->checked) {
+	if (simplify_options.trig_inv_constants) {
 		ids |= CID_TRIG_INV_CONSTANTS;
 		flags |= SIMP_ID_TRIG_INV_CONSTANTS;
 	}
@@ -723,7 +752,7 @@ void execute_simplify(void) {
 
 	console_write("Parsing input...");
 
-	expression = parse_from_dropdown_index(from_drop->index, &err);
+	expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
@@ -734,7 +763,7 @@ void execute_simplify(void) {
 
 			console_write("Exporting...");
 
-			write_to_dropdown_index(to_drop->index, expression, &err);
+			write_variable(output, expression, &err);
 
 			ast_Cleanup(expression);
 
@@ -752,27 +781,26 @@ void execute_simplify(void) {
 	} else {
 		sprintf(buffer, "Failed. %s.", error_text[err]);
 		console_write(buffer);
-		if (from_drop->index == 20)
+		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	}
 
-	console_button->active = true;
-	view_draw(console_button);
+	console_finish();
 }
 
-void execute_evaluate(void) {
+static void execute_evaluate(void) {
 	char buffer[50];
 
 	bool should_sub, should_eval;
 	pcas_ast_t *expression;
 	pcas_error_t err;
 
-	should_eval = evaluate_context[0]->checked;
-	should_sub = evaluate_context[1]->checked;
+	should_eval = evaluate_options.constants;
+	should_sub = evaluate_options.substitute;
 
 	console_write("Parsing input...");
 
-	expression = parse_from_dropdown_index(from_drop->index, &err);
+	expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
@@ -783,13 +811,13 @@ void execute_evaluate(void) {
 				pcas_error_t err;
 
 				console_write("Parsing sub from...");
-				sub_from = parse_from_dropdown_index(evaluate_context[2]->index, &err);
+				sub_from = parse_variable(evaluate_options.from, &err);
 				simplify(sub_from, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
 
 				if (err == E_SUCCESS) {
 					if (sub_from != NULL) {
 						console_write("Parsing sub to...");
-						sub_to = parse_from_dropdown_index(evaluate_context[3]->index, &err);
+						sub_to = parse_variable(evaluate_options.to, &err);
 						simplify(sub_to, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
 
 						if (err == E_SUCCESS) {
@@ -813,7 +841,7 @@ void execute_evaluate(void) {
 				} else {
 					sprintf(buffer, "Failed. %s.", error_text[err]);
 					console_write(buffer);
-					if (evaluate_context[3]->index == 20)
+					if (is_ans(evaluate_options.from))
 						console_write("Make sure Ans is a string.");
 				}
 			}
@@ -828,7 +856,7 @@ void execute_evaluate(void) {
 
 			console_write("Exporting...");
 
-			write_to_dropdown_index(to_drop->index, expression, &err);
+			write_variable(output, expression, &err);
 
 			ast_Cleanup(expression);
 
@@ -846,15 +874,14 @@ void execute_evaluate(void) {
 	} else {
 		sprintf(buffer, "Failed. %s.", error_text[err]);
 		console_write(buffer);
-		if (from_drop->index == 20)
+		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	}
 
-	console_button->active = true;
-	view_draw(console_button);
+	console_finish();
 }
 
-void execute_expand(void) {
+static void execute_expand(void) {
 	char buffer[50];
 
 	pcas_ast_t *expression;
@@ -862,16 +889,16 @@ void execute_expand(void) {
 
 	expand_flags flags = 0;
 
-	if (expand_context[0]->checked) {
+	if (expand_options.multiplication) {
 		flags |= EXP_DISTRIB_NUMBERS | EXP_DISTRIB_MULTIPLICATION | EXP_DISTRIB_ADDITION;
 	}
-	if (expand_context[1]->checked) {
+	if (expand_options.powers) {
 		flags |= EXP_EXPAND_POWERS;
 	}
 
 	console_write("Parsing input...");
 
-	expression = parse_from_dropdown_index(from_drop->index, &err);
+	expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
@@ -881,14 +908,14 @@ void execute_expand(void) {
 			expand(expression, flags);
 			simplify(
 				expression,
-				SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | (expand_context[0]->checked ? SIMP_LIKE_TERMS : 0) |
-					SIMP_EVAL
+				SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL |
+					(expand_options.multiplication ? SIMP_LIKE_TERMS : 0) | SIMP_EVAL
 			);
 			simplify_canonical_form(expression, CANONICAL_ALL ^ CANONICAL_COMBINE_POWERS);
 
 			console_write("Exporting...");
 
-			write_to_dropdown_index(to_drop->index, expression, &err);
+			write_variable(output, expression, &err);
 
 			ast_Cleanup(expression);
 
@@ -906,50 +933,45 @@ void execute_expand(void) {
 	} else {
 		sprintf(buffer, "Failed. %s.", error_text[err]);
 		console_write(buffer);
-		if (from_drop->index == 20)
+		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	}
 
-	console_button->active = true;
-	view_draw(console_button);
+	console_finish();
 }
 
-pcas_ast_t *parse_respect_to(view_t *charselect, pcas_error_t *err) {
+static pcas_ast_t *parse_respect_to(char character, pcas_error_t *err) {
 	char *theta = "theta";
 
 	/*We treat the @ character as theta partially out of laziness*/
-	if (charselect->character == '@')
+	if (character == '@')
 		return parse((uint8_t *)theta, strlen(theta), str_table, err);
 
-	return parse((uint8_t *)&charselect->character, 1, str_table, err);
-}
-
-unsigned parse_list_from_dropdown_index(unsigned index, pcas_ast_t **items, pcas_error_t *err) {
-	return parse_list_from_tok(token_table[index], items, MAX_ITEMS, err);
+	return parse((uint8_t *)&character, 1, str_table, err);
 }
 
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/
-void execute_calculus(Calculus kind, view_t **context, const char *title) {
+static void execute_calculus(Calculus kind, const calculus_options_t *options, const char *title) {
 	char buffer[50];
 
 	pcas_ast_t *items[MAX_ITEMS], *respect_to, *solution = NULL;
 	pcas_error_t err;
 	pcas_work_t work;
 	unsigned count;
-	bool show_work = context[1]->checked;
-	bool verify = kind == CALCULUS_DE && context[2]->checked;
-	bool series = kind == CALCULUS_DE && context[4]->checked;
-	unsigned terms = kind == CALCULUS_DE ? (unsigned)(context[5]->character - '0') : 0;
+	bool show_work = options->show_work;
+	bool verify = options->verify;
+	bool series = options->series;
+	unsigned terms = kind == CALCULUS_DE ? (unsigned)(options->terms - '0') : 0;
 	bool satisfied = false;
 
 	compile_ids(CID_DERIVATIVE);
 
 	console_write("Parsing input...");
 
-	count = parse_list_from_dropdown_index(from_drop->index, items, &err);
+	count = parse_variable_list(input, items, &err);
 
 	if (err == E_SUCCESS && verify) {
-		solution = parse_from_dropdown_index(context[3]->index, &err);
+		solution = parse_variable(options->solution, &err);
 		if (err == E_SUCCESS && solution == NULL)
 			err = E_GENERIC;
 	}
@@ -959,10 +981,10 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 	} else if (err != E_SUCCESS) {
 		sprintf(buffer, "Failed. %s.", error_text[err]);
 		console_write(buffer);
-		if (from_drop->index == 20)
+		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	} else {
-		respect_to = parse_respect_to(context[0], &err);
+		respect_to = parse_respect_to(options->respect_to, &err);
 
 		if (show_work)
 			work_Start(&work);
@@ -989,7 +1011,7 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 
 		if (err == E_SUCCESS && !verify) {
 			console_write("Exporting...");
-			write_to_dropdown_index(to_drop->index, items[0], &err);
+			write_variable(output, items[0], &err);
 		}
 
 		ast_Cleanup(respect_to);
@@ -1020,20 +1042,19 @@ void execute_calculus(Calculus kind, view_t **context, const char *title) {
 		ast_Cleanup(items[--count]);
 	ast_Cleanup(solution);
 
-	console_button->active = true;
-	view_draw(console_button);
+	console_finish();
 }
 
-void execute_derivative(void) {
-	execute_calculus(CALCULUS_DERIVATIVE, derivative_context, "Derivative");
+static void execute_derivative(void) {
+	execute_calculus(CALCULUS_DERIVATIVE, &derivative_options, "Derivative");
 }
 
-void execute_integral(void) {
-	execute_calculus(CALCULUS_INTEGRAL, integral_context, "Integral");
+static void execute_integral(void) {
+	execute_calculus(CALCULUS_INTEGRAL, &integral_options, "Integral");
 }
 
-void execute_de(void) {
-	execute_calculus(CALCULUS_DE, de_context, "Differential equation");
+static void execute_de(void) {
+	execute_calculus(CALCULUS_DE, &de_options, "Differential equation");
 }
 
 #else
