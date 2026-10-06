@@ -29,8 +29,7 @@ static pcas_ast_t *simplest(pcas_ast_t *e) {
 	return e;
 }
 
-/*Fills constants with n letters that do not appear in the equation or in exclude unless it is NULL. Returns false if there are not enough.*/
-static bool choose_constants(const pcas_de_t *de, const pcas_ast_t *exclude, pcas_ast_t **constants, unsigned n) {
+bool choose_constants(const pcas_de_t *de, const pcas_ast_t *exclude, pcas_ast_t **constants, unsigned n) {
 	const char *candidates = "ABCDFGHJKLNPQRSUVW";
 	pcas_ast_t *scope = ast_MakeOperator(OP_ADD);
 	unsigned count = 0;

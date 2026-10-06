@@ -96,3 +96,29 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution);
 
 /*Finds a second solution of a homogeneous second order linear equation from the known solution with the reduction of order formula*/
 pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution);
+
+/*Returns the value of e if it is a rational number, otherwise NULL*/
+mp_rat rational_value(const pcas_ast_t *e);
+
+/*Sets value to p(r), where p has degree n*/
+void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value);
+
+bool is_root(mp_rat *p, unsigned n, mp_rat r);
+
+/*Divides p of degree n by m - r, which must be a factor*/
+void deflate(mp_rat *p, unsigned n, mp_rat r);
+
+/*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
+bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count);
+
+/*Returns the polynomial in m with coefficients p[k]/divisor*/
+pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat divisor);
+
+/*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
+pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned count, const pcas_ast_t *m);
+
+/*Fills constants with n letters that do not appear in the equation or in exclude unless it is NULL. Returns false if there are not enough.*/
+bool choose_constants(const pcas_de_t *de, const pcas_ast_t *exclude, pcas_ast_t **constants, unsigned n);
+
+/*Solves a linear equation with polynomial coefficients and right side with a power series about an ordinary point, recording the recurrence relation and the coefficients*/
+pcas_error_t solve_power_series(pcas_de_t *de, pcas_ast_t **solution);

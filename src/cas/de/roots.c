@@ -14,8 +14,7 @@ static pcas_ast_t *integer_node(mp_int z) {
 	return ast_MakeNumber(n);
 }
 
-/*Returns the value of e if it is a rational number, otherwise NULL*/
-static mp_rat rational_value(const pcas_ast_t *e) {
+mp_rat rational_value(const pcas_ast_t *e) {
 	pcas_ast_t *child;
 	mp_rat value, factor;
 
@@ -41,8 +40,7 @@ static mp_rat rational_value(const pcas_ast_t *e) {
 	return value;
 }
 
-/*Sets value to p(r), where p has degree n*/
-static void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value) {
+void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value) {
 	unsigned k;
 
 	mp_rat_copy(p[n], value);
@@ -53,7 +51,7 @@ static void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value) {
 	}
 }
 
-static bool is_root(mp_rat *p, unsigned n, mp_rat r) {
+bool is_root(mp_rat *p, unsigned n, mp_rat r) {
 	mp_rat value = num_FromInt(0);
 	bool root;
 
@@ -64,8 +62,7 @@ static bool is_root(mp_rat *p, unsigned n, mp_rat r) {
 	return root;
 }
 
-/*Divides p of degree n by m - r, which must be a factor*/
-static void deflate(mp_rat *p, unsigned n, mp_rat r) {
+void deflate(mp_rat *p, unsigned n, mp_rat r) {
 	mp_rat t = num_FromInt(0);
 	unsigned k;
 
@@ -319,8 +316,7 @@ static bool biquadratic(mp_rat *p, root_t *roots, unsigned *count) {
 	return rational;
 }
 
-/*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
-static bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count) {
+bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count) {
 	mp_rat r = num_FromInt(0);
 	bool found = true;
 
@@ -347,8 +343,7 @@ static bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count) {
 	return found;
 }
 
-/*Returns the polynomial in m with coefficients p[k]/divisor*/
-static pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat divisor) {
+pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat divisor) {
 	pcas_ast_t *sum = ast_MakeOperator(OP_ADD), *term;
 	mp_rat c;
 	unsigned k;
@@ -377,8 +372,7 @@ static pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat
 	return tidy(sum);
 }
 
-/*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
-static pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned count, const pcas_ast_t *m) {
+pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned count, const pcas_ast_t *m) {
 	pcas_ast_t *product = ast_MakeOperator(OP_MULT), *factor, *rest;
 	mp_rat scale = num_FromInt(1), t = num_FromInt(0), r;
 	unsigned i, k;
