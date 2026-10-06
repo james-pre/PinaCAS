@@ -657,7 +657,7 @@ static struct compile_info {
 #define CID_ALL ((1 << NUM_COMPILE_INFO) - 1)
 
 /*Loads the identity tables in mask that are not loaded yet*/
-static void compile_ids(unsigned mask) {
+static void compile_ids(compile_ids_mask mask) {
 	char buffer[50];
 
 	for (unsigned i = 0; i < NUM_COMPILE_INFO; i++) {
@@ -692,7 +692,7 @@ void execute_simplify(void) {
 	pcas_error_t err;
 
 	unsigned short flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
-	unsigned ids = 0;
+	compile_ids_mask ids = 0;
 
 	if (simplify_context[0]->checked) {
 		ids |= CID_GENERAL;
