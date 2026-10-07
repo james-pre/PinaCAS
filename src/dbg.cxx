@@ -44,23 +44,23 @@ void _print_tree(const ast *e, unsigned indent, unsigned index) {
 			break;
 		case ast::Type::Operator: {
 			DBG(("OPERATOR: %s\n", operators[static_cast<unsigned>(e->op())]));
-			for (const ast *current : e->children()) {
-				_print_tree(current, indent, index + 1);
+			for (const ast &current : e->children()) {
+				_print_tree(&current, indent, index + 1);
 			}
 			break;
 		}
 	}
 }
 
-void dbg_print_tree(const ast *e, unsigned indent) {
-	_print_tree(e, indent, 0);
+void dbg_print_tree(const ast &e, unsigned indent) {
+	_print_tree(&e, indent, 0);
 }
 
-unsigned dbg_count_nodes(const ast *e) {
+unsigned dbg_count_nodes(const ast &e) {
 	unsigned amount = 1;
 
-	if (e->isOperator()) {
-		for (const ast *current : e->children())
+	if (e.isOperator()) {
+		for (const ast &current : e.children())
 			amount += dbg_count_nodes(current);
 	}
 

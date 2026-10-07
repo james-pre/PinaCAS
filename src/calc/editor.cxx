@@ -170,21 +170,21 @@ static bool is_function(const ast *e) {
 }
 
 /*Shows an initial condition such as Y(0)=1, which is parsed as Y*0=1, as the function at a point*/
-static void show_condition(ast *e) {
-	if (!e->isOp(Op::Equals))
+static void show_condition(ast &e) {
+	if (!e.isOp(Op::Equals))
 		return;
 
-	ast *left = e->firstChild();
-	if (left->isOp(Op::Mult) && left->childCount() == 2 && is_function(left->firstChild()))
-		left->setOp(Op::At);
+	ast &left = *e.firstChild();
+	if (left.isOp(Op::Mult) && left.childCount() == 2 && is_function(left.firstChild()))
+		left.setOp(Op::At);
 }
 
-static bool too_deep(const ast *e, unsigned depth) {
+static bool too_deep(const ast &e, unsigned depth) {
 	if (depth > MAX_PREVIEW_DEPTH)
 		return true;
 
-	if (e->isOperator())
-		for (const ast *child : e->children())
+	if (e.isOperator())
+		for (const ast &child : e.children())
 			if (too_deep(child, depth + 1))
 				return true;
 
@@ -211,7 +211,7 @@ static void update_preview(void) {
 		preview_message = error_text(err);
 
 	for (unsigned i = 0; i < count; i++)
-		if (items[i] != nullptr && too_deep(items[i], 0))
+		if (items[i] != nullptr && too_deep(*items[i], 0))
 			preview_message = "Too deeply nested to preview";
 
 	for (unsigned i = 0; i < count; i++) {
@@ -224,12 +224,12 @@ static void update_preview(void) {
 		}
 
 		if (i > 0)
-			show_condition(items[i]);
+			show_condition(*items[i]);
 
-		simplify(items[i], Simp::Commutative);
-		simplify_canonical_form(items[i], Canonical::All);
+		simplify(*items[i], Simp::Commutative);
+		simplify_canonical_form(*items[i], Canonical::All);
 
-		previews[preview_count] = ts::fromAst(items[i]);
+		previews[preview_count] = ts::fromAst(*items[i]);
 		viewer::measure(previews[preview_count++]);
 
 		ast::dispose(items[i]);

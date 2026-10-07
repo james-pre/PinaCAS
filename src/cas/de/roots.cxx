@@ -14,25 +14,25 @@ static ast *integer_node(const mpz_t *z) {
 	return ast::make(n);
 }
 
-num *rational_value(const ast *e) {
-	if (e->isNumber())
-		return e->num().copy();
+num *rational_value(const ast &e) {
+	if (e.isNumber())
+		return e.num().copy();
 
-	if (!e->isOp(Op::Div) && !e->isOp(Op::Mult))
+	if (!e.isOp(Op::Div) && !e.isOp(Op::Mult))
 		return nullptr;
 
-	num *value = rational_value(e->firstChild());
+	num *value = rational_value(*e.firstChild());
 	if (value == nullptr)
 		return nullptr;
 
-	for (const ast *child = e->firstChild()->next(); child != nullptr; child = child->next()) {
-		num *factor = rational_value(child);
+	for (const ast *child = e.firstChild()->next(); child != nullptr; child = child->next()) {
+		num *factor = rational_value(*child);
 		if (factor == nullptr) {
 			num::dispose(value);
 			return nullptr;
 		}
 
-		if (e->isOp(Op::Div))
+		if (e.isOp(Op::Div))
 			*value /= *factor;
 		else
 			*value *= *factor;
@@ -171,9 +171,9 @@ static ast *square_root(const num &q) {
 /*Records a root, merging it with an equal real root. Takes ownership of re and im.*/
 static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, const num *value, unsigned multiplicity) {
 	work::pause();
-	simplify(re, Simp::Basic);
+	simplify(*re, Simp::Basic);
 	if (im != nullptr)
-		simplify(im, Simp::Basic);
+		simplify(*im, Simp::Basic);
 	work::resume();
 
 	for (unsigned i = 0; i < *count; i++) {
@@ -311,7 +311,7 @@ bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count) {
 	return found;
 }
 
-ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor) {
+ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor) {
 	ast *sum = ast::make(Op::Add);
 
 	for (unsigned k = n + 1; k-- > 0;) {
@@ -325,7 +325,7 @@ ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor) {
 		if (k == 0) {
 			term = ast::make(c);
 		} else {
-			term = k == 1 ? m->copy() : ast::make(Op::Pow, m->copy(), integer(k));
+			term = k == 1 ? m.copy() : ast::make(Op::Pow, m.copy(), integer(k));
 
 			if (*c == 1)
 				num::dispose(c);
@@ -339,7 +339,7 @@ ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor) {
 	return tidy(sum);
 }
 
-ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast *m) {
+ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast &m) {
 	ast *product = ast::make(Op::Mult);
 	num scale(1), t;
 
@@ -350,8 +350,8 @@ ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, con
 		const num &r = *roots[i].value;
 
 		ast *factor = difference(
-			mp_int_compare_value(MP_DENOM_P(&r), 1) == 0 ? m->copy()
-														 : ast::make(Op::Mult, integer_node(MP_DENOM_P(&r)), m->copy()),
+			mp_int_compare_value(MP_DENOM_P(&r), 1) == 0 ? m.copy()
+														 : ast::make(Op::Mult, integer_node(MP_DENOM_P(&r)), m.copy()),
 			integer_node(MP_NUMER_P(&r))
 		);
 
@@ -378,12 +378,12 @@ ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, con
 	return tidy(product);
 }
 
-static void record_roots(const root_t *roots, unsigned count, const ast *m) {
+static void record_roots(const root_t *roots, unsigned count, const ast &m) {
 	for (unsigned i = 0; i < count; i++) {
 		const char *text = roots[i].multiplicity < 4 ? multiplicity_names[roots[i].multiplicity] : "Repeated root";
 
 		if (roots[i].im == nullptr) {
-			work::step(work::Step::Type::Equation, text, m, roots[i].re);
+			work::step(work::Step::Type::Equation, text, &m, roots[i].re);
 			continue;
 		}
 
@@ -393,13 +393,13 @@ static void record_roots(const root_t *roots, unsigned count, const ast *m) {
 				imaginary = negate(imaginary);
 
 			ast *value = roots[i].re->isInt(0) ? imaginary : ast::make(Op::Add, roots[i].re->copy(), imaginary);
-			work::step(work::Step::Type::Equation, sign > 0 ? text : nullptr, m, tidy(value));
+			work::step(work::Step::Type::Equation, sign > 0 ? text : nullptr, &m, tidy(value));
 			ast::dispose(value);
 		}
 	}
 }
 
-ast *basis_function(const DiffEq *de, unsigned j, const ast *r, ast *f) {
+ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f) {
 	ast *product = ast::make(Op::Mult);
 
 	product->appendChild(integer(1));
@@ -407,15 +407,15 @@ ast *basis_function(const DiffEq *de, unsigned j, const ast *r, ast *f) {
 	if (j > 0)
 		product->appendChild(ast::make(Op::Pow, de->x->copy(), integer(j)));
 
-	if (!r->isInt(0)) {
-		product->appendChild(ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, r->copy(), de->x->copy())));
+	if (!r.isInt(0)) {
+		product->appendChild(ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, r.copy(), de->x->copy())));
 	}
 
 	if (f != nullptr)
 		product->appendChild(f);
 
 	work::pause();
-	simplify(product, Simp::Basic);
+	simplify(*product, Simp::Basic);
 	work::resume();
 
 	return product;
@@ -429,13 +429,13 @@ unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast *
 
 		for (unsigned j = 0; j < root->multiplicity; j++) {
 			if (root->im == nullptr) {
-				basis[n++] = basis_function(de, j, root->re, nullptr);
+				basis[n++] = basis_function(de, j, *root->re, nullptr);
 			} else {
 				basis[n++] = basis_function(
-					de, j, root->re, ast::make(Op::Cos, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
+					de, j, *root->re, ast::make(Op::Cos, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
 				);
 				basis[n++] = basis_function(
-					de, j, root->re, ast::make(Op::Sin, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
+					de, j, *root->re, ast::make(Op::Sin, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
 				);
 			}
 		}
@@ -445,12 +445,12 @@ unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast *
 }
 
 /*Finds the roots of a2m^2 + a0 = 0 as ±i*sqrt(a0/a2), assuming that a0/a2 is positive, when the coefficients are constants that are not all rational*/
-static Error oscillator_roots(DiffEq *de, const ast *m, root_t *roots, unsigned *count) {
-	if (de->order != 2 || !de->a[1]->isInt(0) || involves(de->a[0], de->x) || involves(de->a[2], de->x))
+static Error oscillator_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count) {
+	if (de->order != 2 || !de->a[1]->isInt(0) || involves(*de->a[0], *de->x) || involves(*de->a[2], *de->x))
 		return Error::DeUnsolved;
 
 	ast *left = ast::make(
-		Op::Add, ast::make(Op::Mult, de->a[2]->copy(), ast::make(Op::Pow, m->copy(), integer(2))), de->a[0]->copy()
+		Op::Add, ast::make(Op::Mult, de->a[2]->copy(), ast::make(Op::Pow, m.copy(), integer(2))), de->a[0]->copy()
 	);
 	ast *zero = integer(0);
 	work::step(work::Step::Type::Equation, "Characteristic equation", tidy(left), zero);
@@ -470,15 +470,15 @@ static Error oscillator_roots(DiffEq *de, const ast *m, root_t *roots, unsigned 
 	return Error::Success;
 }
 
-Error characteristic_roots(DiffEq *de, const ast *m, root_t *roots, unsigned *count) {
+Error characteristic_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count) {
 	num *p[DiffEq::max_order + 1];
 	unsigned n = de->order;
 
 	*count = 0;
-	canonical_SetFunction(m->symbol());
+	canonical_SetFunction(m.symbol());
 
 	for (unsigned k = 0; k <= de->order; k++) {
-		if ((p[k] = rational_value(de->a[k])) == nullptr) {
+		if ((p[k] = rational_value(*de->a[k])) == nullptr) {
 			while (k > 0)
 				num::dispose(p[--k]);
 

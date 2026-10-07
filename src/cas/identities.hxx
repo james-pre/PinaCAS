@@ -19,9 +19,9 @@ extern Identity complex[];
 
 bool load(Identity *id);
 void unload(Identity *id);
-bool execute(ast *e, Identity *id, bool recursive);
+bool execute(ast &e, Identity *id, bool recursive);
 
-bool executeTable(ast *e, Identity *table, bool recursive);
+bool executeTable(ast &e, Identity *table, bool recursive);
 void loadTable(Identity *table);
 void unloadTable(Identity *table);
 /*Calls unloadTable for all tables*/

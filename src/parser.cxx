@@ -326,93 +326,93 @@ uint8_t operand_count(Tok type) {
 }
 
 /*Changes the Tok into the Op and fixes operands*/
-void translate(ast *e, Tok type) {
+void translate(ast &e, Tok type) {
 	switch (type) {
-		case Tok::Plus: e->setOp(Op::Add); break;
+		case Tok::Plus: e.setOp(Op::Add); break;
 		case Tok::Minus: {
-			e->setOp(Op::Add);
-			e->insertChild(ast::make(Op::Mult, ast::make(num::from(-1)), e->removeChildAt(1)), 0);
+			e.setOp(Op::Add);
+			e.insertChild(ast::make(Op::Mult, ast::make(num::from(-1)), e.removeChildAt(1)), 0);
 			break;
 		}
-		case Tok::Multiply: e->setOp(Op::Mult); break;
-		case Tok::Divide: e->setOp(Op::Div); break;
-		case Tok::Fraction: e->setOp(Op::Div); break;
-		case Tok::Proper: e->setOp(Op::Add); break;
-		case Tok::Power: e->setOp(Op::Pow); break;
+		case Tok::Multiply: e.setOp(Op::Mult); break;
+		case Tok::Divide: e.setOp(Op::Div); break;
+		case Tok::Fraction: e.setOp(Op::Div); break;
+		case Tok::Proper: e.setOp(Op::Add); break;
+		case Tok::Power: e.setOp(Op::Pow); break;
 		case Tok::Scientific: {
-			e->setOp(Op::Mult);
+			e.setOp(Op::Mult);
 
-			ast *op2 = ast::make(Op::Pow, ast::make(num::from(10)), e->childAt(1));
-			e->removeChildAt(1);
-			e->appendChild(op2);
+			ast *op2 = ast::make(Op::Pow, ast::make(num::from(10)), e.childAt(1));
+			e.removeChildAt(1);
+			e.appendChild(op2);
 
 			break;
 		}
-		case Tok::Root: e->setOp(Op::Root); break;
-		case Tok::Equals: e->setOp(Op::Equals); break;
-		case Tok::Prime: e->setOp(Op::Prime); break;
+		case Tok::Root: e.setOp(Op::Root); break;
+		case Tok::Equals: e.setOp(Op::Equals); break;
+		case Tok::Prime: e.setOp(Op::Prime); break;
 		case Tok::Negate:
-			e->setOp(Op::Mult);
-			e->insertChild(ast::make(num::from(-1)), 0);
+			e.setOp(Op::Mult);
+			e.insertChild(ast::make(num::from(-1)), 0);
 			break;
 		case Tok::Reciprocal:
-			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num::from(-1)));
+			e.setOp(Op::Pow);
+			e.appendChild(ast::make(num::from(-1)));
 			break;
 		case Tok::Square:
-			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num::from(2)));
+			e.setOp(Op::Pow);
+			e.appendChild(ast::make(num::from(2)));
 			break;
 		case Tok::Cube:
-			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num::from(3)));
+			e.setOp(Op::Pow);
+			e.appendChild(ast::make(num::from(3)));
 			break;
-		case Tok::Factorial: e->setOp(Op::Factorial); break;
+		case Tok::Factorial: e.setOp(Op::Factorial); break;
 		case Tok::LogBase:
-			e->setOp(Op::Log);
+			e.setOp(Op::Log);
 			/*Swap the operands*/
-			e->appendChild(e->removeChildAt(0));
+			e.appendChild(e.removeChildAt(0));
 			break;
-		case Tok::Deriv: e->setOp(Op::Deriv); break;
-		case Tok::Integral: e->setOp(Op::Integral); break;
-		case Tok::Int: e->setOp(Op::Int); break;
-		case Tok::Abs: e->setOp(Op::Abs); break;
+		case Tok::Deriv: e.setOp(Op::Deriv); break;
+		case Tok::Integral: e.setOp(Op::Integral); break;
+		case Tok::Int: e.setOp(Op::Int); break;
+		case Tok::Abs: e.setOp(Op::Abs); break;
 		case Tok::Sqrt:
-			e->setOp(Op::Root);
-			e->insertChild(ast::make(num::from(2)), 0);
+			e.setOp(Op::Root);
+			e.insertChild(ast::make(num::from(2)), 0);
 			break;
 		case Tok::CubedRoot:
-			e->setOp(Op::Root);
-			e->insertChild(ast::make(num::from(3)), 0);
+			e.setOp(Op::Root);
+			e.insertChild(ast::make(num::from(3)), 0);
 			break;
 		case Tok::Ln:
-			e->setOp(Op::Log);
-			e->insertChild(ast::make(Sym::Euler), 0);
+			e.setOp(Op::Log);
+			e.insertChild(ast::make(Sym::Euler), 0);
 			break;
 		case Tok::EToPower:
-			e->setOp(Op::Pow);
-			e->insertChild(ast::make(Sym::Euler), 0);
+			e.setOp(Op::Pow);
+			e.insertChild(ast::make(Sym::Euler), 0);
 			break;
 		case Tok::Log:
-			e->setOp(Op::Log);
-			e->insertChild(ast::make(num::from(10)), 0);
+			e.setOp(Op::Log);
+			e.insertChild(ast::make(num::from(10)), 0);
 			break;
 		case Tok::TenToPower:
-			e->setOp(Op::Pow);
-			e->insertChild(ast::make(num::from(10)), 0);
+			e.setOp(Op::Pow);
+			e.insertChild(ast::make(num::from(10)), 0);
 			break;
-		case Tok::Sin: e->setOp(Op::Sin); break;
-		case Tok::Sin_Inv: e->setOp(Op::Sin_Inv); break;
-		case Tok::Cos: e->setOp(Op::Cos); break;
-		case Tok::Cos_Inv: e->setOp(Op::Cos_Inv); break;
-		case Tok::Tan: e->setOp(Op::Tan); break;
-		case Tok::Tan_Inv: e->setOp(Op::Tan_Inv); break;
-		case Tok::SinH: e->setOp(Op::SinH); break;
-		case Tok::SinH_Inv: e->setOp(Op::SinH_Inv); break;
-		case Tok::CosH: e->setOp(Op::CosH); break;
-		case Tok::CosH_Inv: e->setOp(Op::CosH_Inv); break;
-		case Tok::TanH: e->setOp(Op::TanH); break;
-		case Tok::TanH_Inv: e->setOp(Op::TanH_Inv); break;
+		case Tok::Sin: e.setOp(Op::Sin); break;
+		case Tok::Sin_Inv: e.setOp(Op::Sin_Inv); break;
+		case Tok::Cos: e.setOp(Op::Cos); break;
+		case Tok::Cos_Inv: e.setOp(Op::Cos_Inv); break;
+		case Tok::Tan: e.setOp(Op::Tan); break;
+		case Tok::Tan_Inv: e.setOp(Op::Tan_Inv); break;
+		case Tok::SinH: e.setOp(Op::SinH); break;
+		case Tok::SinH_Inv: e.setOp(Op::SinH_Inv); break;
+		case Tok::CosH: e.setOp(Op::CosH); break;
+		case Tok::CosH_Inv: e.setOp(Op::CosH_Inv); break;
+		case Tok::TanH: e.setOp(Op::TanH); break;
+		case Tok::TanH_Inv: e.setOp(Op::TanH_Inv); break;
 		default: break;
 	}
 }
@@ -450,7 +450,7 @@ bool collapse_precedence(Stack<const Token *> &operators, Stack<ast *> &expressi
 			collapsed->insertChild(operand, 0);
 		}
 
-		translate(collapsed, op->type);
+		translate(*collapsed, op->type);
 
 		expressions.push(collapsed);
 	}

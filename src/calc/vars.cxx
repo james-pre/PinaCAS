@@ -83,7 +83,7 @@ void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, 
 	*err = Error::Success;
 }
 
-void write_to_tok(const char *tok, const ast *expression, Error *err) {
+void write_to_tok(const char *tok, const ast &expression, Error *err) {
 	unsigned length;
 	uint8_t *data = export_to_binary(expression, &length, ti_table, err);
 

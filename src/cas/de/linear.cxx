@@ -4,7 +4,7 @@
 
 static ast *reduced(ast *e) {
 	work::pause();
-	simplify(e, Simp::All);
+	simplify(*e, Simp::All);
 	work::resume();
 
 	return e;
@@ -13,13 +13,13 @@ static ast *reduced(ast *e) {
 /*Simplifies e, keeping the smallest of its simplified, expanded and identity-reduced forms*/
 static ast *simplest(ast *e) {
 	work::pause();
-	simplify(e, Simp::Basic);
-	expand_if_smaller(e);
+	simplify(*e, Simp::Basic);
+	expand_if_smaller(*e);
 	work::resume();
 
 	ast *candidate = reduced(e->copy());
 
-	if (node_count(candidate) < node_count(e))
+	if (node_count(*candidate) < node_count(*e))
 		e->replace(candidate);
 	else
 		ast::dispose(candidate);
@@ -38,7 +38,7 @@ bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, uns
 		scope->appendChild(exclude->copy());
 
 	for (; *candidates != '\0' && count < n; candidates++) {
-		if (!contains_symbol(scope, (Sym)*candidates))
+		if (!contains_symbol(*scope, (Sym)*candidates))
 			constants[count++] = ast::make(static_cast<Sym>((Sym)*candidates));
 	}
 
@@ -56,7 +56,7 @@ bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, uns
 /*Writes each initial condition as a linear equation in the constants, as row i of the augmented matrix*/
 static void condition_rows(
 	DiffEq *de,
-	const ast *general,
+	const ast &general,
 	ast **constants,
 	unsigned n,
 	ast *matrix[][DiffEq::max_order + 1]
@@ -69,17 +69,17 @@ static void condition_rows(
 			highest = de->conditions[i].order;
 	}
 
-	derivatives[0] = general->copy();
+	derivatives[0] = general.copy();
 
 	for (unsigned k = 1; k <= highest; k++) {
 		derivatives[k] = derivatives[k - 1]->copy();
 
 		work::pause();
-		derivative(derivatives[k], de->x, de->x);
+		derivative(*derivatives[k], *de->x, *de->x);
 		work::resume();
 		simplest(derivatives[k]);
 
-		ast *e = DiffEq::derivative(de->y, k);
+		ast *e = DiffEq::derivative(*de->y, k);
 		work::step(work::Step::Type::Equation, k == 1 ? "Differentiate" : nullptr, e, derivatives[k]);
 		ast::dispose(e);
 	}
@@ -89,11 +89,11 @@ static void condition_rows(
 		ast *e = derivatives[c->order]->copy();
 
 		work::pause();
-		substitute(e, de->x, c->at);
+		substitute(*e, *de->x, *c->at);
 		work::resume();
 		reduced(e);
 
-		ast *at = ast::make(Op::At, DiffEq::derivative(de->y, c->order), c->at->copy());
+		ast *at = ast::make(Op::At, DiffEq::derivative(*de->y, c->order), c->at->copy());
 		ast *chain = ast::make(Op::Equals, e->copy(), c->value->copy());
 		work::step(work::Step::Type::Equation, i == 0 ? "Initial conditions" : nullptr, at, chain);
 		ast::dispose(at);
@@ -103,14 +103,14 @@ static void condition_rows(
 			matrix[i][j] = e->copy();
 
 			work::pause();
-			derivative(matrix[i][j], constants[j], constants[j]);
+			derivative(*matrix[i][j], *constants[j], *constants[j]);
 			work::resume();
 			reduced(matrix[i][j]);
 		}
 
 		work::pause();
 		for (unsigned j = 0; j < n; j++)
-			substitute(e, constants[j], zero);
+			substitute(*e, *constants[j], *zero);
 		work::resume();
 
 		matrix[i][n] = reduced(difference(c->value->copy(), e));
@@ -127,7 +127,7 @@ static unsigned eliminate(ast *matrix[][DiffEq::max_order + 1], unsigned rows, u
 
 	for (unsigned j = 0; j < n && rank < rows; j++) {
 		unsigned row = rank;
-		while (row < rows && is_zero(matrix[row][j]))
+		while (row < rows && is_zero(*matrix[row][j]))
 			row++;
 
 		if (row == rows)
@@ -148,7 +148,7 @@ static unsigned eliminate(ast *matrix[][DiffEq::max_order + 1], unsigned rows, u
 		matrix[rank][j] = integer(1);
 
 		for (unsigned i = 0; i < rows; i++) {
-			if (i == rank || is_zero(matrix[i][j]))
+			if (i == rank || is_zero(*matrix[i][j]))
 				continue;
 
 			ast *factor = matrix[i][j];
@@ -175,11 +175,11 @@ static Error apply_conditions(DiffEq *de, ast *general, ast **constants, unsigne
 	const unsigned rows = de->condition_count;
 	Error err = Error::Success;
 
-	condition_rows(de, general, constants, n, matrix);
+	condition_rows(de, *general, constants, n, matrix);
 	const unsigned rank = eliminate(matrix, rows, n, pivots);
 
 	for (unsigned i = rank; i < rows; i++) {
-		if (!is_zero(matrix[i][n]))
+		if (!is_zero(*matrix[i][n]))
 			err = Error::DeNoSolution;
 	}
 
@@ -191,18 +191,18 @@ static Error apply_conditions(DiffEq *de, ast *general, ast **constants, unsigne
 			for (unsigned r = 0; r < rank; r++)
 				pivot |= pivots[r] == k;
 
-			if (!pivot && !is_zero(matrix[i][k]))
+			if (!pivot && !is_zero(*matrix[i][k]))
 				value = difference(value, ast::make(Op::Mult, matrix[i][k]->copy(), constants[k]->copy()));
 		}
 
 		reduced(value);
-		single_fraction(value);
+		single_fraction(*value);
 		work::step(
 			work::Step::Type::Equation, i == 0 ? "Solve for the constants" : nullptr, constants[pivots[i]], value
 		);
 
 		work::pause();
-		substitute(general, constants[pivots[i]], value);
+		substitute(*general, *constants[pivots[i]], *value);
 		work::resume();
 
 		ast::dispose(value);
@@ -219,7 +219,7 @@ static Error apply_conditions(DiffEq *de, ast *general, ast **constants, unsigne
 	}
 
 	work::pause();
-	simplify(general, Simp::Basic);
+	simplify(*general, Simp::Basic);
 	work::resume();
 
 	work::step(work::Step::Type::Equation, "Solution", de->y, general);
@@ -229,16 +229,16 @@ static Error apply_conditions(DiffEq *de, ast *general, ast **constants, unsigne
 }
 
 /*Returns a/b simplified as one fraction with common factors cancelled and an expanded denominator*/
-static ast *quotient(const ast *a, const ast *b) {
-	ast *q = ast::make(Op::Div, a->copy(), b->copy());
+static ast *quotient(const ast &a, const ast &b) {
+	ast *q = ast::make(Op::Div, a.copy(), b.copy());
 
 	work::pause();
-	simplify(q, Simp::Basic);
-	factor_cancel(q);
+	simplify(*q, Simp::Basic);
+	factor_cancel(*q);
 
 	if (q->isOp(Op::Div)) {
-		expand(q->firstChild()->next(), Expand::All);
-		simplify(q->firstChild()->next(), Simp::Basic);
+		expand(*q->firstChild()->next(), Expand::All);
+		simplify(*q->firstChild()->next(), Simp::Basic);
 	}
 	work::resume();
 
@@ -246,25 +246,25 @@ static ast *quotient(const ast *a, const ast *b) {
 }
 
 /*Returns a times b, expanded term by term when that leaves fewer nodes*/
-static ast *distribute(const ast *a, const ast *b) {
-	ast *product = ast::make(Op::Mult, a->copy(), b->copy());
+static ast *distribute(const ast &a, const ast &b) {
+	ast *product = ast::make(Op::Mult, a.copy(), b.copy());
 
 	work::pause();
-	simplify(product, Simp::Basic);
+	simplify(*product, Simp::Basic);
 
-	if (b->isOp(Op::Add)) {
+	if (b.isOp(Op::Add)) {
 		ast *sum = ast::make(Op::Add);
 
-		for (const ast *term : b->children()) {
-			sum->appendChild(ast::make(Op::Mult, a->copy(), term->copy()));
-			simplify(sum->lastChild(), Simp::Basic);
+		for (const ast &term : b.children()) {
+			sum->appendChild(ast::make(Op::Mult, a.copy(), term.copy()));
+			simplify(*sum->lastChild(), Simp::Basic);
 		}
 
-		expand(sum, Expand::All);
+		expand(*sum, Expand::All);
 
-		simplify(sum, Simp::Basic);
+		simplify(*sum, Simp::Basic);
 
-		if (node_count(sum) < node_count(product)) {
+		if (node_count(*sum) < node_count(*product)) {
 			ast::dispose(product);
 			product = sum;
 		} else {
@@ -312,31 +312,31 @@ static Error solve_with_basis(
 }
 
 /*Returns preferred, or a symbol that does not appear in the equation or taken if preferred does*/
-static ast *pick_symbol(const DiffEq *de, Sym preferred, const ast *taken) {
+static ast *pick_symbol(const DiffEq *de, Sym preferred, const ast &taken) {
 	ast *scope = ast::make(Op::Add);
 
 	scope->appendChild(de->equation->copy());
 	scope->appendChild(de->x->copy());
-	scope->appendChild(taken->copy());
-	const Sym symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
+	scope->appendChild(taken.copy());
+	const Sym symbol = contains_symbol(*scope, preferred) ? fresh_symbol(*scope) : preferred;
 	ast::dispose(scope);
 
 	return ast::make(static_cast<Sym>(symbol));
 }
 
 /*Returns the constant slope of e in x if e is linear in x, otherwise nullptr*/
-static ast *linear_slope(const DiffEq *de, const ast *e) {
-	ast *slope = e->copy();
+static ast *linear_slope(const DiffEq *de, const ast &e) {
+	ast *slope = e.copy();
 
 	work::pause();
-	derivative(slope, de->x, de->x);
-	simplify(slope, Simp::Basic);
+	derivative(*slope, *de->x, *de->x);
+	simplify(*slope, Simp::Basic);
 	ast *second = slope->copy();
-	derivative(second, de->x, de->x);
-	simplify(second, Simp::Basic);
+	derivative(*second, *de->x, *de->x);
+	simplify(*second, Simp::Basic);
 	work::resume();
 
-	if (involves(slope, de->x) || !second->isInt(0)) {
+	if (involves(*slope, *de->x) || !second->isInt(0)) {
 		ast::dispose(slope);
 		slope = nullptr;
 	}
@@ -350,7 +350,7 @@ static ast *linear_slope(const DiffEq *de, const ast *e) {
 static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, ast **rate, ast **frequency) {
 	bool form = true;
 
-	if (term->isOp(Op::Div) && !involves(term->firstChild()->next(), de->x))
+	if (term->isOp(Op::Div) && !involves(*term->firstChild()->next(), *de->x))
 		term = term->firstChild();
 
 	const unsigned count = term->isOp(Op::Mult) ? term->childCount() : 1;
@@ -361,7 +361,7 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 	for (unsigned i = 0; i < count && form; i++) {
 		const ast *factor = term->isOp(Op::Mult) ? term->childAt(i) : term;
 
-		if (!involves(factor, de->x))
+		if (!involves(*factor, *de->x))
 			continue;
 
 		ast *slope;
@@ -375,13 +375,13 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 		) {
 			*degree += (unsigned)n;
 		} else if (
-			factor->isOp(Op::Pow) && is_euler(factor->firstChild()) &&
-			(slope = linear_slope(de, factor->firstChild()->next())) != nullptr
+			factor->isOp(Op::Pow) && is_euler(*factor->firstChild()) &&
+			(slope = linear_slope(de, *factor->firstChild()->next())) != nullptr
 		) {
 			*rate = ast::make(Op::Add, *rate, slope);
 		} else if (
 			(factor->isOp(Op::Sin) || factor->isOp(Op::Cos)) && *frequency == nullptr &&
-			(slope = linear_slope(de, factor->firstChild())) != nullptr
+			(slope = linear_slope(de, *factor->firstChild())) != nullptr
 		) {
 			*frequency = slope;
 		} else {
@@ -393,10 +393,10 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 		*frequency = integer(0);
 
 	work::pause();
-	simplify(*rate, Simp::Basic);
-	if (is_negative_for_sure(*frequency))
+	simplify(**rate, Simp::Basic);
+	if (is_negative_for_sure(**frequency))
 		*frequency = negate(*frequency);
-	simplify(*frequency, Simp::Basic);
+	simplify(**frequency, Simp::Basic);
 	work::resume();
 
 	if (!form || *degree > DiffEq::max_order) {
@@ -409,18 +409,18 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 }
 
 /*Returns the multiplicity of rate + frequency*i as a characteristic root*/
-static unsigned root_multiplicity(const root_t *roots, unsigned count, const ast *rate, const ast *frequency) {
+static unsigned root_multiplicity(const root_t *roots, unsigned count, const ast &rate, const ast &frequency) {
 	unsigned multiplicity = 0;
-	const bool real = frequency->isInt(0);
+	const bool real = frequency.isInt(0);
 
 	for (unsigned i = 0; i < count && multiplicity == 0; i++) {
 		if ((roots[i].im == nullptr) != real)
 			continue;
 
-		ast *re = difference(roots[i].re->copy(), rate->copy());
-		ast *im = real ? integer(0) : difference(roots[i].im->copy(), frequency->copy());
+		ast *re = difference(roots[i].re->copy(), rate.copy());
+		ast *im = real ? integer(0) : difference(roots[i].im->copy(), frequency.copy());
 
-		if (is_zero(re) && is_zero(im))
+		if (is_zero(*re) && is_zero(*im))
 			multiplicity = roots[i].multiplicity;
 
 		ast::dispose(re);
@@ -431,25 +431,25 @@ static unsigned root_multiplicity(const root_t *roots, unsigned count, const ast
 }
 
 /*Returns the factors of term that involve x, or 1*/
-static ast *function_part(const DiffEq *de, const ast *term) {
-	if (!involves(term, de->x))
+static ast *function_part(const DiffEq *de, const ast &term) {
+	if (!involves(term, *de->x))
 		return integer(1);
 
 	ast *part;
-	if (term->isOp(Op::Mult)) {
+	if (term.isOp(Op::Mult)) {
 		part = ast::make(Op::Mult);
-		for (const ast *child : term->children()) {
-			if (involves(child, de->x))
-				part->appendChild(child->copy());
+		for (const ast &child : term.children()) {
+			if (involves(child, *de->x))
+				part->appendChild(child.copy());
 		}
-	} else if (term->isOp(Op::Div)) {
-		part = ast::make(Op::Div, function_part(de, term->firstChild()), function_part(de, term->firstChild()->next()));
+	} else if (term.isOp(Op::Div)) {
+		part = ast::make(Op::Div, function_part(de, *term.firstChild()), function_part(de, *term.firstChild()->next()));
 	} else {
-		part = term->copy();
+		part = term.copy();
 	}
 
 	work::pause();
-	simplify(part, Simp::Basic);
+	simplify(*part, Simp::Basic);
 	work::resume();
 
 	return part;
@@ -458,24 +458,24 @@ static ast *function_part(const DiffEq *de, const ast *term) {
 #define MAX_ROWS (2 * DiffEq::max_order)
 
 /*Substitutes the trial solution into the equation and solves for its unknowns by equating the coefficients of each function of x, recording the work*/
-static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, unsigned size, ast **particular) {
+static Error match_coefficients(DiffEq *de, const ast &trial, ast **unknowns, unsigned size, ast **particular) {
 	ast *derivatives[DiffEq::max_order + 1], *functions[MAX_ROWS], *sums[MAX_ROWS],
 		*matrix[MAX_ROWS][DiffEq::max_order + 1];
 	unsigned pivots[MAX_ROWS], groups = 0, rows = 0;
 	Error err = Error::Success;
 
-	derivatives[0] = trial->copy();
+	derivatives[0] = trial.copy();
 
 	for (unsigned k = 1; k <= de->order; k++) {
 		derivatives[k] = derivatives[k - 1]->copy();
 
 		work::pause();
-		derivative(derivatives[k], de->x, de->x);
-		simplify(derivatives[k], Simp::Basic);
-		expand_if_smaller(derivatives[k]);
+		derivative(*derivatives[k], *de->x, *de->x);
+		simplify(*derivatives[k], Simp::Basic);
+		expand_if_smaller(*derivatives[k]);
 		work::resume();
 
-		ast *prime = DiffEq::derivative(de->y, k);
+		ast *prime = DiffEq::derivative(*de->y, k);
 		work::step(work::Step::Type::Equation, k == 1 ? "Differentiate" : nullptr, prime, derivatives[k]);
 		ast::dispose(prime);
 	}
@@ -489,9 +489,9 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 	ast *before = left->copy();
 
 	work::pause();
-	simplify(left, Simp::Basic);
-	expand(left, Expand::All);
-	simplify(left, Simp::Basic);
+	simplify(*left, Simp::Basic);
+	expand(*left, Expand::All);
+	simplify(*left, Simp::Basic);
 	work::resume();
 
 	if (!left->compare(*before))
@@ -501,13 +501,13 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 	ast *residual = difference(left, de->g->copy());
 
 	work::pause();
-	expand(residual, Expand::All);
-	simplify(residual, Simp::Basic);
+	expand(*residual, Expand::All);
+	simplify(*residual, Simp::Basic);
 	work::resume();
 
 	for (unsigned i = 0; i < (residual->isOp(Op::Add) ? residual->childCount() : 1) && err == Error::Success; i++) {
 		const ast *term = residual->isOp(Op::Add) ? residual->childAt(i) : residual;
-		ast *function = function_part(de, term);
+		ast *function = function_part(de, *term);
 
 		unsigned j = 0;
 		while (j < groups && !functions[j]->compare(*function))
@@ -534,24 +534,24 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 			matrix[rows][j] = sums[i]->copy();
 
 			work::pause();
-			derivative(matrix[rows][j], unknowns[j], unknowns[j]);
+			derivative(*matrix[rows][j], *unknowns[j], *unknowns[j]);
 			work::resume();
 			matrix[rows][j] = reduced(ast::make(Op::Div, matrix[rows][j], functions[i]->copy()));
 
-			nonzero |= !is_zero(matrix[rows][j]);
+			nonzero |= !is_zero(*matrix[rows][j]);
 		}
 
 		ast *constant = sums[i]->copy();
 
 		work::pause();
 		for (unsigned j = 0; j < size; j++)
-			substitute(constant, unknowns[j], zero);
+			substitute(*constant, *unknowns[j], *zero);
 		work::resume();
 
 		matrix[rows][size] = reduced(ast::make(Op::Div, negate(constant), functions[i]->copy()));
 
 		if (!nonzero) {
-			if (!is_zero(matrix[rows][size]))
+			if (!is_zero(*matrix[rows][size]))
 				err = Error::DeUnsolved;
 
 			for (unsigned j = 0; j <= size; j++)
@@ -564,7 +564,7 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 			sum->appendChild(ast::make(Op::Mult, matrix[rows][j]->copy(), unknowns[j]->copy()));
 
 		work::pause();
-		simplify(sum, Simp::Basic);
+		simplify(*sum, Simp::Basic);
 		work::resume();
 
 		work::step(work::Step::Type::Equation, rows == 0 ? "Equate coefficients" : nullptr, sum, matrix[rows][size]);
@@ -577,13 +577,13 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 		rank = eliminate(matrix, rows, size, pivots);
 
 		for (unsigned i = rank; i < rows; i++) {
-			if (!is_zero(matrix[i][size]))
+			if (!is_zero(*matrix[i][size]))
 				err = Error::DeUnsolved;
 		}
 	}
 
 	if (err == Error::Success) {
-		*particular = trial->copy();
+		*particular = trial.copy();
 
 		for (unsigned j = 0; j < size; j++) {
 			ast *value = nullptr;
@@ -594,11 +594,11 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 			if (value == nullptr)
 				value = integer(0);
 
-			single_fraction(value);
+			single_fraction(*value);
 			work::step(work::Step::Type::Equation, j == 0 ? "Solve for the coefficients" : nullptr, unknowns[j], value);
 
 			work::pause();
-			substitute(*particular, unknowns[j], value);
+			substitute(**particular, *unknowns[j], *value);
 			work::resume();
 			ast::dispose(value);
 		}
@@ -627,13 +627,13 @@ static Error match_coefficients(DiffEq *de, const ast *trial, ast **unknowns, un
 }
 
 /*Returns op(frequency*x)*/
-static ast *oscillation(const DiffEq *de, Op op, const ast *frequency) {
-	return ast::make(op, ast::make(Op::Mult, frequency->copy(), de->x->copy()));
+static ast *oscillation(const DiffEq *de, Op op, const ast &frequency) {
+	return ast::make(op, ast::make(Op::Mult, frequency.copy(), de->x->copy()));
 }
 
 /*Appends unknown*x^j e^(rate*x) f to trial, leaving out f when it is nullptr. Takes ownership of f.*/
-static void add_trial_term(const DiffEq *de, ast *trial, const ast *unknown, unsigned j, const ast *rate, ast *f) {
-	trial->appendChild(ast::make(Op::Mult, unknown->copy(), basis_function(de, j, rate, f)));
+static void add_trial_term(const DiffEq *de, ast &trial, const ast &unknown, unsigned j, const ast &rate, ast *f) {
+	trial.appendChild(ast::make(Op::Mult, unknown.copy(), basis_function(de, j, rate, f)));
 }
 
 /*Finds a particular solution with undetermined coefficients when each term of g is a polynomial times e^(ax) times cos(bx) or sin(bx), recording the work*/
@@ -641,7 +641,7 @@ static Error undetermined_coefficients(
 	DiffEq *de,
 	const root_t *roots,
 	unsigned count,
-	const ast *exclude,
+	const ast &exclude,
 	ast **particular
 ) {
 	ast *rates[DiffEq::max_order], *frequencies[DiffEq::max_order], *unknowns[DiffEq::max_order];
@@ -651,8 +651,8 @@ static Error undetermined_coefficients(
 	ast *g = de->g->copy();
 
 	work::pause();
-	expand(g, Expand::All);
-	simplify(g, Simp::Basic);
+	expand(*g, Expand::All);
+	simplify(*g, Simp::Basic);
 	work::resume();
 
 	for (unsigned i = 0; i < (g->isOp(Op::Add) ? g->childCount() : 1) && err == Error::Success; i++) {
@@ -690,7 +690,7 @@ static Error undetermined_coefficients(
 	for (unsigned i = 0; i < groups; i++)
 		size += (degrees[i] + 1) * (frequencies[i]->isInt(0) ? 1 : 2);
 
-	if (err == Error::Success && (size > DiffEq::max_order || !choose_constants(de, exclude, unknowns, size)))
+	if (err == Error::Success && (size > DiffEq::max_order || !choose_constants(de, &exclude, unknowns, size)))
 		err = Error::DeUnsolved;
 
 	if (err == Error::Success) {
@@ -701,17 +701,17 @@ static Error undetermined_coefficients(
 		unsigned k = 0;
 
 		for (unsigned i = 0; i < groups; i++) {
-			const unsigned shift = root_multiplicity(roots, count, rates[i], frequencies[i]);
+			const unsigned shift = root_multiplicity(roots, count, *rates[i], *frequencies[i]);
 
 			for (unsigned j = degrees[i] + 1; j-- > 0;) {
 				if (frequencies[i]->isInt(0)) {
-					add_trial_term(de, trial, unknowns[k++], j + shift, rates[i], nullptr);
+					add_trial_term(de, *trial, *unknowns[k++], j + shift, *rates[i], nullptr);
 				} else {
 					add_trial_term(
-						de, trial, unknowns[k++], j + shift, rates[i], oscillation(de, Op::Cos, frequencies[i])
+						de, *trial, *unknowns[k++], j + shift, *rates[i], oscillation(de, Op::Cos, *frequencies[i])
 					);
 					add_trial_term(
-						de, trial, unknowns[k++], j + shift, rates[i], oscillation(de, Op::Sin, frequencies[i])
+						de, *trial, *unknowns[k++], j + shift, *rates[i], oscillation(de, Op::Sin, *frequencies[i])
 					);
 				}
 			}
@@ -720,7 +720,7 @@ static Error undetermined_coefficients(
 		tidy(trial);
 		work::step(work::Step::Type::Equation, "Trial solution", de->y, trial);
 
-		err = match_coefficients(de, trial, unknowns, size, particular);
+		err = match_coefficients(de, *trial, unknowns, size, particular);
 
 		ast::dispose(trial);
 		for (unsigned i = 0; i < size; i++)
@@ -736,20 +736,20 @@ static Error undetermined_coefficients(
 }
 
 /*Finds a particular solution of a second order equation by variation of parameters, recording the work*/
-static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, const ast *exclude, ast **particular) {
+static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, const ast &exclude, ast **particular) {
 	if (de->order != 2 || size != 2)
 		return Error::DeUnsolved;
 
 	de->method = "Variation of parameters";
 	work::text("Variation of parameters");
 
-	ast *f = quotient(de->g, de->a[2]);
+	ast *f = quotient(*de->g, *de->a[2]);
 
 	if (!de->a[2]->isInt(1)) {
 		ast *left = ast::make(Op::Add);
-		left->appendChild(DiffEq::derivative(de->y, 2));
-		left->appendChild(ast::make(Op::Mult, quotient(de->a[1], de->a[2]), DiffEq::derivative(de->y, 1)));
-		left->appendChild(ast::make(Op::Mult, quotient(de->a[0], de->a[2]), de->y->copy()));
+		left->appendChild(DiffEq::derivative(*de->y, 2));
+		left->appendChild(ast::make(Op::Mult, quotient(*de->a[1], *de->a[2]), DiffEq::derivative(*de->y, 1)));
+		left->appendChild(ast::make(Op::Mult, quotient(*de->a[0], *de->a[2]), de->y->copy()));
 		work::step(work::Step::Type::Equation, "Standard form", tidy(left), f);
 		ast::dispose(left);
 	}
@@ -759,16 +759,16 @@ static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, con
 		derivatives[i] = basis[i]->copy();
 
 		work::pause();
-		derivative(derivatives[i], de->x, de->x);
+		derivative(*derivatives[i], *de->x, *de->x);
 		work::resume();
 		simplest(derivatives[i]);
 	}
 
 	ast *names[3];
 	ast *taken = ast::make(Op::Add);
-	taken->appendChild(exclude->copy());
+	taken->appendChild(exclude.copy());
 	for (unsigned i = 0; i < 3; i++) {
-		names[i] = pick_symbol(de, i == 0 ? Sym::W : i == 1 ? Sym::U : Sym::V, taken);
+		names[i] = pick_symbol(de, i == 0 ? Sym::W : i == 1 ? Sym::U : Sym::V, *taken);
 		taken->appendChild(names[i]->copy());
 	}
 	ast::dispose(taken);
@@ -791,7 +791,7 @@ static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, con
 
 		parameters[i] = simplest(left->copy());
 		right = ast::make(Op::Equals, tidy(left), parameters[i]->copy());
-		left = DiffEq::derivative(names[i + 1], 1);
+		left = DiffEq::derivative(*names[i + 1], 1);
 		work::step(work::Step::Type::Equation, nullptr, left, right);
 		ast::dispose(left);
 		ast::dispose(right);
@@ -804,18 +804,18 @@ static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, con
 
 	for (unsigned i = 0; i < 2; i++) {
 		parameters[i] = ast::make(Op::Integral, parameters[i], de->x->copy());
-		eval_integrals(parameters[i]);
+		eval_integrals(*parameters[i]);
 	}
 
 	fresh_Reserve(nullptr);
 	ast::dispose(taken);
 
-	if (contains_integral(parameters[0]) || contains_integral(parameters[1])) {
+	if (contains_integral(*parameters[0]) || contains_integral(*parameters[1])) {
 		*particular = nullptr;
 	} else {
 		for (unsigned i = 0; i < 2; i++) {
 			work::pause();
-			simplify(parameters[i], Simp::Basic);
+			simplify(*parameters[i], Simp::Basic);
 			work::resume();
 			work::step(work::Step::Type::Equation, nullptr, names[i + 1], parameters[i]);
 		}
@@ -825,7 +825,7 @@ static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, con
 			ast::make(Op::Mult, parameters[0]->copy(), basis[0]->copy()),
 			ast::make(Op::Mult, parameters[1]->copy(), basis[1]->copy())
 		);
-		*particular = ast::make(Op::Add, distribute(basis[0], parameters[0]), distribute(basis[1], parameters[1]));
+		*particular = ast::make(Op::Add, distribute(*basis[0], *parameters[0]), distribute(*basis[1], *parameters[1]));
 		simplest(*particular);
 		work::step(work::Step::Type::Equation, "Particular solution", tidy(left), *particular);
 		ast::dispose(left);
@@ -853,7 +853,7 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 
 	ast *m = substitution_symbol(de, Sym::M);
 
-	Error err = characteristic_roots(de, m, roots, &count);
+	Error err = characteristic_roots(de, *m, roots, &count);
 	if (err == Error::Success) {
 		de->method = "Constant coefficients";
 		size = fill_basis(de, roots, count, basis);
@@ -876,9 +876,9 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 		for (unsigned i = 0; i < size; i++)
 			exclude->appendChild(constants[i]->copy());
 
-		err = undetermined_coefficients(de, roots, count, exclude, &particular);
+		err = undetermined_coefficients(de, roots, count, *exclude, &particular);
 		if (err == Error::DeUnsolved)
-			err = variation_of_parameters(de, basis, size, exclude, &particular);
+			err = variation_of_parameters(de, basis, size, *exclude, &particular);
 
 		ast::dispose(exclude);
 	}
@@ -898,7 +898,7 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 }
 
 Error solve_reduction_of_order(DiffEq *de, ast **solution) {
-	const ast *y1 = de->known;
+	const ast &y1 = *de->known;
 
 	if (de->order != 2 || !de->linear || !de->g->isInt(0))
 		return Error::DeUnsolved;
@@ -912,13 +912,13 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution) {
 	if (!satisfied)
 		return Error::DeNotSolution;
 
-	ast *P = quotient(de->a[1], de->a[2]);
-	ast *Q = quotient(de->a[0], de->a[2]);
+	ast *P = quotient(*de->a[1], *de->a[2]);
+	ast *Q = quotient(*de->a[0], *de->a[2]);
 
 	if (!de->a[2]->isInt(1)) {
 		ast *left = ast::make(Op::Add);
-		left->appendChild(DiffEq::derivative(de->y, 2));
-		left->appendChild(ast::make(Op::Mult, P->copy(), DiffEq::derivative(de->y, 1)));
+		left->appendChild(DiffEq::derivative(*de->y, 2));
+		left->appendChild(ast::make(Op::Mult, P->copy(), DiffEq::derivative(*de->y, 1)));
 		left->appendChild(ast::make(Op::Mult, Q, de->y->copy()));
 		ast *right = integer(0);
 		work::step(work::Step::Type::Equation, "Standard form", tidy(left), right);
@@ -936,36 +936,36 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution) {
 
 	work::pause();
 	P = negate(P);
-	simplify(P, Simp::Basic);
+	simplify(*P, Simp::Basic);
 	work::resume();
 
-	ast *mu = exponential_of_integral(P, de->x);
+	ast *mu = exponential_of_integral(P, *de->x);
 	if (mu == nullptr)
 		return Error::DeIntegral;
 
-	ast *integrand = ast::make(Op::Div, mu, ast::make(Op::Pow, y1->copy(), integer(2)));
-	left = ast::make(Op::Mult, y1->copy(), ast::make(Op::Integral, integrand->copy(), de->x->copy()));
-	single_fraction(integrand);
+	ast *integrand = ast::make(Op::Div, mu, ast::make(Op::Pow, y1.copy(), integer(2)));
+	left = ast::make(Op::Mult, y1.copy(), ast::make(Op::Integral, integrand->copy(), de->x->copy()));
+	single_fraction(*integrand);
 	ast *integral = ast::make(Op::Integral, integrand, de->x->copy());
-	ast *right = ast::make(Op::Mult, y1->copy(), integral->copy());
+	ast *right = ast::make(Op::Mult, y1.copy(), integral->copy());
 	work::step(work::Step::Type::Equation, nullptr, left, right);
 	ast::dispose(left);
 	ast::dispose(right);
 
-	eval_integrals(integral);
+	eval_integrals(*integral);
 
-	if (contains_integral(integral)) {
+	if (contains_integral(*integral)) {
 		ast::dispose(integral);
 		return Error::DeIntegral;
 	}
 
 	ast *basis[2], *constants[2];
-	basis[0] = y1->copy();
-	basis[1] = distribute(y1, integral);
-	left = ast::make(Op::Mult, y1->copy(), integral);
+	basis[0] = y1.copy();
+	basis[1] = distribute(y1, *integral);
+	left = ast::make(Op::Mult, y1.copy(), integral);
 
 	work::pause();
-	simplify(left, Simp::Normalize);
+	simplify(*left, Simp::Normalize);
 	work::resume();
 
 	if (left->compare(*basis[1]))

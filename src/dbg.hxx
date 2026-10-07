@@ -35,5 +35,5 @@ void ti_debug(const char *format, ...);
 
 #endif
 
-void dbg_print_tree(const ast *e, unsigned indent);
-unsigned dbg_count_nodes(const ast *e);
+void dbg_print_tree(const ast &e, unsigned indent);
+unsigned dbg_count_nodes(const ast &e);

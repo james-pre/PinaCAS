@@ -88,7 +88,7 @@ Box *text(const char *text);
 Box *row();
 
 /*Lays out e in math notation*/
-Box *fromAst(const ast *e);
+Box *fromAst(const ast &e);
 
 /*Computes the size of b and its descendants*/
 void measure(Box *b, const Metrics &m);

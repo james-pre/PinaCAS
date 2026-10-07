@@ -135,8 +135,8 @@ test_t **test_Load(char *file, unsigned *len) {
 	return arr;
 }
 
-bool check(test_t *t, ast *actual, ast *expected) {
-	if (!expected->compare(*actual)) {
+bool check(test_t *t, ast &actual, ast &expected) {
+	if (!expected.compare(actual)) {
 		unsigned expected_len, actual_len;
 		Error expted_err, actual_err;
 		char *output_expected = (char *)export_to_binary(expected, &expected_len, str_table, &expted_err);
@@ -185,8 +185,8 @@ static bool run_verify(test_t *t) {
 	if (count == 0 || items[0] == nullptr || solution == nullptr || x == nullptr) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
 	} else if (
-		(err = de.loadList(items, count, x)) != Error::Success ||
-		(err = de.verify(solution, &satisfied)) != Error::Success
+		(err = de.loadList(items, count, *x)) != Error::Success ||
+		(err = de.verify(*solution, &satisfied)) != Error::Success
 	) {
 		printf("Test failed on line %u. %s\n", t->line, error_text(err));
 		de.clear();
@@ -205,7 +205,7 @@ static bool run_verify(test_t *t) {
 	return passed;
 }
 
-static void simplify_solution(ast *e) {
+static void simplify_solution(ast &e) {
 	simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval | Simp::LikeTerms);
 	simplify_canonical_form(e, Canonical::All);
 }
@@ -229,18 +229,18 @@ static bool run_solve(test_t *t) {
 	if (count == 0 || items[0] == nullptr || expected == nullptr || x == nullptr) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
 	} else if (
-		(err = de.loadList(items, count, x)) != Error::Success ||
+		(err = de.loadList(items, count, *x)) != Error::Success ||
 		(err = solve_test(&de, t, &solution)) != Error::Success
 	) {
 		printf("Test failed on line %u. %s\n", t->line, error_text(err));
 		de.clear();
 	} else {
-		simplify_solution(solution);
-		simplify_solution(expected);
-		passed = check(t, solution, expected);
+		simplify_solution(*solution);
+		simplify_solution(*expected);
+		passed = check(t, *solution, *expected);
 
 		if (passed && strcmp(de.method, "Power series") != 0 && solution->firstChild()->compare(*de.y)) {
-			err = de.verify(solution, &satisfied);
+			err = de.verify(*solution, &satisfied);
 			passed = err == Error::Success && satisfied;
 			if (!passed)
 				printf("Test failed on line %u. The solution does not verify.\n", t->line);
@@ -300,13 +300,13 @@ bool test_Run(test_t *t) {
 			expected = b;
 			actual = a;
 
-			eval(actual, Eval::All);
-			simplify(actual, Simp::All);
+			eval(*actual, Eval::All);
+			simplify(*actual, Simp::All);
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 			break;
 		case TestType::Gcd:
 			if (c == nullptr) {
@@ -317,14 +317,14 @@ bool test_Run(test_t *t) {
 			expected = c;
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-			simplify(a, Simp::All);
-			simplify(b, Simp::All);
-			actual = gcd(a, b);
-			simplify(actual, Simp::All);
+			simplify(*a, Simp::All);
+			simplify(*b, Simp::All);
+			actual = gcd(*a, *b);
+			simplify(*actual, Simp::All);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 
 			ast::dispose(actual);
 			break;
@@ -333,25 +333,25 @@ bool test_Run(test_t *t) {
 			actual = a;
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-			simplify(actual, Simp::All);
-			factor(actual, Factor::All);
+			simplify(*actual, Simp::All);
+			factor(*actual, Factor::All);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 			break;
 		case TestType::Expand:
 			expected = b;
 			actual = a;
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-			simplify(actual, Simp::All);
-			expand(actual, Expand::All);
-			simplify(actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::LikeTerms | Simp::Eval);
+			simplify(*actual, Simp::All);
+			expand(*actual, Expand::All);
+			simplify(*actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::LikeTerms | Simp::Eval);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 			break;
 		case TestType::Deriv: {
 			if (c == nullptr) {
@@ -362,15 +362,15 @@ bool test_Run(test_t *t) {
 			actual = a;
 			expected = c;
 
-			derivative(a, b, b);
+			derivative(*a, *b, *b);
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
 			/*Don't simplify derivatives because derivative() should have done that*/
-			simplify(actual, Simp::All & ~Simp::Deriv);
+			simplify(*actual, Simp::All & ~Simp::Deriv);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 
 			break;
 		}
@@ -383,14 +383,14 @@ bool test_Run(test_t *t) {
 			actual = a;
 			expected = c;
 
-			simplify(actual, Simp::All);
-			integral(actual, b);
-			simplify(actual, Simp::All);
+			simplify(*actual, Simp::All);
+			integral(*actual, *b);
+			simplify(*actual, Simp::All);
 
 			/*We do this to change -1 * 23 to -23 to be able to compare*/
-			simplify(expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-			passed = check(t, actual, expected);
+			passed = check(t, *actual, *expected);
 			break;
 		case TestType::DeOrder:
 		case TestType::DeLinear:
@@ -402,13 +402,13 @@ bool test_Run(test_t *t) {
 				break;
 			}
 
-			err = de.load(a, b);
+			err = de.load(*a, *b);
 
 			if (err != Error::Success) {
 				printf("Test failed on line %u. %s\n", t->line, error_text(err));
 			} else if (t->type == TestType::DeOrder) {
 				actual = ast::make(num::from(de.order));
-				passed = check(t, actual, c);
+				passed = check(t, *actual, *c);
 				ast::dispose(actual);
 			} else if (t->type == TestType::DeNonlinear) {
 				passed = !de.linear;
@@ -418,9 +418,9 @@ bool test_Run(test_t *t) {
 				printf("Test failed on line %u. Expected linear.\n", t->line);
 			} else {
 				actual = ast::make(Op::Equals, de.standardForm(), de.g->copy());
-				simplify(actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
-				simplify(c, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
-				passed = check(t, actual, c);
+				simplify(*actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+				simplify(*c, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+				passed = check(t, *actual, *c);
 				ast::dispose(actual);
 			}
 
@@ -432,15 +432,15 @@ bool test_Run(test_t *t) {
 
 	/*This is just here to ensure that the canonical form function terminates on every test case*/
 	if (a != nullptr) {
-		simplify_canonical_form(a, Canonical::All);
+		simplify_canonical_form(*a, Canonical::All);
 		ast::dispose(a);
 	}
 	if (b != nullptr) {
-		simplify_canonical_form(b, Canonical::All);
+		simplify_canonical_form(*b, Canonical::All);
 		ast::dispose(b);
 	}
 	if (c != nullptr) {
-		simplify_canonical_form(c, Canonical::All);
+		simplify_canonical_form(*c, Canonical::All);
 		ast::dispose(c);
 	}
 

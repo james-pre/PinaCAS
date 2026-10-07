@@ -17,6 +17,6 @@ bool read_tokens_from_tok(const char *tok, uint8_t *data, unsigned max, unsigned
 /*Replaces the contents of the variable tok with length bytes of tokens, enabling it if it is a Y= variable*/
 void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, Error *err);
 /*Writes expression to the variable tok, enabling it if it is a Y= variable*/
-void write_to_tok(const char *tok, const ast *expression, Error *err);
+void write_to_tok(const char *tok, const ast &expression, Error *err);
 
 #endif

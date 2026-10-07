@@ -64,8 +64,8 @@ static ast *display_copy(const ast *e) {
 	ast *copy = e->copy();
 
 	paused++;
-	simplify(copy, Simp::Commutative);
-	simplify_canonical_form(copy, Canonical::All & ~Canonical::Rationalize);
+	simplify(*copy, Simp::Commutative);
+	simplify_canonical_form(*copy, Canonical::All & ~Canonical::Rationalize);
 	paused--;
 
 	return copy;
@@ -81,8 +81,8 @@ static void append(Step *step) {
 }
 
 /*True if a and b are drawn the same way*/
-static bool same_display(const ast *a, const ast *b) {
-	if (a->compare(*b))
+static bool same_display(const ast &a, const ast &b) {
+	if (a.compare(b))
 		return true;
 
 	const ts::Box *box_a = ts::fromAst(a);
@@ -95,11 +95,11 @@ static bool same_display(const ast *a, const ast *b) {
 	return same;
 }
 
-static void record_state(const ast *e) {
+static void record_state(const ast &e) {
 	Step *last = current->last;
-	ast *snapshot = display_copy(e);
+	ast *snapshot = display_copy(&e);
 
-	if (last != nullptr && last->type == Step::Type::State && same_display(last->after, snapshot)) {
+	if (last != nullptr && last->type == Step::Type::State && same_display(*last->after, *snapshot)) {
 		delete snapshot;
 		return;
 	}
@@ -114,12 +114,12 @@ static void record_state(const ast *e) {
 	append(new Step(Step::Type::State, nullptr, nullptr, snapshot));
 }
 
-void enter(const ast *e) {
+void enter(const ast &e) {
 	if (depth++ == 0 && recording())
 		record_state(e);
 }
 
-void leave(const ast *e) {
+void leave(const ast &e) {
 	if (--depth == 0 && recording())
 		record_state(e);
 }
@@ -148,12 +148,12 @@ ts::Box *layout(const Step *step, bool continued) {
 				row->append(ts::text("= "));
 			break;
 		default:
-			row->append(ts::fromAst(step->before));
+			row->append(ts::fromAst(*step->before));
 			row->append(ts::text(" = "));
 			break;
 	}
 
-	return row->append(ts::fromAst(step->after));
+	return row->append(ts::fromAst(*step->after));
 }
 
 } // namespace work

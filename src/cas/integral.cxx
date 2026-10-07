@@ -36,24 +36,24 @@ static ast *ln(ast *a) {
 }
 
 /*Takes ownership of f*/
-static ast *integral_node(ast *f, const ast *x) {
-	return ast::make(Op::Integral, f, x->copy());
+static ast *integral_node(ast *f, const ast &x) {
+	return ast::make(Op::Integral, f, x.copy());
 }
 
 /*Returns the value of e if it is a number or a quotient of numbers, otherwise nullptr*/
-static num *number_value(const ast *e) {
-	if (e->isNumber())
-		return e->num().copy();
+static num *number_value(const ast &e) {
+	if (e.isNumber())
+		return e.num().copy();
 
-	if (!e->isOp(Op::Div) || !e->childAt(0)->isNumber() || !e->childAt(1)->isNumber())
+	if (!e.isOp(Op::Div) || !e.childAt(0)->isNumber() || !e.childAt(1)->isNumber())
 		return nullptr;
 
-	num *value = e->childAt(0)->num().copy();
-	*value /= e->childAt(1)->num();
+	num *value = e.childAt(0)->num().copy();
+	*value /= e.childAt(1)->num();
 	return value;
 }
 
-static bool is_ast_fraction(const ast *e, mp_small numer, mp_small denom) {
+static bool is_ast_fraction(const ast &e, mp_small numer, mp_small denom) {
 	num *value = number_value(e);
 
 	if (value == nullptr)
@@ -64,95 +64,95 @@ static bool is_ast_fraction(const ast *e, mp_small numer, mp_small denom) {
 	return equal;
 }
 
-static bool is_ast_symbol(const ast *e, Sym symbol) {
-	return e->isSymbol() && e->symbol() == symbol;
+static bool is_ast_symbol(const ast &e, Sym symbol) {
+	return e.isSymbol() && e.symbol() == symbol;
 }
 
-static void simplify_quietly(ast *e) {
+static void simplify_quietly(ast &e) {
 	work::pause();
 	simplify(e, Simp::Basic);
 	work::resume();
 }
 
-static ast *derivative_of(ast *e, ast *x) {
-	ast *d = e->copy();
+static ast *derivative_of(ast &e, ast &x) {
+	ast *d = e.copy();
 
 	work::pause();
-	derivative(d, x, x);
-	simplify(d, Simp::Basic);
+	derivative(*d, x, x);
+	simplify(*d, Simp::Basic);
 	work::resume();
 
 	return d;
 }
 
 /*Returns the slope of e if e is linear in x, otherwise nullptr*/
-static ast *linear_slope(ast *e, ast *x) {
+static ast *linear_slope(ast &e, ast &x) {
 	if (is_constant(e, x))
 		return nullptr;
 
 	ast *d = derivative_of(e, x);
 
-	if (is_constant(d, x) && !d->isInt(0))
+	if (is_constant(*d, x) && !d->isInt(0))
 		return d;
 
 	ast::dispose(d);
 	return nullptr;
 }
 
-static bool is_polynomial(ast *e, ast *x) {
-	if (is_constant(e, x) || e->compare(*x))
+static bool is_polynomial(ast &e, ast &x) {
+	if (is_constant(e, x) || e.compare(x))
 		return true;
 
-	if (e->isOp(Op::Add) || e->isOp(Op::Mult)) {
-		for (ast *child : e->children()) {
+	if (e.isOp(Op::Add) || e.isOp(Op::Mult)) {
+		for (ast &child : e.children()) {
 			if (!is_polynomial(child, x))
 				return false;
 		}
 		return true;
 	}
 
-	if (e->isOp(Op::Pow)) {
-		const ast *exponent = e->childAt(1);
-		return exponent->isNumber() && exponent->num().isInteger() && exponent->num() >= 0 &&
-			   is_polynomial(e->childAt(0), x);
+	if (e.isOp(Op::Pow)) {
+		const ast &exponent = *e.childAt(1);
+		return exponent.isNumber() && exponent.num().isInteger() && exponent.num() >= 0 &&
+			   is_polynomial(*e.childAt(0), x);
 	}
 
 	return false;
 }
 
-static ast *reciprocal(ast *e) {
+static ast *reciprocal(ast &e) {
 	num *exponent;
 
-	if (e->isOp(Op::Pow) && (exponent = number_value(e->childAt(1))) != nullptr) {
+	if (e.isOp(Op::Pow) && (exponent = number_value(*e.childAt(1))) != nullptr) {
 		mp_rat_neg(exponent, exponent);
-		return power(e->childAt(0)->copy(), ast::make(exponent));
+		return power(e.childAt(0)->copy(), ast::make(exponent));
 	}
 
-	if (e->isOp(Op::Pow) && !e->childAt(0)->isOperator()) {
-		ast *r = power(e->childAt(0)->copy(), negate(e->childAt(1)->copy()));
-		simplify_quietly(r->childAt(1));
+	if (e.isOp(Op::Pow) && !e.childAt(0)->isOperator()) {
+		ast *r = power(e.childAt(0)->copy(), negate(e.childAt(1)->copy()));
+		simplify_quietly(*r->childAt(1));
 		return r;
 	}
 
-	return power(e->copy(), integer(-1));
+	return power(e.copy(), integer(-1));
 }
 
-static void collect_factors(ast *e, ast *product, bool inverted) {
-	if (e->isOp(Op::Mult)) {
-		for (ast *child : e->children())
+static void collect_factors(ast &e, ast &product, bool inverted) {
+	if (e.isOp(Op::Mult)) {
+		for (ast &child : e.children())
 			collect_factors(child, product, inverted);
-	} else if (e->isOp(Op::Div)) {
-		collect_factors(e->childAt(0), product, inverted);
-		collect_factors(e->childAt(1), product, !inverted);
+	} else if (e.isOp(Op::Div)) {
+		collect_factors(*e.childAt(0), product, inverted);
+		collect_factors(*e.childAt(1), product, !inverted);
 	} else {
-		product->appendChild(inverted ? reciprocal(e) : e->copy());
+		product.appendChild(inverted ? reciprocal(e) : e.copy());
 	}
 }
 
 /*Returns a multiplication node of the factors of e, with division written as negative powers*/
-static ast *factors_of(ast *e) {
+static ast *factors_of(ast &e) {
 	ast *product = ast::make(Op::Mult);
-	collect_factors(e, product, false);
+	collect_factors(e, *product, false);
 	return product;
 }
 
@@ -181,12 +181,12 @@ static ast *unwrap(ast *product) {
 }
 
 /*Returns v if e is c + k*v^2 where k is 1 or -1, otherwise nullptr*/
-static ast *match_square_sum(ast *e, mp_small c, mp_small k) {
-	if (!e->isOp(Op::Add) || e->childCount() != 2)
+static ast *match_square_sum(ast &e, mp_small c, mp_small k) {
+	if (!e.isOp(Op::Add) || e.childCount() != 2)
 		return nullptr;
 
-	ast *constant = e->childAt(0);
-	ast *square = e->childAt(1);
+	ast *constant = e.childAt(0);
+	ast *square = e.childAt(1);
 
 	if (!constant->isInt(c)) {
 		ast *swap = constant;
@@ -216,18 +216,19 @@ static ast *match_square_sum(ast *e, mp_small c, mp_small k) {
 }
 
 /*Returns v if e is c + k*v^2 for positive numbers c and k, setting them, otherwise nullptr*/
-static ast *match_positive_square_sum(ast *e, num **c, num **k) {
-	if (!e->isOp(Op::Add) || e->childCount() != 2)
+static ast *match_positive_square_sum(ast &e, num **c, num **k) {
+	if (!e.isOp(Op::Add) || e.childCount() != 2)
 		return nullptr;
 
 	for (unsigned i = 0; i < 2; i++) {
-		*c = number_value(e->childAt(i));
-		ast *square = e->childAt(1 - i);
+		*c = number_value(*e.childAt(i));
+		ast *square = e.childAt(1 - i);
 
 		if (*c == nullptr)
 			continue;
 
-		if (square->isOp(Op::Mult) && square->childCount() == 2 && (*k = number_value(square->childAt(0))) != nullptr) {
+		if (square->isOp(Op::Mult) && square->childCount() == 2 &&
+			(*k = number_value(*square->childAt(0))) != nullptr) {
 			square = square->childAt(1);
 		} else {
 			*k = num::from(1);
@@ -244,7 +245,7 @@ static ast *match_positive_square_sum(ast *e, num **c, num **k) {
 }
 
 /*Takes ownership of F. Divides F by the slope of u, or returns nullptr if u is not linear in x.*/
-static ast *over_slope(ast *F, ast *u, ast *x) {
+static ast *over_slope(ast *F, ast &u, ast &x) {
 	ast *slope = linear_slope(u, x);
 
 	if (slope == nullptr) {
@@ -256,35 +257,35 @@ static ast *over_slope(ast *F, ast *u, ast *x) {
 }
 
 /*Antiderivatives of u^n where u is not linear*/
-static ast *table_special_power(ast *u, ast *n, ast *x) {
+static ast *table_special_power(ast &u, ast &n, ast &x) {
 	ast *v;
 
-	if (is_ast_fraction(n, 2, 1) && (u->isOp(Op::Sin) || u->isOp(Op::Cos))) {
-		v = u->childAt(0);
+	if (is_ast_fraction(n, 2, 1) && (u.isOp(Op::Sin) || u.isOp(Op::Cos))) {
+		v = u.childAt(0);
 		ast *F = quotient(ast::make(Op::Sin, mul(integer(2), v->copy())), integer(4));
-		if (u->isOp(Op::Sin))
+		if (u.isOp(Op::Sin))
 			F = negate(F);
-		return over_slope(add(quotient(v->copy(), integer(2)), F), v, x);
+		return over_slope(add(quotient(v->copy(), integer(2)), F), *v, x);
 	}
 
-	if (is_ast_fraction(n, -2, 1) && u->isOperator()) {
-		v = u->childAt(0);
+	if (is_ast_fraction(n, -2, 1) && u.isOperator()) {
+		v = u.childAt(0);
 
-		switch (u->op()) {
-			case Op::Cos: return over_slope(ast::make(Op::Tan, v->copy()), v, x);
-			case Op::Sin: return over_slope(negate(power(ast::make(Op::Tan, v->copy()), integer(-1))), v, x);
-			case Op::CosH: return over_slope(ast::make(Op::TanH, v->copy()), v, x);
+		switch (u.op()) {
+			case Op::Cos: return over_slope(ast::make(Op::Tan, v->copy()), *v, x);
+			case Op::Sin: return over_slope(negate(power(ast::make(Op::Tan, v->copy()), integer(-1))), *v, x);
+			case Op::CosH: return over_slope(ast::make(Op::TanH, v->copy()), *v, x);
 			default: return nullptr;
 		}
 	}
 
-	if (is_ast_fraction(n, -1, 1) && u->isOp(Op::Tan)) {
-		v = u->childAt(0);
-		return over_slope(ln(ast::make(Op::Abs, ast::make(Op::Sin, v->copy()))), v, x);
+	if (is_ast_fraction(n, -1, 1) && u.isOp(Op::Tan)) {
+		v = u.childAt(0);
+		return over_slope(ln(ast::make(Op::Abs, ast::make(Op::Sin, v->copy()))), *v, x);
 	}
 
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != nullptr)
-		return over_slope(ast::make(Op::Tan_Inv, v->copy()), v, x);
+		return over_slope(ast::make(Op::Tan_Inv, v->copy()), *v, x);
 
 	num *c, *k;
 	if (is_ast_fraction(n, -1, 1) && (v = match_positive_square_sum(u, &c, &k)) != nullptr) {
@@ -294,72 +295,72 @@ static ast *table_special_power(ast *u, ast *n, ast *x) {
 		*c *= *k;
 		F = quotient(F, power(ast::make(c), ast::make(num::from(1, 2))));
 		num::dispose(k);
-		return over_slope(F, v, x);
+		return over_slope(F, *v, x);
 	}
 
-	if (is_ast_fraction(n, -1, 1) && u->isOperator() && (u->op() == Op::Cos || u->op() == Op::Sin)) {
-		v = u->childAt(0);
-		ast *F = power(u->copy(), integer(-1));
+	if (is_ast_fraction(n, -1, 1) && u.isOperator() && (u.op() == Op::Cos || u.op() == Op::Sin)) {
+		v = u.childAt(0);
+		ast *F = power(u.copy(), integer(-1));
 
-		if (u->op() == Op::Cos)
+		if (u.op() == Op::Cos)
 			F = ln(ast::make(Op::Abs, add(F, ast::make(Op::Tan, v->copy()))));
 		else
 			F = negate(ln(ast::make(Op::Abs, add(F, power(ast::make(Op::Tan, v->copy()), integer(-1))))));
 
-		return over_slope(F, v, x);
+		return over_slope(F, *v, x);
 	}
 
 	if (is_ast_fraction(n, -1, 2)) {
 		if ((v = match_square_sum(u, 1, -1)) != nullptr)
-			return over_slope(ast::make(Op::Sin_Inv, v->copy()), v, x);
+			return over_slope(ast::make(Op::Sin_Inv, v->copy()), *v, x);
 		if ((v = match_square_sum(u, 1, 1)) != nullptr)
-			return over_slope(ast::make(Op::SinH_Inv, v->copy()), v, x);
+			return over_slope(ast::make(Op::SinH_Inv, v->copy()), *v, x);
 		if ((v = match_square_sum(u, -1, 1)) != nullptr)
-			return over_slope(ast::make(Op::CosH_Inv, v->copy()), v, x);
+			return over_slope(ast::make(Op::CosH_Inv, v->copy()), *v, x);
 	}
 
 	return nullptr;
 }
 
 /*Antiderivative of a single non-constant factor h from the table of elementary integrals*/
-static ast *table(ast *h, ast *x) {
+static ast *table(ast &h, ast &x) {
 	ast *u;
 
-	if (h->compare(*x))
-		return quotient(power(x->copy(), integer(2)), integer(2));
+	if (h.compare(x))
+		return quotient(power(x.copy(), integer(2)), integer(2));
 
-	if (!h->isOperator())
+	if (!h.isOperator())
 		return nullptr;
 
-	switch (h->op()) {
+	switch (h.op()) {
 		case Op::Pow: {
-			u = h->childAt(0);
-			ast *n = h->childAt(1);
+			u = h.childAt(0);
+			ast &n = *h.childAt(1);
 
 			if (is_constant(n, x)) {
-				ast *slope = linear_slope(u, x);
+				ast *slope = linear_slope(*u, x);
 
 				if (slope == nullptr)
-					return table_special_power(u, n, x);
+					return table_special_power(*u, n, x);
 
 				if (is_ast_fraction(n, -1, 1))
 					return quotient(ln(ast::make(Op::Abs, u->copy())), slope);
 
-				return quotient(power(u->copy(), add(n->copy(), integer(1))), mul(add(n->copy(), integer(1)), slope));
+				return quotient(power(u->copy(), add(n.copy(), integer(1))), mul(add(n.copy(), integer(1)), slope));
 			}
 
-			if (is_constant(u, x)) {
-				if (is_ast_symbol(u, Sym::Euler))
-					return over_slope(h->copy(), n, x);
-				return over_slope(quotient(h->copy(), ln(u->copy())), n, x);
+			if (is_constant(*u, x)) {
+				if (is_ast_symbol(*u, Sym::Euler))
+					return over_slope(h.copy(), n, x);
+				return over_slope(quotient(h.copy(), ln(u->copy())), n, x);
 			}
 
 			return nullptr;
 		}
 		case Op::Log: {
-			const ast *base = h->childAt(0);
+			const ast &base = *h.childAt(0);
 
-			u = h->childAt(1);
+			u = h.childAt(1);
 
 			if (!is_constant(base, x))
 				return nullptr;
@@ -367,23 +368,23 @@ static ast *table(ast *h, ast *x) {
 			ast *F = add(mul(u->copy(), ln(u->copy())), negate(u->copy()));
 
 			if (!is_ast_symbol(base, Sym::Euler))
-				F = quotient(F, ln(base->copy()));
+				F = quotient(F, ln(base.copy()));
 
-			return over_slope(F, u, x);
+			return over_slope(F, *u, x);
 		}
-		case Op::Sin: u = h->childAt(0); return over_slope(negate(ast::make(Op::Cos, u->copy())), u, x);
-		case Op::Cos: u = h->childAt(0); return over_slope(ast::make(Op::Sin, u->copy()), u, x);
+		case Op::Sin: u = h.childAt(0); return over_slope(negate(ast::make(Op::Cos, u->copy())), *u, x);
+		case Op::Cos: u = h.childAt(0); return over_slope(ast::make(Op::Sin, u->copy()), *u, x);
 		case Op::Tan:
-			u = h->childAt(0);
-			return over_slope(negate(ln(ast::make(Op::Abs, ast::make(Op::Cos, u->copy())))), u, x);
-		case Op::SinH: u = h->childAt(0); return over_slope(ast::make(Op::CosH, u->copy()), u, x);
-		case Op::CosH: u = h->childAt(0); return over_slope(ast::make(Op::SinH, u->copy()), u, x);
-		case Op::TanH: u = h->childAt(0); return over_slope(ln(ast::make(Op::CosH, u->copy())), u, x);
+			u = h.childAt(0);
+			return over_slope(negate(ln(ast::make(Op::Abs, ast::make(Op::Cos, u->copy())))), *u, x);
+		case Op::SinH: u = h.childAt(0); return over_slope(ast::make(Op::CosH, u->copy()), *u, x);
+		case Op::CosH: u = h.childAt(0); return over_slope(ast::make(Op::SinH, u->copy()), *u, x);
+		case Op::TanH: u = h.childAt(0); return over_slope(ln(ast::make(Op::CosH, u->copy())), *u, x);
 		default: return nullptr;
 	}
 }
 
-static void expand_quietly(ast *e) {
+static void expand_quietly(ast &e) {
 	work::pause();
 	expand(e, Expand::All);
 	simplify(e, Simp::Basic);
@@ -391,14 +392,14 @@ static void expand_quietly(ast *e) {
 }
 
 /*Antiderivative using linearity, the table, and polynomial expansion, or nullptr*/
-static ast *elementary(ast *f, ast *x) {
+static ast *elementary(ast &f, ast &x) {
 	if (is_constant(f, x))
-		return mul(f->copy(), x->copy());
+		return mul(f.copy(), x.copy());
 
-	if (f->isOp(Op::Add)) {
+	if (f.isOp(Op::Add)) {
 		ast *F = ast::make(Op::Add);
 
-		for (ast *child : f->children()) {
+		for (ast &child : f.children()) {
 			ast *term = elementary(child, x);
 
 			if (term == nullptr) {
@@ -417,18 +418,18 @@ static ast *elementary(ast *f, ast *x) {
 	ast *variable = nullptr;
 	unsigned variables = 0;
 
-	for (ast *child : product->children()) {
+	for (ast &child : product->children()) {
 		if (is_constant(child, x)) {
-			if (!child->isInt(1))
-				constants->appendChild(child->copy());
+			if (!child.isInt(1))
+				constants->appendChild(child.copy());
 		} else {
-			variable = child;
+			variable = &child;
 			variables++;
 		}
 	}
 
 	ast *F = nullptr;
-	if (variables == 1 && (F = table(variable, x)) != nullptr)
+	if (variables == 1 && (F = table(*variable, x)) != nullptr)
 		F = times(constants, F);
 	else
 		ast::dispose(constants);
@@ -436,11 +437,11 @@ static ast *elementary(ast *f, ast *x) {
 	ast::dispose(product);
 
 	if (F == nullptr && is_polynomial(f, x)) {
-		ast *expanded = f->copy();
-		expand_quietly(expanded);
+		ast *expanded = f.copy();
+		expand_quietly(*expanded);
 
 		if (expanded->isOp(Op::Add))
-			F = elementary(expanded, x);
+			F = elementary(*expanded, x);
 
 		ast::dispose(expanded);
 	}
@@ -449,16 +450,16 @@ static ast *elementary(ast *f, ast *x) {
 }
 
 /*Returns the integral of f with its constant factors moved outside*/
-static ast *pull_constants(ast *f, ast *x, bool *pulled) {
+static ast *pull_constants(ast &f, ast &x, bool *pulled) {
 	ast *product = factors_of(f);
 	ast *constants = ast::make(Op::Mult);
 	ast *rest = ast::make(Op::Mult);
 
-	for (const ast *child : product->children()) {
+	for (const ast &child : product->children()) {
 		if (!is_constant(child, x))
-			rest->appendChild(child->copy());
-		else if (!child->isInt(1))
-			constants->appendChild(child->copy());
+			rest->appendChild(child.copy());
+		else if (!child.isInt(1))
+			constants->appendChild(child.copy());
 	}
 
 	ast::dispose(product);
@@ -470,13 +471,13 @@ static ast *pull_constants(ast *f, ast *x, bool *pulled) {
 }
 
 /*Integrates the terms of f that are elementary and pulls out constant factors, leaving integral nodes for the rest*/
-static ast *split(ast *f, ast *x, bool *progress) {
-	if (f->isOp(Op::Add)) {
+static ast *split(ast &f, ast &x, bool *progress) {
+	if (f.isOp(Op::Add)) {
 		ast *sum = ast::make(Op::Add);
 
 		*progress = true;
 
-		for (ast *child : f->children()) {
+		for (ast &child : f.children()) {
 			ast *F = elementary(child, x);
 			sum->appendChild(F != nullptr ? F : pull_constants(child, x, progress));
 		}
@@ -488,24 +489,24 @@ static ast *split(ast *f, ast *x, bool *progress) {
 }
 
 /*Returns the argument of h that could be the inner function of a substitution*/
-static ast *inner_candidate(ast *h, ast *x) {
-	if (!h->isOperator())
+static ast *inner_candidate(ast &h, ast &x) {
+	if (!h.isOperator())
 		return nullptr;
 
-	switch (h->op()) {
+	switch (h.op()) {
 		case Op::Pow:
-			if (is_constant(h->childAt(1), x))
-				return h->childAt(0);
-			if (is_constant(h->childAt(0), x))
-				return h->childAt(1);
+			if (is_constant(*h.childAt(1), x))
+				return h.childAt(0);
+			if (is_constant(*h.childAt(0), x))
+				return h.childAt(1);
 			return nullptr;
-		case Op::Log: return h->childAt(1);
-		default: return is_op_function(h->op()) ? h->childAt(0) : nullptr;
+		case Op::Log: return h.childAt(1);
+		default: return is_op_function(h.op()) ? h.childAt(0) : nullptr;
 	}
 }
 
 /*Integrates g(v(x))v'(x) by substituting u = v(x). Records its steps.*/
-static ast *substitution(ast *f, ast *x) {
+static ast *substitution(ast &f, ast &x) {
 	ast *product = factors_of(f);
 	ast *result = nullptr;
 	const unsigned length = product->childCount();
@@ -517,13 +518,13 @@ static ast *substitution(ast *f, ast *x) {
 	}
 
 	for (unsigned i = 0; i < length && result == nullptr; i++) {
-		ast *h = product->childAt(i);
+		ast &h = *product->childAt(i);
 		ast *v = inner_candidate(h, x);
 
-		if (v == nullptr || is_constant(v, x))
+		if (v == nullptr || is_constant(*v, x))
 			continue;
 
-		ast *slope = linear_slope(v, x);
+		ast *slope = linear_slope(*v, x);
 		if (slope != nullptr) {
 			ast::dispose(slope);
 			continue;
@@ -532,45 +533,45 @@ static ast *substitution(ast *f, ast *x) {
 		ast *rest = product->copy();
 		ast::dispose(rest->removeChildAt(i));
 
-		ast *ratio = quotient(unwrap(rest), derivative_of(v, x));
-		simplify_quietly(ratio);
+		ast *ratio = quotient(unwrap(rest), derivative_of(*v, x));
+		simplify_quietly(*ratio);
 
-		if (!is_constant(ratio, x)) {
+		if (!is_constant(*ratio, x)) {
 			ast::dispose(ratio);
 			continue;
 		}
 
 		ast *u = ast::make(static_cast<Sym>(symbol));
-		ast *g = h->copy();
+		ast *g = h.copy();
 
 		work::pause();
-		substitute(g, v, u);
-		simplify(g, Simp::Basic);
+		substitute(*g, *v, *u);
+		simplify(*g, Simp::Basic);
 		work::resume();
 
 		ast *G;
-		if (is_constant(g, x) && (G = elementary(g, u)) != nullptr) {
-			ast *before = integral_node(f->copy(), x);
-			ast *rewritten = mul(ratio->copy(), integral_node(g->copy(), u));
+		if (is_constant(*g, x) && (G = elementary(*g, *u)) != nullptr) {
+			ast *before = integral_node(f.copy(), x);
+			ast *rewritten = mul(ratio->copy(), integral_node(g->copy(), *u));
 
-			simplify_quietly(G);
-			simplify_quietly(rewritten);
+			simplify_quietly(*G);
+			simplify_quietly(*rewritten);
 
 			work::step(work::Step::Type::Equation, "Substitute", u, v);
 			work::step(work::Step::Type::Integral, "Substitution", before, rewritten);
 
 			ast::dispose(rewritten);
-			rewritten = integral_node(g->copy(), u);
+			rewritten = integral_node(g->copy(), *u);
 			work::step(work::Step::Type::Integral, nullptr, rewritten, G);
 			ast::dispose(rewritten);
 
 			result = mul(ratio->copy(), G);
 
 			work::pause();
-			substitute(result, u, v);
+			substitute(*result, *u, *v);
 			work::resume();
 
-			simplify_quietly(result);
+			simplify_quietly(*result);
 			work::step(work::Step::Type::Integral, "Back-substitute", before, result);
 
 			ast::dispose(before);
@@ -586,8 +587,8 @@ static ast *substitution(ast *f, ast *x) {
 }
 
 /*Fills c with the coefficients of the polynomial e in x, constant first, and returns its degree, or -1 if it is higher than MAX_DEGREE*/
-static int coefficients(ast *e, ast *x, ast **c) {
-	ast *d = e->copy(), *zero = integer(0);
+static int coefficients(ast &e, ast &x, ast **c) {
+	ast *d = e.copy(), *zero = integer(0);
 	int k;
 	mp_small factorial = 1;
 
@@ -603,13 +604,13 @@ static int coefficients(ast *e, ast *x, ast **c) {
 			factorial *= k;
 
 		c[k] = d->copy();
-		substitute(c[k], x, zero);
+		substitute(*c[k], x, *zero);
 		c[k] = quotient(c[k], integer(factorial));
-		simplify(c[k], Simp::Basic);
+		simplify(*c[k], Simp::Basic);
 
 		ast *next = d->copy();
-		derivative(next, x, x);
-		simplify(next, Simp::Basic);
+		derivative(*next, x, x);
+		simplify(*next, Simp::Basic);
 		ast::dispose(d);
 		d = next;
 	}
@@ -621,30 +622,30 @@ static int coefficients(ast *e, ast *x, ast **c) {
 }
 
 /*Returns the sum of c[k]*x^k for k up to degree. Takes ownership of the coefficients.*/
-static ast *polynomial(ast **c, int degree, ast *x) {
+static ast *polynomial(ast **c, int degree, ast &x) {
 	ast *sum = ast::make(Op::Add);
 
 	for (int k = degree; k >= 0; k--)
-		sum->appendChild(mul(c[k], power(x->copy(), integer(k))));
+		sum->appendChild(mul(c[k], power(x.copy(), integer(k))));
 
 	sum->appendChild(integer(0));
 	return sum;
 }
 
 /*Rewrites the integral of a quotient of polynomials whose numerator has at least the degree of the denominator as the integral of a polynomial plus a proper fraction. Records the step.*/
-static ast *divide(ast *f, ast *x) {
+static ast *divide(ast &f, ast &x) {
 	ast *product = factors_of(f), *numerator = ast::make(Op::Mult), *denominator = ast::make(Op::Mult);
-	for (ast *child : product->children()) {
+	for (ast &child : product->children()) {
 		num *exponent;
 
-		if (child->isOp(Op::Pow) && (exponent = number_value(child->childAt(1))) != nullptr) {
+		if (child.isOp(Op::Pow) && (exponent = number_value(*child.childAt(1))) != nullptr) {
 			if (*exponent < 0)
 				denominator->appendChild(reciprocal(child));
 			else
-				numerator->appendChild(child->copy());
+				numerator->appendChild(child.copy());
 			num::dispose(exponent);
 		} else {
-			numerator->appendChild(child->copy());
+			numerator->appendChild(child.copy());
 		}
 	}
 
@@ -655,19 +656,19 @@ static ast *divide(ast *f, ast *x) {
 
 	work::pause();
 
-	if (denominator->childCount() > 0 && is_polynomial(numerator, x) && is_polynomial(denominator, x) &&
-		(dd = coefficients(denominator, x, d)) >= 1) {
-		if ((nd = coefficients(numerator, x, n)) < dd) {
+	if (denominator->childCount() > 0 && is_polynomial(*numerator, x) && is_polynomial(*denominator, x) &&
+		(dd = coefficients(*denominator, x, d)) >= 1) {
+		if ((nd = coefficients(*numerator, x, n)) < dd) {
 			for (int k = 0; k <= nd; k++)
 				ast::dispose(n[k]);
 		} else {
 			for (int k = nd - dd; k >= 0; k--) {
 				q[k] = quotient(n[k + dd]->copy(), d[dd]->copy());
-				simplify(q[k], Simp::Basic);
+				simplify(*q[k], Simp::Basic);
 
 				for (int j = 0; j <= dd; j++) {
 					n[k + j] = add(n[k + j], negate(mul(q[k]->copy(), d[j]->copy())));
-					simplify(n[k + j], Simp::Basic);
+					simplify(*n[k + j], Simp::Basic);
 				}
 			}
 
@@ -675,10 +676,10 @@ static ast *divide(ast *f, ast *x) {
 				ast::dispose(n[k]);
 
 			ast *remainder = quotient(polynomial(n, dd - 1, x), denominator->copy());
-			simplify(remainder, Simp::Basic);
-			factor_cancel(remainder);
+			simplify(*remainder, Simp::Basic);
+			factor_cancel(*remainder);
 			rewritten = add(polynomial(q, nd - dd, x), remainder);
-			simplify(rewritten, Simp::Basic);
+			simplify(*rewritten, Simp::Basic);
 		}
 
 		for (int k = 0; k <= dd; k++)
@@ -689,7 +690,7 @@ static ast *divide(ast *f, ast *x) {
 
 	if (rewritten != nullptr) {
 		rewritten = integral_node(rewritten, x);
-		ast *before = integral_node(f->copy(), x);
+		ast *before = integral_node(f.copy(), x);
 		work::step(work::Step::Type::Integral, "Divide", before, rewritten);
 		ast::dispose(before);
 	}
@@ -700,12 +701,12 @@ static ast *divide(ast *f, ast *x) {
 	return rewritten;
 }
 
-static unsigned liate_rank(ast *h, ast *x) {
-	if (h->isOp(Op::Log) && is_constant(h->childAt(0), x))
+static unsigned liate_rank(ast &h, ast &x) {
+	if (h.isOp(Op::Log) && is_constant(*h.childAt(0), x))
 		return 5;
 
-	if (h->isOperator()) {
-		switch (h->op()) {
+	if (h.isOperator()) {
+		switch (h.op()) {
 			case Op::Sin_Inv:
 			case Op::Cos_Inv:
 			case Op::Tan_Inv:
@@ -723,12 +724,12 @@ static unsigned liate_rank(ast *h, ast *x) {
 }
 
 /*Rewrites the integral of f by parts, choosing u by LIATE. Records the step.*/
-static ast *by_parts(ast *f, ast *x) {
+static ast *by_parts(ast &f, ast &x) {
 	ast *product = factors_of(f);
 	unsigned best = 0, best_index = 0;
 
 	for (unsigned i = 0; i < product->childCount(); i++) {
-		ast *factor = product->childAt(i);
+		ast &factor = *product->childAt(i);
 
 		if (is_constant(factor, x))
 			continue;
@@ -748,25 +749,25 @@ static ast *by_parts(ast *f, ast *x) {
 	ast *u = product->removeChildAt(best_index);
 	ast *dv = unwrap(product);
 
-	ast *v = elementary(dv, x);
+	ast *v = elementary(*dv, x);
 	if (v == nullptr) {
 		ast::dispose(u);
 		ast::dispose(dv);
 		return nullptr;
 	}
 
-	simplify_quietly(v);
-	ast *du = derivative_of(u, x);
+	simplify_quietly(*v);
+	ast *du = derivative_of(*u, x);
 
 	ast *remaining = mul(v->copy(), du);
-	simplify_quietly(remaining);
+	simplify_quietly(*remaining);
 
 	bool pulled = false;
-	ast *rewritten = add(mul(u, v), negate(pull_constants(remaining, x, &pulled)));
+	ast *rewritten = add(mul(u, v), negate(pull_constants(*remaining, x, &pulled)));
 	ast::dispose(remaining);
-	simplify_quietly(rewritten);
+	simplify_quietly(*rewritten);
 
-	ast *before = integral_node(f->copy(), x);
+	ast *before = integral_node(f.copy(), x);
 	work::step(work::Step::Type::Integral, "By parts", before, rewritten);
 	ast::dispose(before);
 
@@ -774,55 +775,55 @@ static ast *by_parts(ast *f, ast *x) {
 	return rewritten;
 }
 
-static bool integrate_all(ast *e, unsigned budget);
+static bool integrate_all(ast &e, unsigned budget);
 
 /*Evaluates the integral node e in place. Returns true if anything was integrated.*/
-static bool integrate_node(ast *e, unsigned budget) {
+static bool integrate_node(ast &e, unsigned budget) {
 	bool progress = false;
 
 	if (budget == 0)
 		return false;
 
-	ast *f = e->childAt(0)->copy();
-	ast *x = e->childAt(1)->copy();
-	ast *before = e->copy();
+	ast *f = e.childAt(0)->copy();
+	ast *x = e.childAt(1)->copy();
+	ast *before = e.copy();
 
-	simplify_quietly(f);
+	simplify_quietly(*f);
 
 	ast *F;
-	if ((F = elementary(f, x)) != nullptr) {
-		simplify_quietly(F);
+	if ((F = elementary(*f, *x)) != nullptr) {
+		simplify_quietly(*F);
 		work::step(work::Step::Type::Integral, nullptr, before, F);
-		e->replace(F);
+		e.replace(F);
 		progress = true;
 	} else if (
 		!f->isOp(Op::Add) &&
-		((F = divide(f, x)) != nullptr || (F = substitution(f, x)) != nullptr || (F = by_parts(f, x)) != nullptr)
+		((F = divide(*f, *x)) != nullptr || (F = substitution(*f, *x)) != nullptr || (F = by_parts(*f, *x)) != nullptr)
 	) {
-		e->replace(F);
+		e.replace(F);
 		integrate_all(e, budget - 1);
 		simplify_quietly(e);
 		progress = true;
 	} else {
-		F = split(f, x, &progress);
+		F = split(*f, *x, &progress);
 
 		if (progress) {
-			simplify_quietly(F);
+			simplify_quietly(*F);
 			work::step(work::Step::Type::Integral, nullptr, before, F);
-			e->replace(F);
+			e.replace(F);
 			integrate_all(e, budget - 1);
 		} else {
 			ast::dispose(F);
 			F = f->copy();
 
 			work::pause();
-			simplify(F, Simp::All);
+			simplify(*F, Simp::All);
 			work::resume();
 
 			if (!F->compare(*f)) {
-				F = integral_node(F, x);
+				F = integral_node(F, *x);
 				work::step(work::Step::Type::Equation, "Identity", before, F);
-				e->replace(F);
+				e.replace(F);
 				progress = integrate_node(e, budget - 1);
 			} else {
 				ast::dispose(F);
@@ -837,31 +838,31 @@ static bool integrate_node(ast *e, unsigned budget) {
 	return progress;
 }
 
-static bool integrate_all(ast *e, unsigned budget) {
+static bool integrate_all(ast &e, unsigned budget) {
 	bool changed = false;
 
-	if (!e->isOperator())
+	if (!e.isOperator())
 		return false;
 
-	for (ast *child : e->children())
+	for (ast &child : e.children())
 		changed |= integrate_all(child, budget);
 
-	if (e->isOp(Op::Integral))
+	if (e.isOp(Op::Integral))
 		changed |= integrate_node(e, budget);
 
 	return changed;
 }
 
-bool eval_integrals(ast *e) {
+bool eval_integrals(ast &e) {
 	return integrate_all(e, MAX_METHOD_DEPTH);
 }
 
-bool contains_integral(const ast *e) {
-	if (e->isOp(Op::Integral))
+bool contains_integral(const ast &e) {
+	if (e.isOp(Op::Integral))
 		return true;
 
-	if (e->isOperator()) {
-		for (const ast *child : e->children()) {
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
 			if (contains_integral(child))
 				return true;
 		}
@@ -870,28 +871,28 @@ bool contains_integral(const ast *e) {
 	return false;
 }
 
-static void antiderivative(ast *e, const ast *respect_to, bool constant) {
+static void antiderivative(ast &e, const ast &respect_to, bool constant) {
 	work::enter(e);
 
-	ast *node = integral_node(e->copy(), respect_to);
-	eval_integrals(node);
+	ast *node = integral_node(e.copy(), respect_to);
+	eval_integrals(*node);
 
-	if (constant && !contains_integral(node)) {
-		node = add(node, ast::make(constant_symbol(node)));
+	if (constant && !contains_integral(*node)) {
+		node = add(node, ast::make(constant_symbol(*node)));
 		work::pause();
-		simplify(node, Simp::Commutative);
+		simplify(*node, Simp::Commutative);
 		work::resume();
 	}
 
-	e->replace(node);
+	e.replace(node);
 
 	work::leave(e);
 }
 
-void integral(ast *e, const ast *respect_to) {
+void integral(ast &e, const ast &respect_to) {
 	antiderivative(e, respect_to, false);
 }
 
-void integral_Indefinite(ast *e, const ast *respect_to) {
+void integral_Indefinite(ast &e, const ast &respect_to) {
 	antiderivative(e, respect_to, true);
 }

@@ -46,8 +46,8 @@ ast::ast(const ast &other) : type_(other.type_) {
 			op_ = {other.op_.type, nullptr};
 
 			ast **link = &op_.content;
-			for (const ast *child : other.children()) {
-				*link = new ast(*child);
+			for (const ast &child : other.children()) {
+				*link = new ast(child);
 				link = &(*link)->next_;
 			}
 			break;
@@ -132,8 +132,8 @@ bool ast::compare(const ast &other) const {
 
 			if (!is_op_commutative(op_.type)) {
 				const ast *b = other.op_.content;
-				for (const ast *a : children()) {
-					if (!a->compare(*b))
+				for (const ast &a : children()) {
+					if (!a.compare(*b))
 						return false;
 					b = b->next_;
 				}
@@ -144,12 +144,12 @@ bool ast::compare(const ast &other) const {
 			bool *used = new bool[length]();
 			bool matched = true;
 
-			for (const ast *a : children()) {
+			for (const ast &a : children()) {
 				matched = false;
 				size_t index = 0;
 
-				for (const ast *b : other.children()) {
-					if (!used[index] && a->compare(*b)) {
+				for (const ast &b : other.children()) {
+					if (!used[index] && a.compare(b)) {
 						used[index] = true;
 						matched = true;
 						break;
@@ -208,8 +208,8 @@ size_t ast::childCount() const {
 
 size_t ast::indexOf(const ast &child) const {
 	size_t index = 0;
-	for (const ast *current : children()) {
-		if (current == &child)
+	for (const ast &current : children()) {
+		if (&current == &child)
 			return index;
 		index++;
 	}

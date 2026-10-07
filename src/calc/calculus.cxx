@@ -10,12 +10,12 @@ Error calculus::run(
 	Kind kind,
 	ast **items,
 	unsigned count,
-	ast *respect_to,
+	ast &respect_to,
 	bool series,
 	unsigned terms,
 	char *summary
 ) {
-	ast *e = items[0];
+	ast &e = *items[0];
 	Error err = Error::Success;
 
 	if (kind != calculus::Kind::DiffEq && count > 1)
@@ -47,10 +47,10 @@ Error calculus::run(
 						sprintf(summary, "Solved. %s.", de.method);
 
 					if (solution->firstChild()->compare(*de.y)) {
-						e->replace(solution->firstChild()->next()->copy());
+						e.replace(solution->firstChild()->next()->copy());
 						ast::dispose(solution);
 					} else {
-						e->replace(solution);
+						e.replace(solution);
 					}
 				} else if (err == Error::DeUnsolved || err == Error::DeIntegral) {
 					if (summary != nullptr)
@@ -59,7 +59,7 @@ Error calculus::run(
 						);
 
 					if (de.linear)
-						e->replace(ast::make(Op::Equals, de.standardForm(), de.g->copy()));
+						e.replace(ast::make(Op::Equals, de.standardForm(), de.g->copy()));
 
 					err = Error::Success;
 				}
@@ -78,7 +78,7 @@ Error calculus::run(
 	return err;
 }
 
-Error calculus::verify(ast **items, unsigned count, ast *respect_to, ast *solution, bool *satisfied) {
+Error calculus::verify(ast **items, unsigned count, ast &respect_to, ast &solution, bool *satisfied) {
 	DiffEq de;
 	Error err = de.loadList(items, count, respect_to);
 

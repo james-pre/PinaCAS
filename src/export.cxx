@@ -44,39 +44,39 @@ static uint8_t precedence(const ast *e) {
 	  precedence(child) < precedence(parent)) ||                                                                       \
 	 (is_right_operator_type(parent->op()) && (child)->isNumber() && *(&(child)->num()) < 0))
 
-static const ast *rightmost(const ast *e) {
-	if (e->isOperator()) {
-		switch (e->op()) {
-			case Op::Pow: return rightmost(e->lastChild());
+static const ast *rightmost(const ast &e) {
+	if (e.isOperator()) {
+		switch (e.op()) {
+			case Op::Pow: return rightmost(*e.lastChild());
 			default: break;
 		}
 	}
 
-	return e;
+	return &e;
 }
-static const ast *leftmost(const ast *e) {
-	if (e->isOperator()) {
-		switch (e->op()) {
+static const ast *leftmost(const ast &e) {
+	if (e.isOperator()) {
+		switch (e.op()) {
 			case Op::Pow:
 			case Op::Root:
 				/*For the sqrt special case*/
-				if (e->childAt(0)->isInt(2))
-					return e;
+				if (e.childAt(0)->isInt(2))
+					return &e;
 				/*FALLTHROUGH*/
 			case Op::Log:
 			case Op::Factorial:
-			case Op::Prime: return leftmost(e->firstChild());
+			case Op::Prime: return leftmost(*e.firstChild());
 			default: break;
 		}
 	}
 
-	return e;
+	return &e;
 }
 
 /*True if every factor of the multiplication is 1 or -1*/
-static bool only_units(const ast *e) {
-	for (const ast *child : e->children()) {
-		if (!child->isInt(1) && !child->isInt(-1))
+static bool only_units(const ast &e) {
+	for (const ast &child : e.children()) {
+		if (!child.isInt(1) && !child.isInt(-1))
 			return false;
 	}
 
@@ -119,7 +119,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 
 					for (unsigned i = 0; i < e_copy->childCount() - 1; i++) {
 						ast *child = e_copy->childAt(i);
-						ast *next = child->next();
+						ast &next = *child->next();
 
 						if (need_paren(e_copy, child))
 							add_token(Tok::OpenPar);
@@ -148,7 +148,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 				case Op::Mult: {
 					for (unsigned i = 0; i < e->childCount() - 1; i++) {
 						const ast *child = e->childAt(i);
-						const ast *next = child->next();
+						const ast &next = *child->next();
 
 						/*Always put parentheses around root operator unless it is sqrt(
                 For example, -1 * 3root2 should be -(3root2) */
@@ -171,19 +171,19 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 
 						const bool needs_mult =
 							!need_paren(e, child) && !root_special_case &&
-							((rightmost(child)->isNumber() && !rightmost(child)->isInt(-1) &&
+							((rightmost(*child)->isNumber() && !rightmost(*child)->isInt(-1) &&
 							  leftmost(next)->isNumber())
 							 /*Should never happen, because the tree should have been flattened. This is just in case*/
 							 || child->isOp(Op::Mult));
 
-						if (needs_mult && !next->isOp(Op::Root))
+						if (needs_mult && !next.isOp(Op::Root))
 							add_token(Tok::Multiply);
 					}
 
 					const ast *child = e->lastChild();
 					const bool root_special_case = child->isOp(Op::Root) && !child->childAt(0)->isInt(2);
 
-					if (!child->isInt(1) || only_units(e)) {
+					if (!child->isInt(1) || only_units(*e)) {
 						if (need_paren(e, child) || root_special_case)
 							add_token(Tok::OpenPar);
 						index = _to_binary(child, data, index, lookup, err);
@@ -247,15 +247,15 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 					break;
 				}
 				case Op::Log: {
-					const ast *a = e->childAt(0);
+					const ast &a = *e->childAt(0);
 					const ast *b = e->childAt(1);
 
-					if (a->isSymbol() && a->symbol() == Sym::Euler) {
+					if (a.isSymbol() && a.symbol() == Sym::Euler) {
 						add_token(Tok::Ln);
 						index = _to_binary(b, data, index, lookup, err);
 						add_token(Tok::ClosePar);
 						break;
-					} else if (a->isNumber() && a->num() == 10) {
+					} else if (a.isNumber() && a.num() == 10) {
 						add_token(Tok::Log);
 						index = _to_binary(b, data, index, lookup, err);
 						add_token(Tok::ClosePar);
@@ -265,7 +265,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 					add_token(Tok::LogBase);
 					index = _to_binary(b, data, index, lookup, err);
 					add_token(Tok::Comma);
-					index = _to_binary(a, data, index, lookup, err);
+					index = _to_binary(&a, data, index, lookup, err);
 					add_token(Tok::ClosePar);
 
 					break;
@@ -352,10 +352,10 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 	return index;
 }
 
-uint8_t *export_to_binary(const ast *e, unsigned *len, const TokenTable &lookup, Error *err) {
+uint8_t *export_to_binary(const ast &e, unsigned *len, const TokenTable &lookup, Error *err) {
 	*err = Error::Success;
 
-	*len = _to_binary(e, nullptr, 0, lookup, err);
+	*len = _to_binary(&e, nullptr, 0, lookup, err);
 
 	if (*err != Error::Success) {
 		*len = 0;
@@ -363,7 +363,7 @@ uint8_t *export_to_binary(const ast *e, unsigned *len, const TokenTable &lookup,
 	}
 
 	uint8_t *data = static_cast<uint8_t *>(malloc(*len));
-	_to_binary(e, data, 0, lookup, err);
+	_to_binary(&e, data, 0, lookup, err);
 
 	return data;
 }

@@ -117,9 +117,9 @@ enum class Simp : unsigned short {
 template <> inline constexpr bool is_flags<Simp> = true;
 
 /*Simplifies ast. Returns true if changed*/
-bool simplify(ast *e, Simp flags);
+bool simplify(ast &e, Simp flags);
 /*Simplifies sin(9pi/4) to sin(pi/4), and likewise for cos and tan. Returns true if changed.*/
-bool simplify_periodic(ast *e);
+bool simplify_periodic(ast &e);
 
 enum class Canonical : unsigned char {
 	/*Order multiplication and division. Change XAZ to AXZ and 1+sin(X)ZA5 to 5AZsin(X)+1*/
@@ -143,7 +143,7 @@ template <> inline constexpr bool is_flags<Canonical> = true;
 
 	Sorting for addition and multiplication is insertion sort, but recursive so kinda expensive
 */
-bool simplify_canonical_form(ast *e, Canonical flags);
+bool simplify_canonical_form(ast &e, Canonical flags);
 
 /*Sorts the unknown function of a differential equation after its coefficients. Sym::Invalid clears it.*/
 void canonical_SetFunction(Sym symbol);
@@ -163,9 +163,9 @@ enum class Factor : unsigned char {
 
 template <> inline constexpr bool is_flags<Factor> = true;
 
-bool factor(ast *e, Factor flags);
+bool factor(ast &e, Factor flags);
 /*Factors e to cancel common factors of its numerator and denominator, keeping the result only if it has fewer nodes*/
-void factor_cancel(ast *e);
+void factor_cancel(ast &e);
 
 enum class Expand : unsigned char {
 	/*Expand 2(A+B) to 2A + 2B or -(A+B) to -1*A + -1*B*/
@@ -185,7 +185,7 @@ enum class Expand : unsigned char {
 
 template <> inline constexpr bool is_flags<Expand> = true;
 
-bool expand(ast *e, Expand flags);
+bool expand(ast &e, Expand flags);
 
 enum class Eval : unsigned short {
 	/*Evaluates identities that are too basic to put in identities.c*/
@@ -215,34 +215,34 @@ template <> inline constexpr bool is_flags<Eval> = true;
 
 /*Evaluates constants such as 5+5 or 6^5. Also implements basic identities
 such as 1A = A, A + 0 = A. Returns true if the ast was changed.*/
-bool eval(ast *e, Eval flags);
+bool eval(ast &e, Eval flags);
 
 /*Replaces all instances of from ast to to ast in e*/
-bool substitute(ast *e, const ast *from, const ast *to);
+bool substitute(ast &e, const ast &from, const ast &to);
 
 /*Returns the greatest common divisor of two expressions.
 gcd(X(X+1)^2, AX) = X 
 gcd(6AX, 10X) = 2X*/
-ast *gcd(const ast *a, const ast *b);
+ast *gcd(const ast &a, const ast &b);
 
 /*Helper functions*/
 
 /*Returns true if the node has an imaginary node.*/
-bool has_imaginary_node(const ast *e);
+bool has_imaginary_node(const ast &e);
 
-bool contains_symbol(const ast *e, Sym symbol);
+bool contains_symbol(const ast &e, Sym symbol);
 /*Returns a symbol that does not appear in e, or Sym::Invalid if every candidate does*/
-Sym fresh_symbol(const ast *e);
+Sym fresh_symbol(const ast &e);
 /*Makes fresh_symbol also avoid the symbols in e until it is called again with nullptr*/
 void fresh_Reserve(const ast *e);
 /*Returns C, or K, or another symbol that does not appear in e, to name an arbitrary constant*/
-Sym constant_symbol(const ast *e);
-unsigned node_count(const ast *e);
+Sym constant_symbol(const ast &e);
+unsigned node_count(const ast &e);
 
 /*Returns true if the node is being multiplied by at least one negative or is already a negative number node.
 The node must be completely simplified for this to work, because it does not detect
 multiplying by more than one negative to make a positive. */
-bool is_negative_for_sure(const ast *a);
+bool is_negative_for_sure(const ast &a);
 
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
-bool absolute_val(ast *e);
+bool absolute_val(ast &e);

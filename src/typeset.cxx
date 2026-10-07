@@ -91,44 +91,44 @@ static Box *symbol_box(Sym symbol) {
 }
 
 /*True if e does not need parentheses as a base or before a postfix operator*/
-static bool is_atom(const ast *e) {
-	switch (e->type()) {
-		case ast::Type::Number: return e->num().isInteger() && e->num() >= 0;
+static bool is_atom(const ast &e) {
+	switch (e.type()) {
+		case ast::Type::Number: return e.num().isInteger() && e.num() >= 0;
 		case ast::Type::Symbol: return true;
 		case ast::Type::Operator:
-			return e->op() == Op::Prime || e->op() == Op::Log || e->op() == Op::Subscript || is_op_function(e->op());
+			return e.op() == Op::Prime || e.op() == Op::Log || e.op() == Op::Subscript || is_op_function(e.op());
 	}
 
 	return false;
 }
 
 /*True if e is drawn starting with a number, so a product needs a dot before it*/
-static bool starts_with_number(const ast *e) {
-	if (e->isNumber())
+static bool starts_with_number(const ast &e) {
+	if (e.isNumber())
 		return true;
 
-	if (!e->isOperator())
+	if (!e.isOperator())
 		return false;
 
-	switch (e->op()) {
+	switch (e.op()) {
 		case Op::Div: return true;
 		case Op::Pow:
 		case Op::Mult:
-		case Op::Factorial: return starts_with_number(e->firstChild());
+		case Op::Factorial: return starts_with_number(*e.firstChild());
 		default: return false;
 	}
 }
 
-static Box *convert(const ast *e);
+static Box *convert(const ast &e);
 
 /*Writes a numeric fraction on one line, as in an exponent, or returns nullptr if e is not one*/
-static Box *inline_fraction(const ast *e) {
+static Box *inline_fraction(const ast &e) {
 	num value;
 
-	if (e->isNumber() && !e->num().isInteger())
-		value = e->num();
-	else if (e->isOp(Op::Div) && e->firstChild()->isNumber() && e->firstChild()->next()->isNumber())
-		value = e->firstChild()->num() / e->firstChild()->next()->num();
+	if (e.isNumber() && !e.num().isInteger())
+		value = e.num();
+	else if (e.isOp(Op::Div) && e.firstChild()->isNumber() && e.firstChild()->next()->isNumber())
+		value = e.firstChild()->num() / e.firstChild()->next()->num();
 	else
 		return nullptr;
 
@@ -147,16 +147,16 @@ static Box *inline_fraction(const ast *e) {
 	return line;
 }
 
-static Box *parenthesized(const ast *e, bool parens) {
+static Box *parenthesized(const ast &e, bool parens) {
 	Box *b = convert(e);
 	return parens ? delimited(b, '(', ')') : b;
 }
 
-static Box *function_box(const ast *e) {
+static Box *function_box(const ast &e) {
 	const char *name;
 	bool inverse = false;
 
-	switch (e->op()) {
+	switch (e.op()) {
 		case Op::Int: name = "int"; break;
 		case Op::Sin_Inv: inverse = true; /*FALLTHROUGH*/
 		case Op::Sin: name = "sin"; break;
@@ -175,22 +175,22 @@ static Box *function_box(const ast *e) {
 
 	return row2(
 		inverse ? pair(Box::Type::Superscript, text(name), text("-1")) : text(name),
-		delimited(convert(e->firstChild()), '(', ')')
+		delimited(convert(*e.firstChild()), '(', ')')
 	);
 }
 
-static Box *sum_box(const ast *e) {
+static Box *sum_box(const ast &e) {
 	Box *line = row();
 
-	for (const ast *term : e->children()) {
-		if (term != e->firstChild() && is_negative_for_sure(term)) {
-			ast *magnitude = term->copy();
-			absolute_val(magnitude);
+	for (const ast &term : e.children()) {
+		if (&term != e.firstChild() && is_negative_for_sure(term)) {
+			ast *magnitude = term.copy();
+			absolute_val(*magnitude);
 			line->append(text(" - "));
-			line->append(convert(magnitude));
+			line->append(convert(*magnitude));
 			delete magnitude;
 		} else {
-			if (term != e->firstChild())
+			if (&term != e.firstChild())
 				line->append(text(" + "));
 			line->append(convert(term));
 		}
@@ -199,12 +199,12 @@ static Box *sum_box(const ast *e) {
 	return line;
 }
 
-static Box *product_box(const ast *e) {
+static Box *product_box(const ast &e) {
 	Box *line = row();
 	bool empty = true;
 
-	for (const ast *factor : e->children()) {
-		if (factor->isInt(1))
+	for (const ast &factor : e.children()) {
+		if (factor.isInt(1))
 			continue;
 
 		if (!empty && starts_with_number(factor)) {
@@ -213,7 +213,7 @@ static Box *product_box(const ast *e) {
 		}
 
 		line->append(parenthesized(
-			factor, factor->isOp(Op::Add) || factor->isOp(Op::Equals) || (!empty && is_negative_for_sure(factor))
+			factor, factor.isOp(Op::Add) || factor.isOp(Op::Equals) || (!empty && is_negative_for_sure(factor))
 		));
 		empty = false;
 	}
@@ -224,94 +224,96 @@ static Box *product_box(const ast *e) {
 	return line;
 }
 
-static Box *log_box(const ast *e) {
-	const ast *base = e->childAt(0);
+static Box *log_box(const ast &e) {
+	const ast &base = *e.childAt(0);
 	Box *name;
 
-	if (base->isSymbol() && base->symbol() == Sym::Euler)
+	if (base.isSymbol() && base.symbol() == Sym::Euler)
 		name = text("ln");
-	else if (base->isInt(10))
+	else if (base.isInt(10))
 		name = text("log");
 	else
 		name = pair(Box::Type::Subscript, text("log"), convert(base));
 
-	return row2(name, delimited(convert(e->childAt(1)), '(', ')'));
+	return row2(name, delimited(convert(*e.childAt(1)), '(', ')'));
 }
 
-static Box *operator_box(const ast *e) {
-	const ast *a = e->firstChild();
+static Box *operator_box(const ast &e) {
+	const ast *a = e.firstChild();
 	const ast *b = a != nullptr ? a->next() : nullptr;
 
-	switch (e->op()) {
+	switch (e.op()) {
 		case Op::Add: return sum_box(e);
 		case Op::Mult: return product_box(e);
-		case Op::Div: return pair(Box::Type::Fraction, convert(a), convert(b));
+		case Op::Div: return pair(Box::Type::Fraction, convert(*a), convert(*b));
 		case Op::Pow: {
-			Box *exponent = inline_fraction(b);
+			Box *exponent = inline_fraction(*b);
 			return pair(
-				Box::Type::Superscript, parenthesized(a, !is_atom(a)), exponent != nullptr ? exponent : convert(b)
+				Box::Type::Superscript, parenthesized(*a, !is_atom(*a)), exponent != nullptr ? exponent : convert(*b)
 			);
 		}
 		case Op::Root:
 			if (a->isInt(2))
-				return (new Box(Box::Type::Root))->append(convert(b));
+				return (new Box(Box::Type::Root))->append(convert(*b));
 			return pair(
-				Box::Type::Superscript, parenthesized(b, !is_atom(b)), pair(Box::Type::Fraction, text("1"), convert(a))
+				Box::Type::Superscript,
+				parenthesized(*b, !is_atom(*b)),
+				pair(Box::Type::Fraction, text("1"), convert(*a))
 			);
 		case Op::Log: return log_box(e);
 		case Op::Deriv: {
 			Box *d = row2(
-				pair(Box::Type::Fraction, text("d"), row2(text("d"), convert(b))), delimited(convert(a), '(', ')')
+				pair(Box::Type::Fraction, text("d"), row2(text("d"), convert(*b))), delimited(convert(*a), '(', ')')
 			);
 
 			if (!b->compare(*b->next())) {
-				Box *at = row2(convert(b), text("="));
-				at->append(convert(b->next()));
+				Box *at = row2(convert(*b), text("="));
+				at->append(convert(*b->next()));
 				d = pair(Box::Type::Subscript, d, at);
 			}
 
 			return d;
 		}
 		case Op::Integral: {
-			Box *integrand = row2(parenthesized(a, a->isOp(Op::Add)), text(" d"));
-			integrand->append(convert(b));
+			Box *integrand = row2(parenthesized(*a, a->isOp(Op::Add)), text(" d"));
+			integrand->append(convert(*b));
 			return (new Box(Box::Type::Integral))->append(integrand);
 		}
-		case Op::Equals: return row2(convert(a), text(" = "))->append(convert(b));
-		case Op::Prime: return row2(parenthesized(a, !is_atom(a)), text("'"));
-		case Op::At: return row2(parenthesized(a, !is_atom(a)), delimited(convert(b), '(', ')'));
+		case Op::Equals: return row2(convert(*a), text(" = "))->append(convert(*b));
+		case Op::Prime: return row2(parenthesized(*a, !is_atom(*a)), text("'"));
+		case Op::At: return row2(parenthesized(*a, !is_atom(*a)), delimited(convert(*b), '(', ')'));
 		case Op::Sum: {
 			char infinity[2] = {Infinity, '\0'};
-			Box *under = row2(convert(b), text("="));
-			under->append(convert(b->next()));
-			return row2(pair(Box::Type::Summation, under, text(infinity)), parenthesized(a, a->isOp(Op::Add)));
+			Box *under = row2(convert(*b), text("="));
+			under->append(convert(*b->next()));
+			return row2(pair(Box::Type::Summation, under, text(infinity)), parenthesized(*a, a->isOp(Op::Add)));
 		}
-		case Op::Subscript: return pair(Box::Type::Subscript, convert(a), convert(b));
-		case Op::Factorial: return row2(parenthesized(a, !is_atom(a)), text("!"));
-		case Op::Abs: return delimited(convert(a), '|', '|');
+		case Op::Subscript: return pair(Box::Type::Subscript, convert(*a), convert(*b));
+		case Op::Factorial: return row2(parenthesized(*a, !is_atom(*a)), text("!"));
+		case Op::Abs: return delimited(convert(*a), '|', '|');
 		default: return function_box(e);
 	}
 }
 
-static Box *convert(const ast *e) {
+static Box *convert(const ast &e) {
 	if (is_negative_for_sure(e)) {
-		ast *magnitude = e->copy();
+		ast *magnitude = e.copy();
 
-		absolute_val(magnitude);
-		Box *b = row2(text("-"), convert(magnitude));
+		absolute_val(*magnitude);
+		Box *b = row2(text("-"), convert(*magnitude));
 		delete magnitude;
 
 		return b;
 	}
 
-	switch (e->type()) {
-		case ast::Type::Number: return number_box(e->num());
-		case ast::Type::Symbol: return symbol_box(e->symbol());
+	switch (e.type()) {
+		case ast::Type::Number: return number_box(e.num());
+		case ast::Type::Symbol: return symbol_box(e.symbol());
 		default: return operator_box(e);
 	}
 }
 
-Box *fromAst(const ast *e) {
+Box *fromAst(const ast &e) {
 	return convert(e);
 }
 

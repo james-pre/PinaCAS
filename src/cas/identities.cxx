@@ -192,19 +192,19 @@ static void dict_Cleanup(Dictionary dict) {
 }
 
 /*Simplifies 2N, 4 to N, 2 to correctly set N*/
-static bool divide_numerical_constants(ast *id, ast *e) {
-	if (!id->isOp(Op::Mult))
+static bool divide_numerical_constants(ast &id, ast &e) {
+	if (!id.isOp(Op::Mult))
 		return false;
 
-	if (e->isInt(0))
+	if (e.isInt(0))
 		return false;
 
-	for (const ast *child : id->children()) {
-		if (child->isNumber()) {
-			const bool negates_e = child->isInt(-1) && !is_negative_for_sure(e);
+	for (const ast &child : id.children()) {
+		if (child.isNumber()) {
+			const bool negates_e = child.isInt(-1) && !is_negative_for_sure(e);
 
-			e->replace(ast::make(Op::Div, e->copy(), child->copy()));
-			id->replace(ast::make(Op::Div, id->copy(), child->copy()));
+			e.replace(ast::make(Op::Div, e.copy(), child.copy()));
+			id.replace(ast::make(Op::Div, id.copy(), child.copy()));
 
 			/*e has no negative coefficient to cancel, so leave the division to fail the match*/
 			if (negates_e)
@@ -226,17 +226,17 @@ static void fill(ast *to, Dictionary dict) {
 		if (dict_Get(dict, to) != nullptr)
 			to->replace(dict_Get(dict, to)->copy());
 	} else if (to->isOperator()) {
-		for (ast *child : to->children()) {
-			fill(child, dict);
+		for (ast &child : to->children()) {
+			fill(&child, dict);
 		}
 	}
 }
 
-static bool matches(ast *id, ast *e, Dictionary dict) {
+static bool matches(ast *id, ast &e, Dictionary dict) {
 	if (id->isSymbol() && id->symbol() < Sym::Imag) {
 		if (id->symbol() == Sym::N) {
 			/*Only integers allowed*/
-			if (!(e->isNumber() && e->num().isInteger()))
+			if (!(e.isNumber() && e.num().isInteger()))
 				return false;
 		} else if (id->symbol() == Sym::I || id->symbol() == Sym::J) {
 			/*We assume something is real if it does not have an imaginary node. This could be wrong.*/
@@ -247,11 +247,11 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 		/*Check if dictionary does not yet have value*/
 		if (dict_Get(dict, id) == nullptr) {
 			/*No value exists in dictionary, this node claims it*/
-			dict_Get(dict, id) = e->copy();
+			dict_Get(dict, id) = e.copy();
 			return true;
 		} else {
 			/*Value already exists, we only match if we are the same*/
-			return dict_Get(dict, id)->compare(*e);
+			return dict_Get(dict, id)->compare(e);
 		}
 	} else if (id->isOperator()) {
 		/*Make a copy of the dictionary in case the children do not match
@@ -266,10 +266,10 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 			char combined_character = '\0';
 
 			ast *id_copy = id->copy();
-			ast *e_copy = e->copy();
+			ast *e_copy = e.copy();
 
 			/*Divide numerical constants from each side.*/
-			while (divide_numerical_constants(id_copy, e_copy))
+			while (divide_numerical_constants(*id_copy, *e_copy))
 				;
 
 			/*Id had numerical coefficients that e did not have.*/
@@ -289,11 +289,11 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 
 			/*Remove the symbol. Do not simplify commutative. id_copy may be a node with one child.*/
 			for (unsigned i = 0; i < id_copy->childCount(); i++) {
-				const ast *child = id_copy->childAt(i);
+				const ast &child = *id_copy->childAt(i);
 
-				if (child->isSymbol() && child->symbol() < Sym::Imag && child->symbol() != Sym::N) {
+				if (child.isSymbol() && child.symbol() < Sym::Imag && child.symbol() != Sym::N) {
 					combined = true;
-					combined_character = static_cast<char>(child->symbol());
+					combined_character = static_cast<char>(child.symbol());
 
 					ast::dispose(id_copy->removeChildAt(i));
 
@@ -335,7 +335,7 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 				matched = false;
 
 				for (unsigned i = 0; i < e_copy->childCount(); i++) {
-					ast *e_child = e_copy->childAt(i);
+					ast &e_child = *e_copy->childAt(i);
 
 					if (matched_e_children[i])
 						continue;
@@ -379,19 +379,19 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 				ast *c = ast::make(id->op());
 
 				for (unsigned i = 0; i < e_copy->childCount(); i++) {
-					const ast *child = e_copy->childAt(i);
+					const ast &child = *e_copy->childAt(i);
 
 					if (!matched_e_children[i])
-						c->appendChild(child->copy());
+						c->appendChild(child.copy());
 				}
 
 				if (c->childCount() > 0) {
 					/*If child length is 1, fix it*/
-					simplify(c, Simp::Commutative);
+					simplify(*c, Simp::Commutative);
 
 					/*If the combined parts need to be real and they are or if they don't need to be real*/
 					/*We assume something is real if it does not have an imaginary node. This could be wrong.*/
-					if (!((combined_character == 'I' || combined_character == 'J') && has_imaginary_node(c))) {
+					if (!((combined_character == 'I' || combined_character == 'J') && has_imaginary_node(*c))) {
 						/*Cleanup and overwrite dummy placeholder*/
 						ast::dispose(dict_copy[combined_character - 'A']);
 						dict_copy[combined_character - 'A'] = c;
@@ -422,19 +422,19 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 
 		} else {
 			/*Order and length do matter*/
-			if (!e->isOperator()) {
+			if (!e.isOperator()) {
 				dict_Cleanup(dict_copy);
 				return false;
 			}
 
-			if (e->op() != id->op() || e->childCount() != id->childCount()) {
+			if (e.op() != id->op() || e.childCount() != id->childCount()) {
 				dict_Cleanup(dict_copy);
 				return false;
 			}
 
 			/*Reverse loop to better guess variables for derivative nodes*/
-			for (int i = e->childCount() - 1; i >= 0; i--) {
-				ast *e_child = e->childAt(i);
+			for (int i = e.childCount() - 1; i >= 0; i--) {
+				ast &e_child = *e.childAt(i);
 				ast *id_child = id->childAt(i);
 				if (!matches(id_child, e_child, dict_copy)) {
 					dict_Cleanup(dict_copy);
@@ -450,13 +450,13 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 	}
 
 	/*Compare numbers or pi, e constants */
-	return e->compare(*id);
+	return e.compare(*id);
 }
 
 /*
     Requires that constants are already evaluated.
 */
-bool execute(ast *e, Identity *id, bool recursive) {
+bool execute(ast &e, Identity *id, bool recursive) {
 	ast *dict[sym_count] = {0};
 	bool changed = false;
 
@@ -472,15 +472,15 @@ bool execute(ast *e, Identity *id, bool recursive) {
 
 		fill(to, dict);
 
-		e->replace(to);
+		e.replace(to);
 
 		/*LOG(("Matched identity from=%s to=%s", id->from_text, id->to_text));*/
 
 		changed = true;
 	}
 
-	if (recursive && e->isOperator()) {
-		for (ast *child : e->children())
+	if (recursive && e.isOperator()) {
+		for (ast &child : e.children())
 			changed |= execute(child, id, recursive);
 	}
 
@@ -505,8 +505,8 @@ bool load(Identity *id) {
 	if (id->from != nullptr && id->to != nullptr) {
 		/*Assumes that from and to are already simplified. This just puts it into a form we can compare*/
 		work::pause();
-		simplify(id->from, Simp::Normalize | Simp::Commutative);
-		simplify(id->to, Simp::Normalize | Simp::Commutative);
+		simplify(*id->from, Simp::Normalize | Simp::Commutative);
+		simplify(*id->to, Simp::Normalize | Simp::Commutative);
 		work::resume();
 		return true;
 	}
@@ -524,7 +524,7 @@ void unload(Identity *id) {
 	id->to = nullptr;
 }
 
-bool executeTable(ast *e, Identity *table, bool recursive) {
+bool executeTable(ast &e, Identity *table, bool recursive) {
 	bool changed = false;
 
 	for (; table->from_text != nullptr; table++) {

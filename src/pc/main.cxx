@@ -87,7 +87,7 @@ int run_gcd(int argc, char **argv) {
 	if (err != Error::Success || a == nullptr)
 		return -1;
 
-	simplify(a, Simp::All);
+	simplify(*a, Simp::All);
 
 	unsigned trimmed_b_len;
 	uint8_t *trimmed_b = trim(argv[3], &trimmed_b_len);
@@ -101,21 +101,21 @@ int run_gcd(int argc, char **argv) {
 	if (err != Error::Success || b == nullptr)
 		return -1;
 
-	simplify(b, Simp::All);
+	simplify(*b, Simp::All);
 
 	printf("Computing gcd...\n\n");
 
-	ast *g = gcd(a, b);
+	ast *g = gcd(*a, *b);
 
-	simplify(g, Simp::All);
-	simplify_canonical_form(g, Canonical::All);
+	simplify(*g, Simp::All);
+	simplify_canonical_form(*g, Canonical::All);
 
-	dbg_print_tree(g, 4);
+	dbg_print_tree(*g, 4);
 
 	printf("\n");
 
 	unsigned output_len;
-	uint8_t *output = export_to_binary(g, &output_len, str_table, &err);
+	uint8_t *output = export_to_binary(*g, &output_len, str_table, &err);
 
 	if (err == Error::Success && output != nullptr) {
 		printf("Output: ");
@@ -152,21 +152,21 @@ int run_simplify(int argc, char **argv) {
 
 	if (err == Error::Success && e != nullptr) {
 		printf("\n");
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Simplifying...\n\n");
 
-		simplify(e, Simp::All);
-		simplify_canonical_form(e, Canonical::All);
+		simplify(*e, Simp::All);
+		simplify_canonical_form(*e, Canonical::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		unsigned output_len;
-		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
+		uint8_t *output = export_to_binary(*e, &output_len, str_table, &err);
 
 		if (err == Error::Success && output != nullptr) {
 			printf("Output: ");
@@ -200,30 +200,30 @@ int run_factor(int argc, char **argv) {
 
 	if (err == Error::Success && e != nullptr) {
 		printf("\n");
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Simplifying...\n\n");
 
-		simplify(e, Simp::All);
+		simplify(*e, Simp::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Factoring...\n\n");
 
-		factor(e, Factor::All);
+		factor(*e, Factor::All);
 
 		/*simplify(e, Simp::All);*/
-		simplify_canonical_form(e, Canonical::All);
+		simplify_canonical_form(*e, Canonical::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 		printf("\n");
 
 		unsigned output_len;
-		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
+		uint8_t *output = export_to_binary(*e, &output_len, str_table, &err);
 
 		if (err == Error::Success && output != nullptr) {
 			printf("Output: ");
@@ -257,30 +257,30 @@ int run_expand(int argc, char **argv) {
 
 	if (err == Error::Success && e != nullptr) {
 		printf("\n");
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Simplifying...\n\n");
 
-		simplify(e, Simp::All);
+		simplify(*e, Simp::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Expanding...\n\n");
 
-		simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational);
-		expand(e, Expand::All);
-		simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::LikeTerms | Simp::Eval);
-		simplify_canonical_form(e, Canonical::All & ~Canonical::CombinePowers);
+		simplify(*e, Simp::Normalize | Simp::Commutative | Simp::Rational);
+		expand(*e, Expand::All);
+		simplify(*e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::LikeTerms | Simp::Eval);
+		simplify_canonical_form(*e, Canonical::All & ~Canonical::CombinePowers);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 		printf("\n");
 
 		unsigned output_len;
-		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
+		uint8_t *output = export_to_binary(*e, &output_len, str_table, &err);
 
 		if (err == Error::Success && output != nullptr) {
 			printf("Output: ");
@@ -377,32 +377,32 @@ int run_derivative(int argc, char **argv) {
 
 	if (err == Error::Success && e != nullptr && respect_to != nullptr && at != nullptr) {
 		printf("\n");
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Simplifying...\n\n");
 
-		simplify(e, Simp::All);
+		simplify(*e, Simp::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 
 		printf("\n");
 
 		printf("Taking derivative...\n");
 
-		derivative(e, respect_to, at);
+		derivative(*e, *respect_to, *at);
 
 		printf("Simplifying...\n\n");
 
-		simplify(e, Simp::All);
-		simplify_canonical_form(e, Canonical::All);
+		simplify(*e, Simp::All);
+		simplify_canonical_form(*e, Canonical::All);
 
-		dbg_print_tree(e, 4);
+		dbg_print_tree(*e, 4);
 		printf("\n");
 
 		unsigned output_len;
-		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
+		uint8_t *output = export_to_binary(*e, &output_len, str_table, &err);
 
 		if (err == Error::Success && output != nullptr) {
 			printf("Output: ");
@@ -419,7 +419,7 @@ int run_derivative(int argc, char **argv) {
 	return 0;
 }
 
-static void print_ast(ast *e) {
+static void print_ast(ast &e) {
 	Error err;
 	unsigned len;
 	uint8_t *output = export_to_binary(e, &len, str_table, &err);
@@ -471,13 +471,13 @@ int run_integral(int argc, char **argv) {
 	}
 
 	if (err == Error::Success && e != nullptr && respect_to != nullptr) {
-		simplify(e, Simp::All);
-		integral_Indefinite(e, respect_to);
-		simplify(e, Simp::All);
-		simplify_canonical_form(e, Canonical::All);
+		simplify(*e, Simp::All);
+		integral_Indefinite(*e, *respect_to);
+		simplify(*e, Simp::All);
+		simplify_canonical_form(*e, Canonical::All);
 
 		printf("Output: ");
-		print_ast(e);
+		print_ast(*e);
 		printf("\n");
 	} else {
 		printf("%s\n", error_text(err));
@@ -517,7 +517,7 @@ int run_de(int argc, char **argv) {
 
 	if (err == Error::Success && count > 0 && items[0] != nullptr && x != nullptr) {
 		DiffEq de;
-		err = de.loadList(items, count, x);
+		err = de.loadList(items, count, *x);
 
 		if (err == Error::Success) {
 			de.series = !strcmp(argv[1], "series");
@@ -533,9 +533,9 @@ int run_de(int argc, char **argv) {
 				ast *standard = de.standardForm();
 				ast *equation = ast::make(Op::Equals, standard, de.g->copy());
 
-				simplify_canonical_form(equation, Canonical::All);
+				simplify_canonical_form(*equation, Canonical::All);
 				printf("Standard form: ");
-				print_ast(equation);
+				print_ast(*equation);
 				printf("\n");
 
 				ast::dispose(equation);
@@ -544,10 +544,10 @@ int run_de(int argc, char **argv) {
 			err = de.solve(&solution);
 
 			if (err == Error::Success) {
-				simplify_canonical_form(solution, Canonical::All);
+				simplify_canonical_form(*solution, Canonical::All);
 				printf("Method: %s\n", de.method);
 				printf("Solution: ");
-				print_ast(solution);
+				print_ast(*solution);
 				printf("\n");
 			}
 		}
@@ -601,10 +601,10 @@ int run_verify(int argc, char **argv) {
 
 	if (err == Error::Success && count > 0 && items[0] != nullptr && solution != nullptr && x != nullptr) {
 		DiffEq de;
-		err = de.loadList(items, count, x);
+		err = de.loadList(items, count, *x);
 
 		if (err == Error::Success)
-			err = de.verify(solution, &satisfied);
+			err = de.verify(*solution, &satisfied);
 
 		printf("%s\n", err == Error::Success ? (satisfied ? "Solution" : "Not a solution") : error_text(err));
 

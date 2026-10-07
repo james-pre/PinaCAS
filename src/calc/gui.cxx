@@ -729,7 +729,7 @@ static unsigned parse_variable_list(unsigned variable, ast **items, Error *err) 
 	return parse_list_from_tok(variables[variable].token, items, MAX_ITEMS, err);
 }
 
-static void write_variable(unsigned variable, ast *expression, Error *err) {
+static void write_variable(unsigned variable, ast &expression, Error *err) {
 	write_to_tok(variables[variable].token, expression, err);
 }
 
@@ -775,12 +775,12 @@ static void execute_simplify(void) {
 		if (expression != nullptr) {
 			console_write("Simplifying...");
 
-			simplify(expression, flags);
-			simplify_canonical_form(expression, Canonical::All);
+			simplify(*expression, flags);
+			simplify_canonical_form(*expression, Canonical::All);
 
 			console_write("Exporting...");
 
-			write_variable(output, expression, &err);
+			write_variable(output, *expression, &err);
 
 			ast::dispose(expression);
 
@@ -818,25 +818,25 @@ static void execute_evaluate(void) {
 
 	if (err == Error::Success) {
 		if (expression != nullptr) {
-			simplify(expression, Simp::Normalize | Simp::Commutative | Simp::Rational);
+			simplify(*expression, Simp::Normalize | Simp::Commutative | Simp::Rational);
 
 			if (should_sub) {
 				Error err;
 
 				console_write("Parsing sub from...");
 				ast *sub_from = parse_variable(evaluate_options.from, &err);
-				simplify(sub_from, Simp::Normalize | Simp::Commutative | Simp::Rational);
+				simplify(*sub_from, Simp::Normalize | Simp::Commutative | Simp::Rational);
 
 				if (err == Error::Success) {
 					if (sub_from != nullptr) {
 						console_write("Parsing sub to...");
 						ast *sub_to = parse_variable(evaluate_options.to, &err);
-						simplify(sub_to, Simp::Normalize | Simp::Commutative | Simp::Rational);
+						simplify(*sub_to, Simp::Normalize | Simp::Commutative | Simp::Rational);
 
 						if (err == Error::Success) {
 							if (sub_to != nullptr) {
 								console_write("Substituting...");
-								substitute(expression, sub_from, sub_to);
+								substitute(*expression, *sub_from, *sub_to);
 
 								ast::dispose(sub_from);
 								ast::dispose(sub_to);
@@ -861,15 +861,15 @@ static void execute_evaluate(void) {
 
 			if (should_eval) {
 				console_write("Evaluating constants..");
-				eval(expression, Eval::All);
+				eval(*expression, Eval::All);
 			}
 
-			simplify(expression, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval | Simp::LikeTerms);
-			simplify_canonical_form(expression, Canonical::All);
+			simplify(*expression, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval | Simp::LikeTerms);
+			simplify_canonical_form(*expression, Canonical::All);
 
 			console_write("Exporting...");
 
-			write_variable(output, expression, &err);
+			write_variable(output, *expression, &err);
 
 			ast::dispose(expression);
 
@@ -915,18 +915,18 @@ static void execute_expand(void) {
 		if (expression != nullptr) {
 			console_write("Expanding...");
 
-			simplify(expression, Simp::Normalize | Simp::Commutative | Simp::Rational);
-			expand(expression, flags);
+			simplify(*expression, Simp::Normalize | Simp::Commutative | Simp::Rational);
+			expand(*expression, flags);
 			simplify(
-				expression,
+				*expression,
 				Simp::Normalize | Simp::Commutative | Simp::Rational |
 					(expand_options.multiplication ? Simp::LikeTerms : Simp{}) | Simp::Eval
 			);
-			simplify_canonical_form(expression, Canonical::All & ~Canonical::CombinePowers);
+			simplify_canonical_form(*expression, Canonical::All & ~Canonical::CombinePowers);
 
 			console_write("Exporting...");
 
-			write_variable(output, expression, &err);
+			write_variable(output, *expression, &err);
 
 			ast::dispose(expression);
 
@@ -999,7 +999,7 @@ static void execute_calculus(calculus::Kind kind, const calculus_options_t *opti
 		if (verify) {
 			bool satisfied = false;
 			console_write("Verifying...");
-			err = calculus::verify(items, count, respect_to, solution, &satisfied);
+			err = calculus::verify(items, count, *respect_to, *solution, &satisfied);
 			if (err == Error::Success)
 				console_write(satisfied ? "It is a solution." : "It is not a solution.");
 		} else {
@@ -1009,7 +1009,7 @@ static void execute_calculus(calculus::Kind kind, const calculus_options_t *opti
 												   : "Solving..."
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? (unsigned)(options->terms - '0') : 0;
-			err = calculus::run(kind, items, count, respect_to, options->series, terms, buffer);
+			err = calculus::run(kind, items, count, *respect_to, options->series, terms, buffer);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)
 				console_write(buffer);
@@ -1020,7 +1020,7 @@ static void execute_calculus(calculus::Kind kind, const calculus_options_t *opti
 
 		if (err == Error::Success && !verify) {
 			console_write("Exporting...");
-			write_variable(output, items[0], &err);
+			write_variable(output, *items[0], &err);
 		}
 
 		ast::dispose(respect_to);

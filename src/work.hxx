@@ -56,8 +56,8 @@ void pause();
 void resume();
 
 /*Brackets a CAS operation on e. The outermost operation records the state of e on entry and exit.*/
-void enter(const ast *e);
-void leave(const ast *e);
+void enter(const ast &e);
+void leave(const ast &e);
 
 /*Records a step. Copies before and after.*/
 void step(Step::Type type, const char *text, const ast *before, const ast *after);

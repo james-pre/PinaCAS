@@ -123,4 +123,4 @@ unsigned parse_list(
 	unsigned max,
 	Error *err
 );
-uint8_t *export_to_binary(const ast *e, unsigned *len, const TokenTable &lookup, Error *err);
+uint8_t *export_to_binary(const ast &e, unsigned *len, const TokenTable &lookup, Error *err);

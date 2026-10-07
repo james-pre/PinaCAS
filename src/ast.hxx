@@ -121,8 +121,8 @@ template <class T> class ChildIterator {
 	explicit ChildIterator(T *node) : node(node) {
 	}
 
-	T *operator*() const {
-		return node;
+	T &operator*() const {
+		return *node;
 	}
 
 	ChildIterator &operator++() {

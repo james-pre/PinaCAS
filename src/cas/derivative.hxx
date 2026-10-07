@@ -13,11 +13,11 @@ extern Identity deriv_product_rule;
 
 } // namespace id
 
-bool is_constant(const ast *e, const ast *respect_to);
+bool is_constant(const ast &e, const ast &respect_to);
 
 /*Applies one differentiation rule to each derivative node*/
-bool eval_derivative_nodes(ast *e);
+bool eval_derivative_nodes(ast &e);
 /*Evaluates every derivative node completely, innermost first, recording each as a step*/
-bool eval_derivatives(ast *e);
+bool eval_derivatives(ast &e);
 /*Replaces the node with a deriv() node and calls eval_derivative nodes*/
-void derivative(ast *e, const ast *respect_to, const ast *eval_at);
+void derivative(ast &e, const ast &respect_to, const ast &eval_at);

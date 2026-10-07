@@ -39,12 +39,12 @@ id::Identity id::deriv_exponential_rule = {"deriv(B^A,X,T", "deriv(e^(Aln(B,X,T"
 id::Identity id::deriv_constant_rule = {"deriv(CX,X,T", "C"};
 id::Identity id::deriv_product_rule = {"deriv(AB,X,T", "Aderiv(B,X,T)+Bderiv(A,X,T"};
 
-bool is_constant(const ast *e, const ast *respect_to) {
-	if (e->compare(*respect_to))
+bool is_constant(const ast &e, const ast &respect_to) {
+	if (e.compare(respect_to))
 		return false;
 
-	if (e->isOperator()) {
-		for (const ast *child : e->children()) {
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
 			if (!is_constant(child, respect_to))
 				return false;
 		}
@@ -53,38 +53,38 @@ bool is_constant(const ast *e, const ast *respect_to) {
 	return true;
 }
 
-bool eval_derivative_nodes(ast *e) {
+bool eval_derivative_nodes(ast &e) {
 	bool changed = false;
 
-	if (!e->isOperator())
+	if (!e.isOperator())
 		return false;
 
-	for (ast *child : e->children())
+	for (ast &child : e.children())
 		changed |= eval_derivative_nodes(child);
 
-	if (!e->isOp(Op::Deriv))
+	if (!e.isOp(Op::Deriv))
 		return changed;
 
-	const ast *expr = e->childAt(0);
+	const ast &expr = *e.childAt(0);
 	/*Have to copy these because node might change away from deriv node*/
-	ast *respect_to = e->childAt(1)->copy();
-	ast *at = e->childAt(2)->copy();
+	ast *respect_to = e.childAt(1)->copy();
+	ast *at = e.childAt(2)->copy();
 
 	/*Hardcode constant rule*/
-	if (is_constant(expr, respect_to)) {
-		e->replace(ast::make(num::from(0)));
+	if (is_constant(expr, *respect_to)) {
+		e.replace(ast::make(num::from(0)));
 		ast::dispose(respect_to);
 		ast::dispose(at);
 		return true;
 	}
 	/*Hardcode multiplication rules*/
-	else if (expr->isOp(Op::Mult)) {
-		ast *copy = e->copy();
-		changed |= id::execute(copy, &id::deriv_constant_rule, false);
+	else if (expr.isOp(Op::Mult)) {
+		ast *copy = e.copy();
+		changed |= id::execute(*copy, &id::deriv_constant_rule, false);
 
 		/*Multiplication of a constant*/
-		if (is_constant(copy, respect_to)) {
-			e->replace(copy);
+		if (is_constant(*copy, *respect_to)) {
+			e.replace(copy);
 			changed = true;
 		}
 		/*Apply product rule*/
@@ -94,25 +94,25 @@ bool eval_derivative_nodes(ast *e) {
 		}
 	}
 	/*Hardcode sum rule*/
-	else if (expr->isOp(Op::Add)) {
+	else if (expr.isOp(Op::Add)) {
 		ast *n = ast::make(Op::Add);
 
-		for (const ast *child : expr->children()) {
+		for (const ast &child : expr.children()) {
 			ast *deriv = ast::make(Op::Deriv);
 
-			deriv->appendChild(child->copy());
+			deriv->appendChild(child.copy());
 			deriv->appendChild(respect_to->copy());
 			deriv->appendChild(at->copy());
 			n->appendChild(deriv);
 		}
 
-		e->replace(n);
+		e.replace(n);
 		changed = true;
 	}
 	/*Hardcode power rule because we have to check if the power is a constant*/
-	else if (expr->isOp(Op::Pow) && is_constant(expr->childAt(1), respect_to)) {
+	else if (expr.isOp(Op::Pow) && is_constant(*expr.childAt(1), *respect_to)) {
 		changed |= id::execute(e, &id::deriv_power_rule, false);
-	} else if (expr->isOp(Op::Pow) && !(expr->firstChild()->isSymbol() && expr->firstChild()->symbol() == Sym::Euler)) {
+	} else if (expr.isOp(Op::Pow) && !(expr.firstChild()->isSymbol() && expr.firstChild()->symbol() == Sym::Euler)) {
 		changed |= id::execute(e, &id::deriv_exponential_rule, false);
 	} else {
 		/*While is necessary because of power rules.*/
@@ -120,12 +120,12 @@ bool eval_derivative_nodes(ast *e) {
 			changed = true;
 	}
 
-	for (ast *child : e->children())
+	for (ast &child : e.children())
 		changed |= eval_derivative_nodes(child);
 
 	if (changed) {
 		if (!respect_to->compare(*at))
-			substitute(e, respect_to, at);
+			substitute(e, *respect_to, *at);
 	}
 
 	ast::dispose(respect_to);
@@ -134,19 +134,19 @@ bool eval_derivative_nodes(ast *e) {
 	return changed;
 }
 
-bool eval_derivatives(ast *e) {
+bool eval_derivatives(ast &e) {
 	bool changed = false;
 
-	if (!e->isOperator())
+	if (!e.isOperator())
 		return false;
 
-	for (ast *child : e->children())
+	for (ast &child : e.children())
 		changed |= eval_derivatives(child);
 
-	if (!e->isOp(Op::Deriv))
+	if (!e.isOp(Op::Deriv))
 		return changed;
 
-	ast *before = e->copy();
+	ast *before = e.copy();
 
 	work::pause();
 	while (eval_derivative_nodes(e))
@@ -154,24 +154,24 @@ bool eval_derivatives(ast *e) {
 	simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval | Simp::LikeTerms);
 	work::resume();
 
-	work::step(work::Step::Type::Derivative, nullptr, before, e);
+	work::step(work::Step::Type::Derivative, nullptr, before, &e);
 	ast::dispose(before);
 
 	return true;
 }
 
-void derivative(ast *e, const ast *respect_to, const ast *eval_at) {
+void derivative(ast &e, const ast &respect_to, const ast &eval_at) {
 	ast *deriv_node = ast::make(Op::Deriv);
 
 	work::enter(e);
 
-	deriv_node->appendChild(e->copy());          /*value to take the derivative of*/
-	deriv_node->appendChild(respect_to->copy()); /*variable in respect to*/
-	deriv_node->appendChild(eval_at->copy());    /*evaluate at*/
+	deriv_node->appendChild(e.copy());          /*value to take the derivative of*/
+	deriv_node->appendChild(respect_to.copy()); /*variable in respect to*/
+	deriv_node->appendChild(eval_at.copy());    /*evaluate at*/
 
-	eval_derivatives(deriv_node);
+	eval_derivatives(*deriv_node);
 
-	e->replace(deriv_node);
+	e.replace(deriv_node);
 
 	work::leave(e);
 }

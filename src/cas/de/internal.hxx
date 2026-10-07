@@ -16,49 +16,49 @@ ast *negate(ast *a);
 ast *difference(ast *a, ast *b);
 
 /*Replaces y, y', ..., y^(order) in f with distinct symbols that are not x, so the derivatives can be treated as variables*/
-void derivatives_to_symbols(DiffEq *de, ast *f, ast **symbols);
+void derivatives_to_symbols(DiffEq *de, ast &f, ast **symbols);
 
-bool is_euler(const ast *e);
+bool is_euler(const ast &e);
 
 ast *ln(ast *a);
 
 /*Returns base^e, writing e^(A+B) as e^A*e^B, e^ln(A) as A and e^(n*ln(A)) as A^n. Takes ownership of e.*/
-ast *exponential(const ast *base, ast *e);
+ast *exponential(const ast &base, ast *e);
 
 /*Writes e as one fraction num/den, without simplifying*/
-void rational_parts(const ast *e, ast **numer, ast **denom);
+void rational_parts(const ast &e, ast **numer, ast **denom);
 
 /*True if e simplifies to zero, trying identities only when needed*/
-bool is_zero(const ast *e);
+bool is_zero(const ast &e);
 
-bool involves(const ast *e, const ast *v);
+bool involves(const ast &e, const ast &v);
 
 /*Expands e when that leaves fewer nodes*/
-void expand_if_smaller(ast *e);
+void expand_if_smaller(ast &e);
 
 /*Returns d/dv(e) as an unevaluated derivative node*/
-ast *derivative_node(ast *e, const ast *v);
+ast *derivative_node(ast *e, const ast &v);
 
 /*Returns e^(integral of P dv) without absolute values, recording the integral, or nullptr if it cannot be found. Takes ownership of P.*/
-ast *exponential_of_integral(ast *P, const ast *v);
+ast *exponential_of_integral(ast *P, const ast &v);
 
 /*Simplifies e lightly for display and returns it*/
 ast *tidy(ast *e);
 
 /*Writes e as one fraction with an expanded numerator and cancels common factors*/
-void single_fraction(ast *e);
+void single_fraction(ast &e);
 
 /*Returns preferred, or a symbol that does not appear in the equation if preferred does*/
 ast *substitution_symbol(const DiffEq *de, Sym preferred);
 
 /*Checks whether solution, written as y = f or as f, satisfies the equation, and the initial conditions if conditions, recording the check under text*/
-Error check_solution(DiffEq *de, const ast *solution, const char *text, bool conditions, bool *satisfied);
+Error check_solution(DiffEq *de, const ast &solution, const char *text, bool conditions, bool *satisfied);
 
 /*Returns e with the point of the initial condition substituted*/
-ast *at_condition(DiffEq *de, const ast *e, DiffEq::Condition *c);
+ast *at_condition(DiffEq *de, const ast &e, DiffEq::Condition *c);
 
 /*Solves lhs = rhs for y and records the solution. Takes ownership of lhs and rhs.*/
-void conclude(DiffEq *de, ast *lhs, ast *rhs, const ast *constant, DiffEq::Condition *c, ast **solution);
+void conclude(DiffEq *de, ast *lhs, ast *rhs, const ast &constant, DiffEq::Condition *c, ast **solution);
 
 /*Records lhs = antiderivative + C, finds C from the initial condition and solves for y. Takes ownership of lhs and antiderivative.*/
 void finish(DiffEq *de, ast *lhs, ast *antiderivative, ast **solution);
@@ -66,12 +66,12 @@ void finish(DiffEq *de, ast *lhs, ast *antiderivative, ast **solution);
 Error solve_first_order(DiffEq *de, ast **solution);
 
 /*Finds the roots of the characteristic polynomial in m with their multiplicities, recording the work*/
-Error characteristic_roots(DiffEq *de, const ast *m, root_t *roots, unsigned *count);
+Error characteristic_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count);
 
 void free_roots(root_t *roots, unsigned count);
 
 /*Returns x^j e^(rx) f, leaving out f when it is nullptr. Takes ownership of f.*/
-ast *basis_function(const DiffEq *de, unsigned j, const ast *r, ast *f);
+ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f);
 
 /*Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are*/
 unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast **basis);
@@ -83,7 +83,7 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution);
 Error solve_reduction_of_order(DiffEq *de, ast **solution);
 
 /*Returns the value of e if it is a rational number, otherwise nullptr*/
-num *rational_value(const ast *e);
+num *rational_value(const ast &e);
 
 /*Sets value to p(r), where p has degree n*/
 void evaluate(num **p, unsigned n, const num &r, num &value);
@@ -97,10 +97,10 @@ void deflate(num **p, unsigned n, const num &r);
 bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
-ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor);
+ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
-ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast *m);
+ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast &m);
 
 /*Fills constants with n letters that do not appear in the equation or in exclude unless it is nullptr. Returns false if there are not enough.*/
 bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, unsigned n);

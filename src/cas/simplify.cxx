@@ -6,28 +6,28 @@
 #include "identities.hxx"
 
 /*Executes the Simp::Commutative flag*/
-static bool simplify_commutative(ast *e) {
-	if (!e->isOperator())
+static bool simplify_commutative(ast &e) {
+	if (!e.isOperator())
 		return false;
 
-	if (e->childCount() == 1 && is_op_commutative(e->op())) {
-		e->replace(e->firstChild());
+	if (e.childCount() == 1 && is_op_commutative(e.op())) {
+		e.replace(e.firstChild());
 		simplify_commutative(e);
 		return true;
 	}
 
 	bool changed = false;
 
-	for (ast *child = e->firstChild(); child != nullptr;) {
+	for (ast *child = e.firstChild(); child != nullptr;) {
 		/*Flatten a child with the same commutative operator by moving its children to the end*/
-		if (is_op_commutative(e->op()) && child->isOp(e->op())) {
-			e->takeChildren(*child);
+		if (is_op_commutative(e.op()) && child->isOp(e.op())) {
+			e.takeChildren(*child);
 			ast *next = child->next();
-			ast::dispose(e->removeChild(*child));
+			ast::dispose(e.removeChild(*child));
 			child = next;
 			changed = true;
 		} else {
-			changed |= simplify_commutative(child);
+			changed |= simplify_commutative(*child);
 			child = child->next();
 		}
 	}
@@ -36,46 +36,46 @@ static bool simplify_commutative(ast *e) {
 }
 
 /*Executes the Simp::Rational flag*/
-static bool simplify_rational(ast *e) {
-	if (!e->isOperator())
+static bool simplify_rational(ast &e) {
+	if (!e.isOperator())
 		return false;
 
 	bool changed = false;
 	unsigned i = 0;
 
 	/*A rewrite changes e, so the child at the same index is checked again*/
-	while (i < e->childCount()) {
-		ast *child = e->childAt(i);
+	while (i < e.childCount()) {
+		ast &child = *e.childAt(i);
 
-		if (!child->isOp(Op::Div) || (!e->isOp(Op::Div) && !e->isOp(Op::Mult))) {
+		if (!child.isOp(Op::Div) || (!e.isOp(Op::Div) && !e.isOp(Op::Mult))) {
 			changed |= simplify_rational(child);
 			i++;
 			continue;
 		}
 
-		const ast *child_num = child->childAt(0);
-		const ast *child_den = child_num->next();
+		const ast &child_num = *child.childAt(0);
+		const ast &child_den = *child_num.next();
 
-		if (e->isOp(Op::Div) && i == 0) {
+		if (e.isOp(Op::Div) && i == 0) {
 			/*(A/B)/C = A/(BC)*/
-			const ast *e_den = child->next();
-			e->replace(ast::make(Op::Div, child_num->copy(), ast::make(Op::Mult, child_den->copy(), e_den->copy())));
-		} else if (e->isOp(Op::Div)) {
+			const ast &e_den = *child.next();
+			e.replace(ast::make(Op::Div, child_num.copy(), ast::make(Op::Mult, child_den.copy(), e_den.copy())));
+		} else if (e.isOp(Op::Div)) {
 			/*A/(B/C) = (AC)/B*/
-			const ast *e_num = e->firstChild();
-			e->replace(ast::make(Op::Div, ast::make(Op::Mult, e_num->copy(), child_den->copy()), child_num->copy()));
+			const ast &e_num = *e.firstChild();
+			e.replace(ast::make(Op::Div, ast::make(Op::Mult, e_num.copy(), child_den.copy()), child_num.copy()));
 		} else {
 			/*A(B/C) = (AB)/C*/
-			ast *product = e->copy();
-			ast *den = child_den->copy();
+			ast *product = e.copy();
+			ast *den = child_den.copy();
 
-			product->appendChild(child_num->copy());
+			product->appendChild(child_num.copy());
 			ast::dispose(product->removeChildAt(i));
 
-			e->replace(ast::make(Op::Div, product, den));
+			e.replace(ast::make(Op::Div, product, den));
 
-			simplify_rational(product);
-			simplify_rational(den);
+			simplify_rational(*product);
+			simplify_rational(*den);
 		}
 
 		changed = true;
@@ -85,31 +85,31 @@ static bool simplify_rational(ast *e) {
 }
 
 /*Executes the Simp::Normalize flag*/
-static bool simplify_normalize(ast *e) {
+static bool simplify_normalize(ast &e) {
 	bool changed = false;
 
-	if (e->isOperator()) {
-		for (ast *child : e->children())
+	if (e.isOperator()) {
+		for (ast &child : e.children())
 			changed |= simplify_normalize(child);
 
-		if (e->isOp(Op::Root)) {
+		if (e.isOp(Op::Root)) {
 			/*The root with index a of b is b^(1/a)*/
-			ast *a = e->childAt(0)->copy();
-			ast *b = e->childAt(1)->copy();
+			ast *a = e.childAt(0)->copy();
+			ast *b = e.childAt(1)->copy();
 
-			e->replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(num::from(1)), a)));
+			e.replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(num::from(1)), a)));
 
 			changed = true;
 		}
-	} else if (e->isNumber() && !e->num().isInteger()) {
+	} else if (e.isNumber() && !e.num().isInteger()) {
 		num *numer = num::from(1);
 		num *denom = num::from(1);
 
-		mp_rat_reduce(&e->num());
-		mp_int_copy(MP_NUMER_P(&e->num()), MP_NUMER_P(numer));
-		mp_int_copy(MP_DENOM_P(&e->num()), MP_NUMER_P(denom));
+		mp_rat_reduce(&e.num());
+		mp_int_copy(MP_NUMER_P(&e.num()), MP_NUMER_P(numer));
+		mp_int_copy(MP_DENOM_P(&e.num()), MP_NUMER_P(denom));
 
-		e->replace(ast::make(Op::Div, ast::make(numer), ast::make(denom)));
+		e.replace(ast::make(Op::Div, ast::make(numer), ast::make(denom)));
 
 		changed = true;
 	}
@@ -117,11 +117,11 @@ static bool simplify_normalize(ast *e) {
 	return changed;
 }
 
-bool has_imaginary_node(const ast *e) {
-	if (e->isSymbol())
-		return e->symbol() == Sym::Imag;
+bool has_imaginary_node(const ast &e) {
+	if (e.isSymbol())
+		return e.symbol() == Sym::Imag;
 
-	for (const ast *child : e->children()) {
+	for (const ast &child : e.children()) {
 		if (has_imaginary_node(child))
 			return true;
 	}
@@ -129,11 +129,11 @@ bool has_imaginary_node(const ast *e) {
 	return false;
 }
 
-bool contains_symbol(const ast *e, Sym symbol) {
-	if (e->isSymbol())
-		return e->symbol() == symbol;
+bool contains_symbol(const ast &e, Sym symbol) {
+	if (e.isSymbol())
+		return e.symbol() == symbol;
 
-	for (const ast *child : e->children()) {
+	for (const ast &child : e.children()) {
 		if (contains_symbol(child, symbol))
 			return true;
 	}
@@ -147,61 +147,61 @@ void fresh_Reserve(const ast *e) {
 	reserved = e;
 }
 
-Sym fresh_symbol(const ast *e) {
+Sym fresh_symbol(const ast &e) {
 	for (const char *candidate = "UVWTSRQPNMKJHGFDCBA"; *candidate != '\0'; candidate++) {
 		const Sym symbol = static_cast<Sym>(*candidate);
 
-		if (!contains_symbol(e, symbol) && (reserved == nullptr || !contains_symbol(reserved, symbol)))
+		if (!contains_symbol(e, symbol) && (reserved == nullptr || !contains_symbol(*reserved, symbol)))
 			return symbol;
 	}
 
 	return Sym::Invalid;
 }
 
-unsigned node_count(const ast *e) {
+unsigned node_count(const ast &e) {
 	unsigned count = 1;
 
-	for (const ast *child : e->children())
+	for (const ast &child : e.children())
 		count += node_count(child);
 
 	return count;
 }
 
-Sym constant_symbol(const ast *e) {
+Sym constant_symbol(const ast &e) {
 	return !contains_symbol(e, Sym::C) ? Sym::C : !contains_symbol(e, Sym::K) ? Sym::K : fresh_symbol(e);
 }
 
 /*Expects everything to be completely simplified*/
-bool is_negative_for_sure(const ast *a) {
-	if (a->isNumber())
-		return a->num() < 0;
+bool is_negative_for_sure(const ast &a) {
+	if (a.isNumber())
+		return a.num() < 0;
 
-	if (a->isOp(Op::Mult)) {
-		for (const ast *child : a->children()) {
+	if (a.isOp(Op::Mult)) {
+		for (const ast &child : a.children()) {
 			if (is_negative_for_sure(child))
 				return true;
 		}
-	} else if (a->isOp(Op::Div)) {
-		return is_negative_for_sure(a->childAt(0)) || is_negative_for_sure(a->childAt(1));
+	} else if (a.isOp(Op::Div)) {
+		return is_negative_for_sure(*a.childAt(0)) || is_negative_for_sure(*a.childAt(1));
 	}
 
 	return false;
 }
 
 /*Returns true if changed. Expects completely simplified.*/
-bool absolute_val(ast *e) {
-	if (e->isNumber() && e->num() < 0) {
-		mp_rat_abs(&e->num(), &e->num());
+bool absolute_val(ast &e) {
+	if (e.isNumber() && e.num() < 0) {
+		mp_rat_abs(&e.num(), &e.num());
 		return true;
 	}
 
-	if (e->isOp(Op::Mult)) {
-		for (ast *child : e->children()) {
+	if (e.isOp(Op::Mult)) {
+		for (ast &child : e.children()) {
 			if (absolute_val(child))
 				return true;
 		}
-	} else if (e->isOp(Op::Div)) {
-		return absolute_val(e->childAt(0)) || absolute_val(e->childAt(1));
+	} else if (e.isOp(Op::Div)) {
+		return absolute_val(*e.childAt(0)) || absolute_val(*e.childAt(1));
 	}
 
 	return false;
@@ -221,45 +221,45 @@ void canonical_SetSeries(const ast *base) {
 }
 
 /*Returns the exponent of e when it is a positive integer below limit, otherwise 0*/
-static int small_exponent(const ast *e, mp_small limit) {
-	const ast *power = e->childAt(1);
+static int small_exponent(const ast &e, mp_small limit) {
+	const ast &power = *e.childAt(1);
 	mp_small k;
 
-	if (!power->isNumber() || !power->num().toInt(k))
+	if (!power.isNumber() || !power.num().toInt(k))
 		return 0;
 
 	return k > 0 && k < limit ? static_cast<int>(k) : 0;
 }
 
-static bool is_number_fraction(const ast *e) {
-	return e->isOp(Op::Div) && e->childAt(0)->isNumber() && e->childAt(1)->isNumber();
+static bool is_number_fraction(const ast &e) {
+	return e.isOp(Op::Div) && e.childAt(0)->isNumber() && e.childAt(1)->isNumber();
 }
 
 /*Returns k if e is a number times the series base to the integer power k, 0 if e is a number, otherwise -1*/
-static int series_degree(const ast *e) {
+static int series_degree(const ast &e) {
 	if (series_base == nullptr)
 		return -1;
 
-	if (e->isNumber())
+	if (e.isNumber())
 		return 0;
 
-	if (e->compare(*series_base))
+	if (e.compare(*series_base))
 		return 1;
 
-	if (e->isOp(Op::Pow) && e->firstChild()->compare(*series_base)) {
+	if (e.isOp(Op::Pow) && e.firstChild()->compare(*series_base)) {
 		const int k = small_exponent(e, 1000);
 		if (k > 0)
 			return k;
 	}
 
-	if (e->isOp(Op::Div))
-		return e->childAt(1)->isNumber() ? series_degree(e->firstChild()) : -1;
+	if (e.isOp(Op::Div))
+		return e.childAt(1)->isNumber() ? series_degree(*e.firstChild()) : -1;
 
-	if (e->isOp(Op::Mult)) {
+	if (e.isOp(Op::Mult)) {
 		int degree = 0;
 
-		for (const ast *child : e->children()) {
-			if (child->isNumber() || is_number_fraction(child))
+		for (const ast &child : e.children()) {
+			if (child.isNumber() || is_number_fraction(child))
 				continue;
 
 			if (degree > 0)
@@ -279,11 +279,11 @@ static int series_degree(const ast *e) {
 static bool ascending_series = false;
 
 /*True if e is a sum with a term that is a number times a positive power of the series base*/
-static bool is_series_sum(const ast *e) {
-	if (!e->isOp(Op::Add))
+static bool is_series_sum(const ast &e) {
+	if (!e.isOp(Op::Add))
 		return false;
 
-	for (const ast *child : e->children()) {
+	for (const ast &child : e.children()) {
 		if (series_degree(child) > 0)
 			return true;
 	}
@@ -292,35 +292,35 @@ static bool is_series_sum(const ast *e) {
 }
 
 /*Orders factors of a product: numbers, symbols, sums, subscripts, then the rest*/
-static int factor_class(const ast *e) {
-	if (e->isNumber())
+static int factor_class(const ast &e) {
+	if (e.isNumber())
 		return 0;
-	if (e->isSymbol())
+	if (e.isSymbol())
 		return 1;
-	if (e->isOp(Op::Add))
+	if (e.isOp(Op::Add))
 		return 2;
-	if (e->isOp(Op::Subscript))
+	if (e.isOp(Op::Subscript))
 		return 3;
 	return 4;
 }
 
-static bool is_function(const ast *e) {
-	return e->isSymbol() && function_symbol != Sym::Invalid && e->symbol() == function_symbol;
+static bool is_function(const ast &e) {
+	return e.isSymbol() && function_symbol != Sym::Invalid && e.symbol() == function_symbol;
 }
 
 /*0 if e does not involve the unknown function, otherwise one more than the highest derivative of it in e*/
-static unsigned function_rank(const ast *e) {
-	if (e->isSymbol())
+static unsigned function_rank(const ast &e) {
+	if (e.isSymbol())
 		return is_function(e);
 
-	if (e->isOp(Op::Prime)) {
-		const unsigned rank = function_rank(e->firstChild());
+	if (e.isOp(Op::Prime)) {
+		const unsigned rank = function_rank(*e.firstChild());
 		return (rank == 0 ? 1 : rank) + 1;
 	}
 
 	unsigned rank = 0;
 
-	for (const ast *child : e->children()) {
+	for (const ast &child : e.children()) {
 		const unsigned child_rank = function_rank(child);
 		if (child_rank > rank)
 			rank = child_rank;
@@ -330,21 +330,21 @@ static unsigned function_rank(const ast *e) {
 }
 
 /*Returns k if e is a number times the unknown function to the positive integer power k, 0 if e is a number, otherwise -1*/
-static int function_degree(const ast *e) {
-	if (e->isNumber())
+static int function_degree(const ast &e) {
+	if (e.isNumber())
 		return 0;
 
 	if (is_function(e))
 		return 1;
 
-	if (e->isOp(Op::Pow) && is_function(e->firstChild())) {
+	if (e.isOp(Op::Pow) && is_function(*e.firstChild())) {
 		const int k = small_exponent(e, DiffEq::max_order + 1);
 		if (k > 0)
 			return k;
 	}
 
-	if (e->isOp(Op::Mult) && e->childCount() == 2 && e->firstChild()->isNumber()) {
-		const int degree = function_degree(e->childAt(1));
+	if (e.isOp(Op::Mult) && e.childCount() == 2 && e.firstChild()->isNumber()) {
+		const int degree = function_degree(*e.childAt(1));
 		return degree > 0 ? degree : -1;
 	}
 
@@ -352,22 +352,22 @@ static int function_degree(const ast *e) {
 }
 
 /*Returns e if it is a symbol, the first symbol factor if it is a product, otherwise Sym::Invalid*/
-static Sym leading_symbol(const ast *e) {
-	if (e->isSymbol())
-		return e->symbol();
+static Sym leading_symbol(const ast &e) {
+	if (e.isSymbol())
+		return e.symbol();
 
-	if (e->isOp(Op::Mult)) {
-		for (const ast *child : e->children()) {
-			if (child->isSymbol())
-				return child->symbol();
+	if (e.isOp(Op::Mult)) {
+		for (const ast &child : e.children()) {
+			if (child.isSymbol())
+				return child.symbol();
 		}
 	}
 
 	return Sym::Invalid;
 }
 
-static ast *factors_or_self(const ast *e) {
-	return e->isOp(Op::Mult) ? e->copy() : ast::make(Op::Mult, e->copy());
+static ast *factors_or_self(const ast &e) {
+	return e.isOp(Op::Mult) ? e.copy() : ast::make(Op::Mult, e.copy());
 }
 
 /*Takes ownership of product. Returns its only factor, 1 if it has none, or product itself.*/
@@ -384,44 +384,44 @@ static ast *unwrap_product(ast *product) {
 }
 
 /*Splits e into a base and a numeric exponent, which is 1 unless e is a power of a number*/
-static const ast *power_base(const ast *e, num &exponent) {
-	if (e->isOp(Op::Pow) && e->childAt(1)->isNumber()) {
-		exponent = e->childAt(1)->num();
-		return e->firstChild();
+static const ast *power_base(const ast &e, num &exponent) {
+	if (e.isOp(Op::Pow) && e.childAt(1)->isNumber()) {
+		exponent = e.childAt(1)->num();
+		return e.firstChild();
 	}
 
 	exponent = num(1);
-	return e;
+	return &e;
 }
 
 /*Replaces the factor at index i of product with base raised to exponent, or removes it if exponent is 0*/
-static void set_power(ast *product, unsigned i, const ast *base, const num &exponent) {
+static void set_power(ast &product, unsigned i, const ast &base, const num &exponent) {
 	ast *replacement = nullptr;
 
 	if (exponent == 1)
-		replacement = base->copy();
+		replacement = base.copy();
 	else if (exponent != 0)
-		replacement = ast::make(Op::Pow, base->copy(), ast::make(exponent.copy()));
+		replacement = ast::make(Op::Pow, base.copy(), ast::make(exponent.copy()));
 
-	ast::dispose(product->removeChildAt(i));
+	ast::dispose(product.removeChildAt(i));
 	if (replacement != nullptr)
-		product->insertChild(replacement, i);
+		product.insertChild(replacement, i);
 }
 
 /*Divides the factors that a and b have in common out of both, where X^2 and X share X. Returns false and sets nothing if they share none.*/
-static bool remove_common_factors(const ast *a, const ast *b, ast **rest_a, ast **rest_b) {
+static bool remove_common_factors(const ast &a, const ast &b, ast **rest_a, ast **rest_b) {
 	ast *fa = factors_or_self(a), *fb = factors_or_self(b);
 	bool removed = false;
 	unsigned i = 0;
 
 	while (i < fa->childCount()) {
 		num exponent_a;
-		const ast *base_a = power_base(fa->childAt(i), exponent_a);
+		const ast *base_a = power_base(*fa->childAt(i), exponent_a);
 		bool factor_gone = false;
 
 		for (unsigned j = 0; j < fb->childCount(); j++) {
 			num exponent_b;
-			const ast *base_b = power_base(fb->childAt(j), exponent_b);
+			const ast *base_b = power_base(*fb->childAt(j), exponent_b);
 
 			if (base_a->compare(*base_b) && exponent_a > 0 && exponent_b > 0) {
 				const num common = exponent_a < exponent_b ? exponent_a : exponent_b;
@@ -431,8 +431,8 @@ static bool remove_common_factors(const ast *a, const ast *b, ast **rest_a, ast 
 				exponent_b -= common;
 				factor_gone = exponent_a == 0;
 
-				set_power(fb, j, base, exponent_b);
-				set_power(fa, i, base, exponent_a);
+				set_power(*fb, j, *base, exponent_b);
+				set_power(*fa, i, *base, exponent_a);
 
 				ast::dispose(base);
 				removed = true;
@@ -455,32 +455,32 @@ static bool remove_common_factors(const ast *a, const ast *b, ast **rest_a, ast 
 	return true;
 }
 
-static bool is_constant_of_integration(const ast *e) {
-	return e->isSymbol() && e->symbol() == Sym::C;
+static bool is_constant_of_integration(const ast &e) {
+	return e.isSymbol() && e.symbol() == Sym::C;
 }
 
 /*Returns negative if a sorts before b, 0 if they are equal and positive if a sorts after b*/
 static int sort_order(const ast *a, const ast *b, bool add) {
 	int multiplier = 1;
-	const int rank_a = function_rank(a), rank_b = function_rank(b);
+	const int rank_a = function_rank(*a), rank_b = function_rank(*b);
 
 	/*An added constant of integration goes last*/
-	if (add && is_constant_of_integration(a) != is_constant_of_integration(b))
-		return is_constant_of_integration(a) ? 1 : -1;
+	if (add && is_constant_of_integration(*a) != is_constant_of_integration(*b))
+		return is_constant_of_integration(*a) ? 1 : -1;
 
 	/*Highest derivatives first in sums, and the unknown function last in products*/
 	if (rank_a != rank_b)
 		return add ? rank_b - rank_a : rank_a - rank_b;
 
-	if (!add && (a->isOp(Op::Subscript) || b->isOp(Op::Subscript)) && factor_class(a) != factor_class(b))
-		return factor_class(a) - factor_class(b);
+	if (!add && (a->isOp(Op::Subscript) || b->isOp(Op::Subscript)) && factor_class(*a) != factor_class(*b))
+		return factor_class(*a) - factor_class(*b);
 
 	if (add) {
-		const int degree_a = function_degree(a), degree_b = function_degree(b);
-		const int series_a = ascending_series ? series_degree(a) : -1;
-		const int series_b = ascending_series ? series_degree(b) : -1;
-		const bool imaginary_a = contains_symbol(a, Sym::Imag), imaginary_b = contains_symbol(b, Sym::Imag);
-		const Sym symbol_a = leading_symbol(a), symbol_b = leading_symbol(b);
+		const int degree_a = function_degree(*a), degree_b = function_degree(*b);
+		const int series_a = ascending_series ? series_degree(*a) : -1;
+		const int series_b = ascending_series ? series_degree(*b) : -1;
+		const bool imaginary_a = contains_symbol(*a, Sym::Imag), imaginary_b = contains_symbol(*b, Sym::Imag);
+		const Sym symbol_a = leading_symbol(*a), symbol_b = leading_symbol(*b);
 
 		/*Power series after the other terms, by ascending degree*/
 		if ((series_a >= 0) != (series_b >= 0))
@@ -510,7 +510,7 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 	if (a->isOp(Op::Mult)) {
 		ast *rest_a, *rest_b;
 
-		if (remove_common_factors(a, b, &rest_a, &rest_b)) {
+		if (remove_common_factors(*a, *b, &rest_a, &rest_b)) {
 			const int order = sort_order(rest_a, rest_b, add);
 
 			ast::dispose(rest_a);
@@ -532,7 +532,7 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 		return multiplier * order;
 	}
 
-	const bool negative_a = is_negative_for_sure(a), negative_b = is_negative_for_sure(b);
+	const bool negative_a = is_negative_for_sure(*a), negative_b = is_negative_for_sure(*b);
 
 	if (negative_a && !negative_b)
 		return multiplier * (add ? 1 : -1);
@@ -558,21 +558,21 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 	return 0;
 }
 
-static bool is_exponential(const ast *e) {
-	return e->isOp(Op::Pow) && e->firstChild()->isSymbol() && e->firstChild()->symbol() == Sym::Euler;
+static bool is_exponential(const ast &e) {
+	return e.isOp(Op::Pow) && e.firstChild()->isSymbol() && e.firstChild()->symbol() == Sym::Euler;
 }
 
 /*Moves powers of e out of the denominator of the division e, negating their exponents*/
-static bool exponentials_to_numerator(ast *e) {
-	const ast *den = e->childAt(1);
+static bool exponentials_to_numerator(ast &e) {
+	const ast &den = *e.childAt(1);
 	ast *moved = ast::make(Op::Mult), *rest;
 
-	if (den->isOp(Op::Mult)) {
+	if (den.isOp(Op::Mult)) {
 		rest = ast::make(Op::Mult);
-		for (const ast *child : den->children())
-			(is_exponential(child) ? moved : rest)->appendChild(child->copy());
+		for (const ast &child : den.children())
+			(is_exponential(child) ? moved : rest)->appendChild(child.copy());
 	} else if (is_exponential(den)) {
-		moved->appendChild(den->copy());
+		moved->appendChild(den.copy());
 		rest = ast::make(num::from(1));
 	} else {
 		ast::dispose(moved);
@@ -585,41 +585,41 @@ static bool exponentials_to_numerator(ast *e) {
 		return false;
 	}
 
-	for (ast *child : moved->children()) {
-		ast *exponent = child->childAt(1);
-		exponent->replace(ast::make(Op::Mult, ast::make(num::from(-1)), exponent->copy()));
+	for (ast &child : moved->children()) {
+		ast &exponent = *child.childAt(1);
+		exponent.replace(ast::make(Op::Mult, ast::make(num::from(-1)), exponent.copy()));
 		simplify(exponent, Simp::Normalize | Simp::Commutative | Simp::Eval);
 	}
 
-	moved->insertChild(e->firstChild()->copy(), 0);
-	simplify(rest, Simp::Commutative);
-	simplify(moved, Simp::Commutative);
+	moved->insertChild(e.firstChild()->copy(), 0);
+	simplify(*rest, Simp::Commutative);
+	simplify(*moved, Simp::Commutative);
 
 	if (rest->isInt(1)) {
 		ast::dispose(rest);
-		e->replace(moved);
+		e.replace(moved);
 	} else {
-		e->replace(ast::make(Op::Div, moved, rest));
+		e.replace(ast::make(Op::Div, moved, rest));
 	}
 
 	return true;
 }
 
 /*Combines the first two powers in the product e with the same exponent, writing a^5b^5 as (ab)^5*/
-static bool combine_powers(ast *e) {
-	for (ast *a : e->children()) {
-		if (!a->isOp(Op::Pow))
+static bool combine_powers(ast &e) {
+	for (ast &a : e.children()) {
+		if (!a.isOp(Op::Pow))
 			continue;
 
-		for (ast *b = a->next(); b != nullptr; b = b->next()) {
-			if (!b->isOp(Op::Pow) || !a->childAt(1)->compare(*b->childAt(1)))
+		for (ast *b = a.next(); b != nullptr; b = b->next()) {
+			if (!b->isOp(Op::Pow) || !a.childAt(1)->compare(*b->childAt(1)))
 				continue;
 
-			ast *base = ast::make(Op::Mult, a->childAt(0)->copy(), b->childAt(0)->copy());
-			e->appendChild(ast::make(Op::Pow, base, a->childAt(1)->copy()));
+			ast *base = ast::make(Op::Mult, a.childAt(0)->copy(), b->childAt(0)->copy());
+			e.appendChild(ast::make(Op::Pow, base, a.childAt(1)->copy()));
 
-			ast::dispose(e->removeChild(*a));
-			ast::dispose(e->removeChild(*b));
+			ast::dispose(e.removeChild(a));
+			ast::dispose(e.removeChild(*b));
 
 			simplify(e, Simp::Commutative);
 			return true;
@@ -630,17 +630,17 @@ static bool combine_powers(ast *e) {
 }
 
 /*Multiplies the numerator and denominator of the division e by a root in the denominator*/
-static bool rationalize(ast *e) {
-	ast *num = e->childAt(0);
-	ast *den = e->childAt(1);
+static bool rationalize(ast &e) {
+	ast &num = *e.childAt(0);
+	ast &den = *e.childAt(1);
 	const ast *root = nullptr;
 
-	if (den->isOp(Op::Root)) {
-		root = den;
-	} else if (den->isOp(Op::Mult)) {
-		for (const ast *child : den->children()) {
-			if (child->isOp(Op::Root)) {
-				root = child;
+	if (den.isOp(Op::Root)) {
+		root = &den;
+	} else if (den.isOp(Op::Mult)) {
+		for (const ast &child : den.children()) {
+			if (child.isOp(Op::Root)) {
+				root = &child;
 				break;
 			}
 		}
@@ -650,8 +650,8 @@ static bool rationalize(ast *e) {
 		return false;
 
 	ast *factor = root->copy();
-	num->replace(ast::make(Op::Mult, num->copy(), factor->copy()));
-	den->replace(ast::make(Op::Mult, den->copy(), factor));
+	num.replace(ast::make(Op::Mult, num.copy(), factor->copy()));
+	den.replace(ast::make(Op::Mult, den.copy(), factor));
 
 	simplify(num, Simp::Normalize | Simp::Commutative | Simp::Eval | Simp::Rational | Simp::LikeTerms);
 	simplify(den, Simp::Normalize | Simp::Commutative | Simp::Eval | Simp::Rational | Simp::LikeTerms);
@@ -660,21 +660,21 @@ static bool rationalize(ast *e) {
 }
 
 /*Orders the terms of a sum or product by insertion sort*/
-static bool sort_children(ast *e) {
-	if (!e->isOp(Op::Mult) && !e->isOp(Op::Add))
+static bool sort_children(ast &e) {
+	if (!e.isOp(Op::Mult) && !e.isOp(Op::Add))
 		return false;
 
-	const bool add = e->isOp(Op::Add);
+	const bool add = e.isOp(Op::Add);
 	bool changed = false;
 
 	ascending_series = is_series_sum(e);
 
-	for (unsigned i = 0; i < e->childCount(); i++) {
-		const ast *child = e->childAt(i);
+	for (unsigned i = 0; i < e.childCount(); i++) {
+		const ast *child = e.childAt(i);
 
 		for (unsigned j = 0; j < i; j++) {
-			if (sort_order(child, e->childAt(j), add) < 0) {
-				e->insertChild(e->removeChildAt(i), j);
+			if (sort_order(child, e.childAt(j), add) < 0) {
+				e.insertChild(e.removeChildAt(i), j);
 				changed = true;
 			}
 		}
@@ -697,32 +697,32 @@ static bool sort_children(ast *e) {
 
     Sorting for addition and multiplication is O(n^2) by insertion sort
 */
-static bool _simplify_canonical_form(ast *e, Canonical flags) {
+static bool _simplify_canonical_form(ast &e, Canonical flags) {
 	bool changed = false, repeat;
 
 	do {
 		repeat = false;
 
-		if (has(flags, Canonical::CombinePowers) && e->isOp(Op::Mult)) {
+		if (has(flags, Canonical::CombinePowers) && e.isOp(Op::Mult)) {
 			while (combine_powers(e))
 				repeat = true;
 		}
 
-		if (has(flags, Canonical::Exponentials) && e->isOp(Op::Div))
+		if (has(flags, Canonical::Exponentials) && e.isOp(Op::Div))
 			repeat |= exponentials_to_numerator(e);
 
-		if (has(flags, Canonical::PowersToRoots) && e->isOp(Op::Pow)) {
-			const ast *base = e->childAt(0);
-			const ast *power = e->childAt(1);
+		if (has(flags, Canonical::PowersToRoots) && e.isOp(Op::Pow)) {
+			const ast &base = *e.childAt(0);
+			const ast &power = *e.childAt(1);
 
 			/*Write X^(1/n) as the nth root of X*/
-			if (power->isOp(Op::Div) && power->childAt(0)->isInt(1)) {
-				e->replace(ast::make(Op::Root, power->childAt(1)->copy(), base->copy()));
+			if (power.isOp(Op::Div) && power.childAt(0)->isInt(1)) {
+				e.replace(ast::make(Op::Root, power.childAt(1)->copy(), base.copy()));
 				repeat = true;
 			}
 		}
 
-		if (has(flags, Canonical::Rationalize) && e->isOp(Op::Div))
+		if (has(flags, Canonical::Rationalize) && e.isOp(Op::Div))
 			repeat |= rationalize(e);
 
 		if (has(flags, Canonical::Sort))
@@ -730,7 +730,7 @@ static bool _simplify_canonical_form(ast *e, Canonical flags) {
 
 		changed |= repeat;
 
-		for (ast *child : e->children()) {
+		for (ast &child : e.children()) {
 			repeat |= _simplify_canonical_form(child, flags);
 			changed |= repeat;
 		}
@@ -739,20 +739,20 @@ static bool _simplify_canonical_form(ast *e, Canonical flags) {
 	return changed;
 }
 
-bool simplify_canonical_form(ast *e, Canonical flags) {
+bool simplify_canonical_form(ast &e, Canonical flags) {
 	work::pause();
 	const bool changed = _simplify_canonical_form(e, flags);
 	work::resume();
 	return changed;
 }
 
-static const ast *base_of(const ast *e) {
-	return e->isOp(Op::Pow) ? e->childAt(0) : e;
+static const ast *base_of(const ast &e) {
+	return e.isOp(Op::Pow) ? e.childAt(0) : &e;
 }
 
 /*Returns a copy of the exponent of e, which is 1 unless e is a power*/
-static ast *exponent_of(const ast *e) {
-	return e->isOp(Op::Pow) ? e->childAt(1)->copy() : ast::make(num::from(1));
+static ast *exponent_of(const ast &e) {
+	return e.isOp(Op::Pow) ? e.childAt(1)->copy() : ast::make(num::from(1));
 }
 
 /*
@@ -760,30 +760,30 @@ static ast *exponent_of(const ast *e) {
     AA to A^(1+1)
     A^2AB to A^(2+1)B
 */
-static bool simplify_like_terms_multiplication(ast *e) {
+static bool simplify_like_terms_multiplication(ast &e) {
 	bool changed = false;
 
-	for (ast *child : e->children())
+	for (ast &child : e.children())
 		changed |= simplify_like_terms_multiplication(child);
 
-	if (!e->isOp(Op::Mult))
+	if (!e.isOp(Op::Mult))
 		return changed;
 
 	unsigned i = 0;
 
 	/*Combining removes the factor at i, so the factor that takes its place is checked next*/
-	while (i < e->childCount()) {
-		ast *a = e->childAt(i);
+	while (i < e.childCount()) {
+		ast &a = *e.childAt(i);
 		bool combined = false;
 
-		for (ast *b = a->next(); b != nullptr; b = b->next()) {
-			if (!base_of(a)->compare(*base_of(b)))
+		for (ast *b = a.next(); b != nullptr; b = b->next()) {
+			if (!base_of(a)->compare(*base_of(*b)))
 				continue;
 
-			e->appendChild(ast::make(Op::Pow, base_of(a)->copy(), ast::make(Op::Add, exponent_of(a), exponent_of(b))));
+			e.appendChild(ast::make(Op::Pow, base_of(a)->copy(), ast::make(Op::Add, exponent_of(a), exponent_of(*b))));
 
-			ast::dispose(e->removeChild(*a));
-			ast::dispose(e->removeChild(*b));
+			ast::dispose(e.removeChild(a));
+			ast::dispose(e.removeChild(*b));
 
 			combined = changed = true;
 			break;
@@ -801,12 +801,12 @@ static bool simplify_like_terms_multiplication(ast *e) {
 
     Works on sin, cos, and tan
 */
-bool simplify_periodic(ast *e) {
-	if (!e->isOp(Op::Sin) && !e->isOp(Op::Cos) && !e->isOp(Op::Tan))
+bool simplify_periodic(ast &e) {
+	if (!e.isOp(Op::Sin) && !e.isOp(Op::Cos) && !e.isOp(Op::Tan))
 		return false;
 
-	ast *copy = ast::make(Op::Div, e->childAt(0)->copy(), ast::make(Sym::Pi));
-	simplify(copy, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+	ast *copy = ast::make(Op::Div, e.childAt(0)->copy(), ast::make(Sym::Pi));
+	simplify(*copy, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
 	const num *numer = nullptr, *denom = nullptr;
 
@@ -820,7 +820,7 @@ bool simplify_periodic(ast *e) {
 		return false;
 	}
 
-	const bool is_negative = is_negative_for_sure(copy);
+	const bool is_negative = is_negative_for_sure(*copy);
 	bool changed = false;
 
 	mp_int a = mp_int_alloc();
@@ -838,7 +838,7 @@ bool simplify_periodic(ast *e) {
 	mp_int_init(c);
 
 	/*c = 2b for sin and cos, c = b for tan*/
-	if (e->isOp(Op::Tan))
+	if (e.isOp(Op::Tan))
 		mp_int_copy(b, c);
 	else
 		mp_int_mul_value(b, 2, c);
@@ -864,7 +864,7 @@ bool simplify_periodic(ast *e) {
 		mp_int_copy(b, MP_NUMER_P(new_den));
 
 		ast *fraction = ast::make(Op::Div, ast::make(new_num), ast::make(new_den));
-		e->replace(ast::make(e->op(), ast::make(Op::Mult, ast::make(Sym::Pi), fraction)));
+		e.replace(ast::make(e.op(), ast::make(Op::Mult, ast::make(Sym::Pi), fraction)));
 
 		changed = true;
 	}
@@ -879,7 +879,7 @@ bool simplify_periodic(ast *e) {
 	return changed;
 }
 
-static bool simplify_identities(ast *e, Simp flags) {
+static bool simplify_identities(ast &e, Simp flags) {
 	bool changed = false;
 
 	if (has(flags, Simp::IdGeneral))
@@ -915,7 +915,7 @@ static bool simplify_identities(ast *e, Simp flags) {
 
     Returns true if ast was changed
 */
-static bool _simplify(ast *e, Simp flags) {
+static bool _simplify(ast &e, Simp flags) {
 	bool changed = false, repeat;
 
 	do {
@@ -983,7 +983,7 @@ static bool _simplify(ast *e, Simp flags) {
 	return changed;
 }
 
-bool simplify(ast *e, Simp flags) {
+bool simplify(ast &e, Simp flags) {
 	work::enter(e);
 	const bool changed = _simplify(e, flags);
 	work::leave(e);

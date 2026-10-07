@@ -33,8 +33,8 @@ typedef struct {
 } series_t;
 
 /*Fills p with the coefficients of e in powers of x - center and returns its degree, -1 if e is zero, or -2 if e is not a polynomial with rational coefficients*/
-static int taylor_coefficients(const DiffEq *de, const ast *e, const ast *center, num **p) {
-	ast *d = e->copy();
+static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center, num **p) {
+	ast *d = e.copy();
 	num factorial(1), scale;
 	int count = 0, degree = -1;
 	bool polynomial = false;
@@ -43,11 +43,11 @@ static int taylor_coefficients(const DiffEq *de, const ast *e, const ast *center
 		ast *value = d->copy();
 
 		work::pause();
-		substitute(value, de->x, center);
-		simplify(value, Simp::Basic);
+		substitute(*value, *de->x, center);
+		simplify(*value, Simp::Basic);
 		work::resume();
 
-		p[j] = rational_value(value);
+		p[j] = rational_value(*value);
 		ast::dispose(value);
 
 		if (p[j] == nullptr)
@@ -59,12 +59,12 @@ static int taylor_coefficients(const DiffEq *de, const ast *e, const ast *center
 		if (*p[j] != 0)
 			degree = j;
 
-		polynomial = !involves(d, de->x);
+		polynomial = !involves(*d, *de->x);
 
 		if (!polynomial) {
 			work::pause();
-			derivative(d, de->x, de->x);
-			simplify(d, Simp::Basic);
+			derivative(*d, *de->x, *de->x);
+			simplify(*d, Simp::Basic);
 			work::resume();
 
 			mp_rat_set_value(&scale, j + 1, 1);
@@ -81,7 +81,7 @@ static int taylor_coefficients(const DiffEq *de, const ast *e, const ast *center
 }
 
 /*Reads the terms of the equation and its right side in powers of x - center. Returns false if they are not polynomials with rational coefficients.*/
-static bool load_terms(series_t *s, const ast *center) {
+static bool load_terms(series_t *s, const ast &center) {
 	num *p[MAX_SERIES_DEGREE + 1];
 
 	s->terms =
@@ -90,7 +90,7 @@ static bool load_terms(series_t *s, const ast *center) {
 	s->g_degree = -1;
 
 	for (unsigned k = s->de->order + 1; k-- > 0;) {
-		const int degree = taylor_coefficients(s->de, s->de->a[k], center, p);
+		const int degree = taylor_coefficients(s->de, *s->de->a[k], center, p);
 		if (degree == -2)
 			return false;
 
@@ -106,7 +106,7 @@ static bool load_terms(series_t *s, const ast *center) {
 		}
 	}
 
-	s->g_degree = taylor_coefficients(s->de, s->de->g, center, s->g);
+	s->g_degree = taylor_coefficients(s->de, *s->de->g, center, s->g);
 
 	return s->g_degree != -2;
 }
@@ -183,7 +183,7 @@ static ast *right_side(const series_t *s) {
 		return integer(0);
 
 	num one(1);
-	ast *g = polynomial((num **)s->g, (unsigned)s->g_degree, s->base, one);
+	ast *g = polynomial((num **)s->g, (unsigned)s->g_degree, *s->base, one);
 
 	return g;
 }
@@ -229,7 +229,7 @@ static void record_substitution(const series_t *s) {
 			}
 
 			if (sum->childCount() > 0)
-				left->appendChild(ast::make(Op::Mult, tidy(sum), DiffEq::derivative(s->de->y, k)));
+				left->appendChild(ast::make(Op::Mult, tidy(sum), DiffEq::derivative(*s->de->y, k)));
 			else
 				ast::dispose(sum);
 		}
@@ -246,7 +246,7 @@ static void record_substitution(const series_t *s) {
 		ast *term = ast::make(Op::Mult, falling(s, 0, k), coefficient(s, s->index->copy()));
 		term = ast::make(Op::Mult, term, base_power(s, tidy(index_plus(s, -(int)k))));
 		ast *sum = series_sum(s, one, term, k);
-		ast *left = DiffEq::derivative(s->de->y, k);
+		ast *left = DiffEq::derivative(*s->de->y, k);
 		work::step(work::Step::Type::Equation, k == 0 ? "Power series" : k == 1 ? "Differentiate" : nullptr, left, sum);
 		ast::dispose(left);
 		ast::dispose(sum);
@@ -302,7 +302,7 @@ static ast *factored_polynomial(const series_t *s, num **p, unsigned n) {
 		copy[d] = p[d]->copy();
 
 	find_roots(copy, &n, roots, &count);
-	ast *e = factored_form(copy, n, roots, count, s->index);
+	ast *e = factored_form(copy, n, roots, count, *s->index);
 
 	for (unsigned d = 0; d <= n; d++)
 		num::dispose(copy[d]);
@@ -331,7 +331,7 @@ static void record_recurrence(series_t *s) {
 		}
 
 		work::pause();
-		simplify(e, Simp::Basic);
+		simplify(*e, Simp::Basic);
 		work::resume();
 
 		ast *sum = (int)m <= s->g_degree ? ast::make(s->g[m]->copy()) : integer(0);
@@ -413,7 +413,7 @@ static ast *combination_of(num **c, ast **constants, unsigned free_count) {
 	sum->appendChild(ast::make(c[free_count]->copy()));
 
 	work::pause();
-	simplify(sum, Simp::Basic);
+	simplify(*sum, Simp::Basic);
 	work::resume();
 
 	return sum;
@@ -455,7 +455,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 	for (unsigned i = 0; i < de->condition_count; i++) {
 		ast *e = difference(de->conditions[i].at->copy(), center->copy());
-		if (!is_zero(e))
+		if (!is_zero(*e))
 			err = Error::DeBadCondition;
 		ast::dispose(e);
 		conditions[de->conditions[i].order] = &de->conditions[i];
@@ -471,7 +471,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 	s.g_degree = -1;
 	s.lead = nullptr;
 
-	if (err == Error::Success && !load_terms(&s, center))
+	if (err == Error::Success && !load_terms(&s, *center))
 		err = Error::DeUnsolved;
 
 	for (unsigned i = 0; i < s.count && err == Error::Success; i++) {
@@ -495,11 +495,11 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 	scope->appendChild(de->equation->copy());
 	scope->appendChild(de->x->copy());
 	scope->appendChild(s.name->copy());
-	s.index = ast::make(static_cast<Sym>(contains_symbol(scope, Sym::N) ? fresh_symbol(scope) : Sym::N));
+	s.index = ast::make(static_cast<Sym>(contains_symbol(*scope, Sym::N) ? fresh_symbol(*scope) : Sym::N));
 	ast::dispose(scope);
 
 	ast *offset = difference(center->copy(), integer(0));
-	s.base = is_zero(offset) ? de->x->copy() : tidy(difference(de->x->copy(), center->copy()));
+	s.base = is_zero(*offset) ? de->x->copy() : tidy(difference(de->x->copy(), center->copy()));
 	ast::dispose(offset);
 
 	s.lowest_shift = (int)order;
@@ -558,7 +558,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		}
 
 		num::dispose(coefficients[k][free_count]);
-		if ((coefficients[k][free_count] = rational_value(conditions[k]->value)) == nullptr) {
+		if ((coefficients[k][free_count] = rational_value(*conditions[k]->value)) == nullptr) {
 			coefficients[k][free_count] = num::from(0);
 			err = Error::DeUnsolved;
 		}
@@ -566,7 +566,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		falling_value(value, (int)k, 0, k);
 		*coefficients[k][free_count] /= value;
 
-		ast *e = ast::make(Op::At, DiffEq::derivative(de->y, k), center->copy());
+		ast *e = ast::make(Op::At, DiffEq::derivative(*de->y, k), center->copy());
 		if (k > 1)
 			e = ast::make(Op::Div, e, ast::make(value.copy()));
 		ast *chain = ast::make(Op::Equals, e, ast::make(coefficients[k][free_count]->copy()));
@@ -678,7 +678,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 	if (err == Error::Success) {
 		work::pause();
-		simplify(answer, Simp::Normalize | Simp::Rational);
+		simplify(*answer, Simp::Normalize | Simp::Rational);
 		work::resume();
 		work::step(work::Step::Type::Equation, "Solution", de->y, answer);
 		*solution = ast::make(Op::Equals, de->y->copy(), answer);
