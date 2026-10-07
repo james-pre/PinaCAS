@@ -1,8 +1,9 @@
 #pragma once
 
-#include "imath.hxx"
+#include "num.hxx"
 #include "error.hxx"
 
+#include <cassert>
 #include <cstddef>
 #include <cstdlib>
 
@@ -115,18 +116,6 @@ enum class Sym : unsigned char {
 /* Number of symbols from Sym::A up to Sym::Invalid */
 constexpr unsigned sym_count = static_cast<unsigned>(Sym::Invalid) - static_cast<unsigned>(Sym::A);
 
-/*Wrapper functions for shorthand calling in functions*/
-/*Expects null terminated string*/
-mp_rat num_FromString(const char *str);
-mp_rat num_FromInt(mp_small num);
-mp_rat num_FromFraction(mp_small num, mp_small den);
-mp_rat num_Copy(const mpq_t *other);
-/*Expects num to be reduced*/
-bool num_IsInt(const mpq_t *num, mp_small value);
-int num_Compare(const mpq_t *a, const mpq_t *b);
-char *num_ToString(const mpq_t *num, mp_size precision);
-void num_Cleanup(mp_rat num);
-
 template <class T> class ChildIterator {
   public:
 	explicit ChildIterator(T *node) : node(node) {
@@ -181,7 +170,7 @@ class ast {
 	// make and dispose exist solely because without them a lot of garbage is inlined.
 	// this saves about 21.5 KB of flash space!
 	/* Allocates a node, which dispose frees */
-	static ast *make(mp_rat num);
+	static ast *make(::num *value);
 	static ast *make(Sym symbol);
 	static ast *make(Op op);
 	static ast *make(Op op, ast *operand);
@@ -221,18 +210,23 @@ class ast {
 		return type_ == Type::Operator;
 	}
 
-	/* Expects the number to be reduced */
 	bool isInt(mp_small value) const {
-		return isNumber() && num_IsInt(num_, value);
+		return isNumber() && *num_ == value;
 	}
 
-	/* Null when the node is not a number */
-	mp_rat num() {
-		return isNumber() ? num_ : nullptr;
+	/* Expects a number node */
+	::num &num() {
+#ifdef COMPILE_PC
+		assert(isNumber());
+#endif
+		return *num_;
 	}
 
-	const mpq_t *num() const {
-		return isNumber() ? num_ : nullptr;
+	const ::num &num() const {
+#ifdef COMPILE_PC
+		assert(isNumber());
+#endif
+		return *num_;
 	}
 
 	/* Sym::Invalid when the node is not a symbol */
@@ -309,7 +303,7 @@ class ast {
 	ast *next_ = nullptr;
 
 	union {
-		mp_rat num_;
+		::num *num_;
 		Sym symbol_;
 		Operator op_;
 	};

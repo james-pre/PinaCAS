@@ -6,7 +6,7 @@
 #define MAX_EXPANDED_TERMS 4096
 
 ast *integer(mp_small n) {
-	return ast::make(num_FromInt(n));
+	return ast::make(num::from(n));
 }
 
 ast *negate(ast *a) {
@@ -106,7 +106,7 @@ static bool linear_form(DiffEq *de, ast *f) {
 		de->g = negate(f->copy());
 
 		for (unsigned k = 0; k <= de->order; k++) {
-			ast *zero = ast::make(num_FromInt(0));
+			ast *zero = ast::make(num::from(0));
 			substitute(de->g, symbols[k], zero);
 			ast::dispose(zero);
 		}
@@ -137,7 +137,7 @@ Error DiffEq::load(const ast *entered, const ast *variable) {
 	if (entered->isOp(Op::Equals))
 		equation = entered->copy();
 	else
-		equation = ast::make(Op::Equals, entered->copy(), ast::make(num_FromInt(0)));
+		equation = ast::make(Op::Equals, entered->copy(), ast::make(num::from(0)));
 
 	ast *function = nullptr;
 	const Error err = find_function(equation, &function, &order);
@@ -350,24 +350,24 @@ static void split_exponentials(ast *e) {
 		e->replace(exponential(e->firstChild(), e->firstChild()->next()->copy()));
 }
 
-void rational_parts(const ast *e, ast **num, ast **den) {
+void rational_parts(const ast *e, ast **numer, ast **denom) {
 	if (e->isOp(Op::Div)) {
 		ast *n1, *d1, *n2, *d2;
 
 		rational_parts(e->firstChild(), &n1, &d1);
 		rational_parts(e->firstChild()->next(), &n2, &d2);
 
-		*num = ast::make(Op::Mult, n1, d2);
-		*den = ast::make(Op::Mult, d1, n2);
+		*numer = ast::make(Op::Mult, n1, d2);
+		*denom = ast::make(Op::Mult, d1, n2);
 	} else if (e->isOp(Op::Mult)) {
-		*num = ast::make(Op::Mult);
-		*den = ast::make(Op::Mult);
+		*numer = ast::make(Op::Mult);
+		*denom = ast::make(Op::Mult);
 
 		for (const ast *child : e->children()) {
 			ast *n, *d;
 			rational_parts(child, &n, &d);
-			(*num)->appendChild(n);
-			(*den)->appendChild(d);
+			(*numer)->appendChild(n);
+			(*denom)->appendChild(d);
 		}
 	} else if (e->isOp(Op::Add)) {
 		ast *nums = ast::make(Op::Add), *dens = ast::make(Op::Mult);
@@ -386,7 +386,7 @@ void rational_parts(const ast *e, ast **num, ast **den) {
 				distinct->appendChild(d->copy());
 		}
 
-		*num = ast::make(Op::Add);
+		*numer = ast::make(Op::Add);
 
 		for (const ast *n = nums->firstChild(), *d = dens->firstChild(); n != nullptr; n = n->next(), d = d->next()) {
 			ast *term = ast::make(Op::Mult);
@@ -400,25 +400,25 @@ void rational_parts(const ast *e, ast **num, ast **den) {
 					term->appendChild(other->copy());
 			}
 
-			(*num)->appendChild(term);
+			(*numer)->appendChild(term);
 		}
 
 		ast::dispose(nums);
 		ast::dispose(dens);
-		*den = distinct;
+		*denom = distinct;
 	} else if (e->isOp(Op::Pow) && e->firstChild()->next()->isNumber()) {
 		ast *n, *d;
-		mp_rat exponent = num_Copy(e->firstChild()->next()->num());
-		const bool negative = mp_rat_compare_zero(exponent) < 0;
+		num *exponent = e->firstChild()->next()->num().copy();
+		const bool negative = *exponent < 0;
 
 		mp_rat_abs(exponent, exponent);
 		rational_parts(e->firstChild(), &n, &d);
 
-		*num = ast::make(Op::Pow, negative ? d : n, ast::make(num_Copy(exponent)));
-		*den = ast::make(Op::Pow, negative ? n : d, ast::make(exponent));
+		*numer = ast::make(Op::Pow, negative ? d : n, ast::make(exponent->copy()));
+		*denom = ast::make(Op::Pow, negative ? n : d, ast::make(exponent));
 	} else {
-		*num = e->copy();
-		*den = ast::make(num_FromInt(1));
+		*numer = e->copy();
+		*denom = ast::make(num::from(1));
 	}
 }
 
@@ -450,8 +450,7 @@ static unsigned long expanded_terms(const ast *e, unsigned long limit) {
 	}
 
 	mp_small n;
-	if (e->isOp(Op::Pow) && e->firstChild()->next()->isNumber() && mp_rat_is_integer(e->firstChild()->next()->num()) &&
-		mp_int_to_int(MP_NUMER_P(e->firstChild()->next()->num()), &n) == MP_OK && n > 1) {
+	if (e->isOp(Op::Pow) && e->firstChild()->next()->isNumber() && e->firstChild()->next()->num().toInt(n) && n > 1) {
 		const unsigned long base = expanded_terms(e->firstChild(), limit);
 		unsigned long terms = 1;
 
@@ -476,8 +475,7 @@ static bool reduce_sine_powers(ast *e) {
 
 	mp_small n;
 	if (e->isOp(Op::Pow) && e->firstChild()->isOp(Op::Sin) && e->firstChild()->next()->isNumber() &&
-		mp_rat_is_integer(e->firstChild()->next()->num()) &&
-		mp_int_to_int(MP_NUMER_P(e->firstChild()->next()->num()), &n) == MP_OK && n >= 2) {
+		e->firstChild()->next()->num().toInt(n) && n >= 2) {
 		const ast *sine = e->firstChild();
 		e->replace(
 			ast::make(

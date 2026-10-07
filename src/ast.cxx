@@ -3,73 +3,9 @@
 #include <cstdlib>
 #include <utility>
 
-constexpr mp_size radix = 10;
-
-mp_rat num_FromString(const char *str) {
-	mp_rat n = mp_rat_alloc();
-	mp_rat_init(n);
-	mp_rat_read_decimal(n, radix, str);
-	return n;
-}
-
-mp_rat num_FromInt(mp_small num) {
-	mp_rat n = mp_rat_alloc();
-	mp_rat_init(n);
-	mp_int_set_value(MP_NUMER_P(n), num);
-	return n;
-}
-
-bool num_IsInt(const mpq_t *num, mp_small value) {
-	return mp_rat_is_integer(num) && mp_int_compare_value(MP_NUMER_P(num), value) == 0;
-}
-
-int num_Compare(const mpq_t *a, const mpq_t *b) {
-	return mp_rat_compare(a, b);
-}
-
-mp_rat num_FromFraction(mp_small num, mp_small den) {
-	mp_rat n = mp_rat_alloc();
-	mp_rat_init(n);
-	mp_rat_set_value(n, num, den);
-	return n;
-}
-
-mp_rat num_Copy(const mpq_t *other) {
-	mp_rat n = mp_rat_alloc();
-	mp_rat_init_copy(n, other);
-	return n;
-}
-
-char *num_ToString(const mpq_t *num, mp_size precision) {
-	char *str;
-
-	if (mp_rat_is_integer(num)) {
-		const int len = mp_int_string_len(&num->num, radix);
-		str = static_cast<char *>(malloc(len * sizeof(char)));
-		if (mp_int_to_string(&num->num, radix, str, len) != MP_OK) {
-			free(str);
-			return nullptr;
-		}
-	} else {
-		const int len = mp_rat_decimal_len(num, radix, precision);
-		str = static_cast<char *>(malloc(len * sizeof(char)));
-		if (mp_rat_to_decimal(num, radix, precision, MP_ROUND_HALF_UP, str, len) != MP_OK) {
-			free(str);
-			return nullptr;
-		}
-	}
-
-	return str;
-}
-
-void num_Cleanup(mp_rat num) {
-	if (num != nullptr)
-		mp_rat_free(num);
-}
-
-ast *ast::make(mp_rat num) {
+ast *ast::make(::num *value) {
 	ast *node = new ast(Type::Number);
-	node->num_ = num;
+	node->num_ = value;
 	return node;
 }
 
@@ -104,7 +40,7 @@ void ast::dispose(ast *node) {
 
 ast::ast(const ast &other) : type_(other.type_) {
 	switch (type_) {
-		case Type::Number: num_ = num_Copy(other.num_); break;
+		case Type::Number: num_ = other.num_->copy(); break;
 		case Type::Symbol: symbol_ = other.symbol_; break;
 		case Type::Operator: {
 			op_ = {other.op_.type, nullptr};
@@ -139,7 +75,7 @@ ast &ast::operator=(ast &&other) noexcept {
 
 ast::~ast() {
 	switch (type_) {
-		case Type::Number: num_Cleanup(num_); break;
+		case Type::Number: ::num::dispose(num_); break;
 		case Type::Symbol: break;
 		case Type::Operator: {
 			ast *child = op_.content;
@@ -184,7 +120,7 @@ bool ast::compare(const ast &other) const {
 		return false;
 
 	switch (type_) {
-		case Type::Number: return num_Compare(num_, other.num_) == 0;
+		case Type::Number: return *num_ == *other.num_;
 		case Type::Symbol: return symbol_ == other.symbol_;
 		case Type::Operator: {
 			if (op_.type != other.op_.type)

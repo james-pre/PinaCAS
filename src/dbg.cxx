@@ -31,7 +31,7 @@ void _print_tree(const ast *e, unsigned indent, unsigned index) {
 
 	switch (e->type()) {
 		case ast::Type::Number: {
-			char *num = num_ToString(e->num(), 6);
+			char *num = e->num().toString(6);
 			DBG(("NUMBER: %s\n", num));
 			free(num);
 			break;

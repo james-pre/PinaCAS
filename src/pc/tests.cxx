@@ -407,7 +407,7 @@ bool test_Run(test_t *t) {
 			if (err != Error::Success) {
 				printf("Test failed on line %u. %s\n", t->line, error_text(err));
 			} else if (t->type == TestType::DeOrder) {
-				actual = ast::make(num_FromInt(de.order));
+				actual = ast::make(num::from(de.order));
 				passed = check(t, actual, c);
 				ast::dispose(actual);
 			} else if (t->type == TestType::DeNonlinear) {

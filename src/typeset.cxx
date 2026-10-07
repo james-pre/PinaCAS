@@ -69,8 +69,8 @@ static Box *integer_box(const mpz_t *z) {
 	return b;
 }
 
-static Box *number_box(const mpq_t *r) {
-	if (mp_rat_is_integer(r))
+static Box *number_box(const num *r) {
+	if (r->isInteger())
 		return integer_box(MP_NUMER_P(r));
 
 	return pair(Box::Type::Fraction, integer_box(MP_NUMER_P(r)), integer_box(MP_DENOM_P(r)));
@@ -93,7 +93,7 @@ static Box *symbol_box(Sym symbol) {
 /*True if e does not need parentheses as a base or before a postfix operator*/
 static bool is_atom(const ast *e) {
 	switch (e->type()) {
-		case ast::Type::Number: return mp_rat_is_integer(e->num()) && mp_rat_compare_zero(e->num()) >= 0;
+		case ast::Type::Number: return e->num().isInteger() && e->num() >= 0;
 		case ast::Type::Symbol: return true;
 		case ast::Type::Operator:
 			return e->op() == Op::Prime || e->op() == Op::Log || e->op() == Op::Subscript || is_op_function(e->op());
@@ -123,30 +123,30 @@ static Box *convert(const ast *e);
 
 /*Writes a numeric fraction on one line, as in an exponent, or returns nullptr if e is not one*/
 static Box *inline_fraction(const ast *e) {
-	mp_rat value;
+	num *value;
 
-	if (e->isNumber() && !mp_rat_is_integer(e->num())) {
-		value = num_Copy(e->num());
+	if (e->isNumber() && !e->num().isInteger()) {
+		value = e->num().copy();
 	} else if (e->isOp(Op::Div) && e->firstChild()->isNumber() && e->firstChild()->next()->isNumber()) {
-		value = num_Copy(e->firstChild()->num());
-		mp_rat_div(value, e->firstChild()->next()->num(), value);
+		value = e->firstChild()->num().copy();
+		*value /= e->firstChild()->next()->num();
 	} else {
 		return nullptr;
 	}
 
 	Box *line = row();
-	if (mp_rat_compare_zero(value) < 0) {
+	if (*value < 0) {
 		line->append(text("-"));
 		mp_rat_abs(value, value);
 	}
 
 	line->append(integer_box(MP_NUMER_P(value)));
-	if (!mp_rat_is_integer(value)) {
+	if (!value->isInteger()) {
 		line->append(text("/"));
 		line->append(integer_box(MP_DENOM_P(value)));
 	}
 
-	num_Cleanup(value);
+	num::dispose(value);
 	return line;
 }
 
@@ -308,7 +308,7 @@ static Box *convert(const ast *e) {
 	}
 
 	switch (e->type()) {
-		case ast::Type::Number: return number_box(e->num());
+		case ast::Type::Number: return number_box(&e->num());
 		case ast::Type::Symbol: return symbol_box(e->symbol());
 		default: return operator_box(e);
 	}

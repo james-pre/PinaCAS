@@ -51,7 +51,7 @@ static void split_division(ast *e) {
 	const ast *num = e->childAt(0);
 	const ast *den = num->next();
 
-	e->replace(ast::make(Op::Mult, num->copy(), ast::make(Op::Div, ast::make(num_FromInt(1)), den->copy())));
+	e->replace(ast::make(Op::Mult, num->copy(), ast::make(Op::Div, ast::make(num::from(1)), den->copy())));
 }
 
 /*Writes (AB)^n as A^nB^n and (A/B)^n as A^n/B^n*/
@@ -85,12 +85,8 @@ static bool expand_power(ast *e) {
 	const ast *base = e->childAt(0);
 	const ast *power = base->next();
 
-	if (!base->isOp(Op::Add) || !power->isNumber() || !mp_rat_is_integer(power->num()) ||
-		mp_rat_compare_zero(power->num()) <= 0)
-		return false;
-
 	mp_small count;
-	if (mp_int_to_int(MP_NUMER_P(power->num()), &count) != MP_OK)
+	if (!base->isOp(Op::Add) || !power->isNumber() || !power->num().toInt(count) || count <= 0)
 		return false;
 
 	ast *product = ast::make(Op::Mult);
@@ -102,7 +98,7 @@ static bool expand_power(ast *e) {
 }
 
 static bool _expand(ast *e, Expand flags) {
-	if (e->isSymbol() || (e->isNumber() && mp_rat_is_integer(e->num())))
+	if (e->isSymbol() || (e->isNumber() && e->num().isInteger()))
 		return false;
 
 	bool changed = false;

@@ -14,7 +14,7 @@ static ast *logarithm(const ast *base, ast *e) {
 /*Returns 1 or -1 when the sign of e is known, otherwise 0*/
 static int sign_of(const ast *e) {
 	if (e->isNumber()) {
-		const int compared = mp_rat_compare_zero(e->num());
+		const int compared = num::compare(e->num(), 0);
 		return (compared > 0) - (compared < 0);
 	}
 
@@ -224,7 +224,7 @@ static bool isolate_step(DiffEq *de, ast **lhs, ast **rhs, const ast *constant, 
 		const ast *power = base->next();
 
 		if (!involves(power, de->y)) {
-			if (power->isNumber() && mp_int_is_even(MP_NUMER_P(power->num()))) {
+			if (power->isNumber() && mp_int_is_even(MP_NUMER_P(&power->num()))) {
 				sign = c != nullptr ? sign_at(de, base, c) : 0;
 				if (sign == 0)
 					return false;
@@ -420,15 +420,15 @@ static void merge_absolute_values(ast *e) {
 
 /*Returns the least common multiple of the integer denominators of the terms of e*/
 static ast *common_denominator(const ast *e) {
-	mp_rat multiple = num_FromInt(1);
+	num *multiple = num::from(1);
 
 	for (const ast *child : e->children()) {
 		ast *numerator, *denominator;
 		rational_parts(child, &numerator, &denominator);
 		simplify(denominator, Simp::Basic);
 
-		if (denominator->isNumber() && mp_rat_is_integer(denominator->num()))
-			mp_int_lcm(MP_NUMER_P(multiple), MP_NUMER_P(denominator->num()), MP_NUMER_P(multiple));
+		if (denominator->isNumber() && denominator->num().isInteger())
+			mp_int_lcm(MP_NUMER_P(multiple), MP_NUMER_P(&denominator->num()), MP_NUMER_P(multiple));
 
 		ast::dispose(numerator);
 		ast::dispose(denominator);

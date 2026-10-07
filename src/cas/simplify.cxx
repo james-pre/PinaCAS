@@ -97,19 +97,19 @@ static bool simplify_normalize(ast *e) {
 			ast *a = e->childAt(0)->copy();
 			ast *b = e->childAt(1)->copy();
 
-			e->replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(num_FromInt(1)), a)));
+			e->replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(num::from(1)), a)));
 
 			changed = true;
 		}
-	} else if (e->isNumber() && !mp_rat_is_integer(e->num())) {
-		mp_rat num = num_FromInt(1);
-		mp_rat den = num_FromInt(1);
+	} else if (e->isNumber() && !e->num().isInteger()) {
+		num *numer = num::from(1);
+		num *denom = num::from(1);
 
-		mp_rat_reduce(e->num());
-		mp_int_copy(MP_NUMER_P(e->num()), MP_NUMER_P(num));
-		mp_int_copy(MP_DENOM_P(e->num()), MP_NUMER_P(den));
+		mp_rat_reduce(&e->num());
+		mp_int_copy(MP_NUMER_P(&e->num()), MP_NUMER_P(numer));
+		mp_int_copy(MP_DENOM_P(&e->num()), MP_NUMER_P(denom));
 
-		e->replace(ast::make(Op::Div, ast::make(num), ast::make(den)));
+		e->replace(ast::make(Op::Div, ast::make(numer), ast::make(denom)));
 
 		changed = true;
 	}
@@ -174,7 +174,7 @@ Sym constant_symbol(const ast *e) {
 /*Expects everything to be completely simplified*/
 bool is_negative_for_sure(const ast *a) {
 	if (a->isNumber())
-		return mp_rat_compare_zero(a->num()) < 0;
+		return a->num() < 0;
 
 	if (a->isOp(Op::Mult)) {
 		for (const ast *child : a->children()) {
@@ -190,8 +190,8 @@ bool is_negative_for_sure(const ast *a) {
 
 /*Returns true if changed. Expects completely simplified.*/
 bool absolute_val(ast *e) {
-	if (e->isNumber() && mp_rat_compare_zero(e->num()) < 0) {
-		mp_rat_abs(e->num(), e->num());
+	if (e->isNumber() && e->num() < 0) {
+		mp_rat_abs(&e->num(), &e->num());
 		return true;
 	}
 
@@ -225,7 +225,7 @@ static int small_exponent(const ast *e, mp_small limit) {
 	const ast *power = e->childAt(1);
 	mp_small k;
 
-	if (!power->isNumber() || !mp_rat_is_integer(power->num()) || mp_int_to_int(MP_NUMER_P(power->num()), &k) != MP_OK)
+	if (!power->isNumber() || !power->num().toInt(k))
 		return 0;
 
 	return k > 0 && k < limit ? static_cast<int>(k) : 0;
@@ -373,7 +373,7 @@ static ast *factors_or_self(const ast *e) {
 /*Takes ownership of product. Returns its only factor, 1 if it has none, or product itself.*/
 static ast *unwrap_product(ast *product) {
 	switch (product->childCount()) {
-		case 0: ast::dispose(product); return ast::make(num_FromInt(1));
+		case 0: ast::dispose(product); return ast::make(num::from(1));
 		case 1: {
 			ast *only = product->removeChildAt(0);
 			ast::dispose(product);
@@ -384,24 +384,24 @@ static ast *unwrap_product(ast *product) {
 }
 
 /*Splits e into a base and a numeric exponent, which is 1 unless e is a power of a number*/
-static const ast *power_base(const ast *e, mp_rat *exponent) {
+static const ast *power_base(const ast *e, num **exponent) {
 	if (e->isOp(Op::Pow) && e->childAt(1)->isNumber()) {
-		*exponent = num_Copy(e->childAt(1)->num());
+		*exponent = e->childAt(1)->num().copy();
 		return e->firstChild();
 	}
 
-	*exponent = num_FromInt(1);
+	*exponent = num::from(1);
 	return e;
 }
 
 /*Replaces the factor at index i of product with base raised to exponent, or removes it if exponent is 0*/
-static void set_power(ast *product, unsigned i, const ast *base, const mpq_t *exponent) {
+static void set_power(ast *product, unsigned i, const ast *base, const num *exponent) {
 	ast *replacement = nullptr;
 
-	if (num_IsInt(exponent, 1))
+	if (*exponent == 1)
 		replacement = base->copy();
-	else if (mp_rat_compare_zero(exponent) != 0)
-		replacement = ast::make(Op::Pow, base->copy(), ast::make(num_Copy(exponent)));
+	else if (*exponent != 0)
+		replacement = ast::make(Op::Pow, base->copy(), ast::make(exponent->copy()));
 
 	ast::dispose(product->removeChildAt(i));
 	if (replacement != nullptr)
@@ -415,39 +415,38 @@ static bool remove_common_factors(const ast *a, const ast *b, ast **rest_a, ast 
 	unsigned i = 0;
 
 	while (i < fa->childCount()) {
-		mp_rat exponent_a;
+		num *exponent_a;
 		const ast *base_a = power_base(fa->childAt(i), &exponent_a);
 		bool factor_gone = false;
 
 		for (unsigned j = 0; j < fb->childCount(); j++) {
-			mp_rat exponent_b;
+			num *exponent_b;
 			const ast *base_b = power_base(fb->childAt(j), &exponent_b);
-			const bool shared =
-				base_a->compare(*base_b) && mp_rat_compare_zero(exponent_a) > 0 && mp_rat_compare_zero(exponent_b) > 0;
+			const bool shared = base_a->compare(*base_b) && *exponent_a > 0 && *exponent_b > 0;
 
 			if (shared) {
-				mp_rat common = num_Copy(mp_rat_compare(exponent_a, exponent_b) < 0 ? exponent_a : exponent_b);
+				num *common = (*exponent_a < *exponent_b ? exponent_a : exponent_b)->copy();
 				ast *base = base_a->copy();
 
-				mp_rat_sub(exponent_a, common, exponent_a);
-				mp_rat_sub(exponent_b, common, exponent_b);
-				factor_gone = mp_rat_compare_zero(exponent_a) == 0;
+				*exponent_a -= *common;
+				*exponent_b -= *common;
+				factor_gone = *exponent_a == 0;
 
 				set_power(fb, j, base, exponent_b);
 				set_power(fa, i, base, exponent_a);
 
-				num_Cleanup(common);
+				num::dispose(common);
 				ast::dispose(base);
 				removed = true;
 			}
 
-			num_Cleanup(exponent_b);
+			num::dispose(exponent_b);
 
 			if (shared)
 				break;
 		}
 
-		num_Cleanup(exponent_a);
+		num::dispose(exponent_a);
 
 		if (!factor_gone)
 			i++;
@@ -559,7 +558,7 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 		return 0;
 
 	switch (a->type()) {
-		case ast::Type::Number: return multiplier * mp_rat_compare(a->num(), b->num());
+		case ast::Type::Number: return multiplier * num::compare(a->num(), b->num());
 		case ast::Type::Symbol: return multiplier * (static_cast<int>(a->symbol()) - static_cast<int>(b->symbol()));
 		case ast::Type::Operator: return multiplier * (static_cast<int>(a->op()) - static_cast<int>(b->op()));
 	}
@@ -582,7 +581,7 @@ static bool exponentials_to_numerator(ast *e) {
 			(is_exponential(child) ? moved : rest)->appendChild(child->copy());
 	} else if (is_exponential(den)) {
 		moved->appendChild(den->copy());
-		rest = ast::make(num_FromInt(1));
+		rest = ast::make(num::from(1));
 	} else {
 		ast::dispose(moved);
 		return false;
@@ -596,7 +595,7 @@ static bool exponentials_to_numerator(ast *e) {
 
 	for (ast *child : moved->children()) {
 		ast *exponent = child->childAt(1);
-		exponent->replace(ast::make(Op::Mult, ast::make(num_FromInt(-1)), exponent->copy()));
+		exponent->replace(ast::make(Op::Mult, ast::make(num::from(-1)), exponent->copy()));
 		simplify(exponent, Simp::Normalize | Simp::Commutative | Simp::Eval);
 	}
 
@@ -761,7 +760,7 @@ static const ast *base_of(const ast *e) {
 
 /*Returns a copy of the exponent of e, which is 1 unless e is a power*/
 static ast *exponent_of(const ast *e) {
-	return e->isOp(Op::Pow) ? e->childAt(1)->copy() : ast::make(num_FromInt(1));
+	return e->isOp(Op::Pow) ? e->childAt(1)->copy() : ast::make(num::from(1));
 }
 
 /*
@@ -817,13 +816,13 @@ bool simplify_periodic(ast *e) {
 	ast *copy = ast::make(Op::Div, e->childAt(0)->copy(), ast::make(Sym::Pi));
 	simplify(copy, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-	const mpq_t *num = nullptr, *den = nullptr;
+	const num *numer = nullptr, *denom = nullptr;
 
 	if (copy->isNumber()) {
-		num = copy->num();
+		numer = &copy->num();
 	} else if (copy->isOp(Op::Div) && copy->childAt(0)->isNumber() && copy->childAt(1)->isNumber()) {
-		num = copy->childAt(0)->num();
-		den = copy->childAt(1)->num();
+		numer = &copy->childAt(0)->num();
+		denom = &copy->childAt(1)->num();
 	} else {
 		ast::dispose(copy);
 		return false;
@@ -833,10 +832,10 @@ bool simplify_periodic(ast *e) {
 	bool changed = false;
 
 	mp_int a = mp_int_alloc();
-	mp_int_init_copy(a, MP_NUMER_P(num));
+	mp_int_init_copy(a, MP_NUMER_P(numer));
 	mp_int b = mp_int_alloc();
-	if (den != nullptr)
-		mp_int_init_copy(b, MP_NUMER_P(den));
+	if (denom != nullptr)
+		mp_int_init_copy(b, MP_NUMER_P(denom));
 	else
 		mp_int_init_value(b, 1);
 
@@ -866,8 +865,8 @@ bool simplify_periodic(ast *e) {
 		if (is_negative)
 			mp_int_neg(a, a);
 
-		mp_rat new_num = num_FromInt(1);
-		mp_rat new_den = num_FromInt(1);
+		num *new_num = num::from(1);
+		num *new_den = num::from(1);
 
 		mp_int_copy(a, MP_NUMER_P(new_num));
 		mp_int_copy(b, MP_NUMER_P(new_den));

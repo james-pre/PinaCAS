@@ -72,7 +72,7 @@ bool eval_derivative_nodes(ast *e) {
 
 	/*Hardcode constant rule*/
 	if (is_constant(expr, respect_to)) {
-		e->replace(ast::make(num_FromInt(0)));
+		e->replace(ast::make(num::from(0)));
 		ast::dispose(respect_to);
 		ast::dispose(at);
 		return true;

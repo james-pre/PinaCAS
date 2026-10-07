@@ -236,7 +236,7 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 	if (id->isSymbol() && id->symbol() < Sym::Imag) {
 		if (id->symbol() == Sym::N) {
 			/*Only integers allowed*/
-			if (!(e->isNumber() && mp_rat_is_integer(e->num())))
+			if (!(e->isNumber() && e->num().isInteger()))
 				return false;
 		} else if (id->symbol() == Sym::I || id->symbol() == Sym::J) {
 			/*We assume something is real if it does not have an imaginary node. This could be wrong.*/
@@ -298,9 +298,9 @@ static bool matches(ast *id, ast *e, Dictionary dict) {
 					ast::dispose(id_copy->removeChildAt(i));
 
 					if (id->isOp(Op::Add))
-						dict_copy[combined_character - 'A'] = ast::make(num_FromInt(0));
+						dict_copy[combined_character - 'A'] = ast::make(num::from(0));
 					else /*Op::Mult*/
-						dict_copy[combined_character - 'A'] = ast::make(num_FromInt(1));
+						dict_copy[combined_character - 'A'] = ast::make(num::from(1));
 
 					break;
 				}

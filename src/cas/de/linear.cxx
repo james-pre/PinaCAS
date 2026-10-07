@@ -370,8 +370,7 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 			(*degree)++;
 		} else if (
 			factor->isOp(Op::Pow) && factor->firstChild()->compare(*de->x) &&
-			factor->firstChild()->next()->isNumber() && mp_rat_is_integer(factor->firstChild()->next()->num()) &&
-			mp_int_to_int(MP_NUMER_P(factor->firstChild()->next()->num()), &n) == MP_OK && n > 0 &&
+			factor->firstChild()->next()->isNumber() && factor->firstChild()->next()->num().toInt(n) && n > 0 &&
 			n <= DiffEq::max_order
 		) {
 			*degree += (unsigned)n;

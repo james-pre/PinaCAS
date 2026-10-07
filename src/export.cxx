@@ -42,7 +42,7 @@ static uint8_t precedence(const ast *e) {
 	((((parent)->isOperator() && is_op_operator(parent->op()) && !is_op_commutative(parent->op()) &&                   \
 	   precedence(child) <= precedence(parent)) ||                                                                     \
 	  precedence(child) < precedence(parent)) ||                                                                       \
-	 (is_right_operator_type(parent->op()) && (child)->isNumber() && mp_rat_compare_zero((child)->num()) < 0))
+	 (is_right_operator_type(parent->op()) && (child)->isNumber() && *(&(child)->num()) < 0))
 
 static const ast *rightmost(const ast *e) {
 	if (e->isOperator()) {
@@ -87,7 +87,7 @@ static bool only_units(const ast *e) {
 static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const TokenTable &lookup, Error *err) {
 	switch (e->type()) {
 		case ast::Type::Number: {
-			char *buffer = num_ToString(e->num(), 6);
+			char *buffer = e->num().toString(6);
 
 			for (unsigned i = 0; i < strlen(buffer); i++) {
 				uint8_t c = (uint8_t)buffer[i];
@@ -255,7 +255,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 						index = _to_binary(b, data, index, lookup, err);
 						add_token(Tok::ClosePar);
 						break;
-					} else if (a->isNumber() && mp_rat_compare_value(a->num(), 10, 1) == 0) {
+					} else if (a->isNumber() && a->num() == 10) {
 						add_token(Tok::Log);
 						index = _to_binary(b, data, index, lookup, err);
 						add_token(Tok::ClosePar);

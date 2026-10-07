@@ -8,7 +8,7 @@
 #define MAX_DEGREE 8
 
 static ast *integer(mp_small n) {
-	return ast::make(num_FromInt(n));
+	return ast::make(num::from(n));
 }
 
 static ast *mul(ast *a, ast *b) {
@@ -41,26 +41,26 @@ static ast *integral_node(ast *f, const ast *x) {
 }
 
 /*Returns the value of e if it is a number or a quotient of numbers, otherwise nullptr*/
-static mp_rat number_value(const ast *e) {
+static num *number_value(const ast *e) {
 	if (e->isNumber())
-		return num_Copy(e->num());
+		return e->num().copy();
 
 	if (!e->isOp(Op::Div) || !e->childAt(0)->isNumber() || !e->childAt(1)->isNumber())
 		return nullptr;
 
-	mp_rat value = num_Copy(e->childAt(0)->num());
-	mp_rat_div(value, e->childAt(1)->num(), value);
+	num *value = e->childAt(0)->num().copy();
+	*value /= e->childAt(1)->num();
 	return value;
 }
 
-static bool is_ast_fraction(const ast *e, mp_small num, mp_small den) {
-	mp_rat value = number_value(e);
+static bool is_ast_fraction(const ast *e, mp_small numer, mp_small denom) {
+	num *value = number_value(e);
 
 	if (value == nullptr)
 		return false;
 
-	const bool equal = mp_rat_compare_value(value, num, den) == 0;
-	num_Cleanup(value);
+	const bool equal = mp_rat_compare_value(value, numer, denom) == 0;
+	num::dispose(value);
 	return equal;
 }
 
@@ -113,15 +113,15 @@ static bool is_polynomial(ast *e, ast *x) {
 
 	if (e->isOp(Op::Pow)) {
 		const ast *exponent = e->childAt(1);
-		return exponent->isNumber() && mp_rat_is_integer(exponent->num()) &&
-			   mp_rat_compare_zero(exponent->num()) >= 0 && is_polynomial(e->childAt(0), x);
+		return exponent->isNumber() && exponent->num().isInteger() && exponent->num() >= 0 &&
+			   is_polynomial(e->childAt(0), x);
 	}
 
 	return false;
 }
 
 static ast *reciprocal(ast *e) {
-	mp_rat exponent;
+	num *exponent;
 
 	if (e->isOp(Op::Pow) && (exponent = number_value(e->childAt(1))) != nullptr) {
 		mp_rat_neg(exponent, exponent);
@@ -216,7 +216,7 @@ static ast *match_square_sum(ast *e, mp_small c, mp_small k) {
 }
 
 /*Returns v if e is c + k*v^2 for positive numbers c and k, setting them, otherwise nullptr*/
-static ast *match_positive_square_sum(ast *e, mp_rat *c, mp_rat *k) {
+static ast *match_positive_square_sum(ast *e, num **c, num **k) {
 	if (!e->isOp(Op::Add) || e->childCount() != 2)
 		return nullptr;
 
@@ -230,15 +230,14 @@ static ast *match_positive_square_sum(ast *e, mp_rat *c, mp_rat *k) {
 		if (square->isOp(Op::Mult) && square->childCount() == 2 && (*k = number_value(square->childAt(0))) != nullptr) {
 			square = square->childAt(1);
 		} else {
-			*k = num_FromInt(1);
+			*k = num::from(1);
 		}
 
-		if (mp_rat_compare_zero(*c) > 0 && mp_rat_compare_zero(*k) > 0 && square->isOp(Op::Pow) &&
-			square->childAt(1)->isInt(2))
+		if (*(*c) > 0 && *(*k) > 0 && square->isOp(Op::Pow) && square->childAt(1)->isInt(2))
 			return square->childAt(0);
 
-		num_Cleanup(*c);
-		num_Cleanup(*k);
+		num::dispose(*c);
+		num::dispose(*k);
 	}
 
 	return nullptr;
@@ -287,14 +286,14 @@ static ast *table_special_power(ast *u, ast *n, ast *x) {
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != nullptr)
 		return over_slope(ast::make(Op::Tan_Inv, v->copy()), v, x);
 
-	mp_rat c, k;
+	num *c, *k;
 	if (is_ast_fraction(n, -1, 1) && (v = match_positive_square_sum(u, &c, &k)) != nullptr) {
-		ast *F = ast::make(num_Copy(k));
-		F = power(quotient(F, ast::make(num_Copy(c))), ast::make(num_FromFraction(1, 2)));
+		ast *F = ast::make(k->copy());
+		F = power(quotient(F, ast::make(c->copy())), ast::make(num::from(1, 2)));
 		F = ast::make(Op::Tan_Inv, mul(F, v->copy()));
-		mp_rat_mul(c, k, c);
-		F = quotient(F, power(ast::make(c), ast::make(num_FromFraction(1, 2))));
-		num_Cleanup(k);
+		*c *= *k;
+		F = quotient(F, power(ast::make(c), ast::make(num::from(1, 2))));
+		num::dispose(k);
 		return over_slope(F, v, x);
 	}
 
@@ -636,14 +635,14 @@ static ast *polynomial(ast **c, int degree, ast *x) {
 static ast *divide(ast *f, ast *x) {
 	ast *product = factors_of(f), *numerator = ast::make(Op::Mult), *denominator = ast::make(Op::Mult);
 	for (ast *child : product->children()) {
-		mp_rat exponent;
+		num *exponent;
 
 		if (child->isOp(Op::Pow) && (exponent = number_value(child->childAt(1))) != nullptr) {
-			if (mp_rat_compare_zero(exponent) < 0)
+			if (*exponent < 0)
 				denominator->appendChild(reciprocal(child));
 			else
 				numerator->appendChild(child->copy());
-			num_Cleanup(exponent);
+			num::dispose(exponent);
 		} else {
 			numerator->appendChild(child->copy());
 		}

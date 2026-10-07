@@ -94,7 +94,7 @@ struct Token {
 	Tok type;
 
 	union {
-		mp_rat num;
+		num *number;
 		Sym symbol;
 	};
 };
@@ -109,13 +109,7 @@ static bool is_num(uint8_t byte, const TokenTable &lookup) {
 	return (byte >= '0' && byte <= '9') || byte == lookup[Tok::Period].bytes[0];
 }
 
-mp_rat read_num(
-	const uint8_t *equation,
-	unsigned index,
-	unsigned length,
-	const TokenTable &lookup,
-	unsigned *consumed
-) {
+num *read_num(const uint8_t *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
 	unsigned size = 0;
 
 	for (unsigned i = index; i < length; i++) {
@@ -139,7 +133,7 @@ mp_rat read_num(
 
 	buffer[size] = '\0';
 
-	mp_rat num = num_FromString(buffer);
+	num *num = num::from(buffer);
 
 	free(buffer);
 
@@ -207,7 +201,7 @@ Token read_token(
 
 	if (is_num(equation[index], lookup)) {
 		tok.type = Tok::Number;
-		tok.num = read_num(equation, index, length, lookup, consumed);
+		tok.number = read_num(equation, index, length, lookup, consumed);
 
 	} else if (read_symbol(equation, index, length, lookup, consumed) != Sym::Invalid) {
 		tok.type = Tok::Symbol;
@@ -245,7 +239,7 @@ Error _tokenize(
 			tokens[token_index] = tok;
 		} else if (tok.type == Tok::Number) {
 			/*Clean up the number if it's not being saved*/
-			num_Cleanup(tok.num);
+			num::dispose(tok.number);
 		}
 
 		token_index++;
@@ -337,7 +331,7 @@ void translate(ast *e, Tok type) {
 		case Tok::Plus: e->setOp(Op::Add); break;
 		case Tok::Minus: {
 			e->setOp(Op::Add);
-			e->insertChild(ast::make(Op::Mult, ast::make(num_FromInt(-1)), e->removeChildAt(1)), 0);
+			e->insertChild(ast::make(Op::Mult, ast::make(num::from(-1)), e->removeChildAt(1)), 0);
 			break;
 		}
 		case Tok::Multiply: e->setOp(Op::Mult); break;
@@ -348,7 +342,7 @@ void translate(ast *e, Tok type) {
 		case Tok::Scientific: {
 			e->setOp(Op::Mult);
 
-			ast *op2 = ast::make(Op::Pow, ast::make(num_FromInt(10)), e->childAt(1));
+			ast *op2 = ast::make(Op::Pow, ast::make(num::from(10)), e->childAt(1));
 			e->removeChildAt(1);
 			e->appendChild(op2);
 
@@ -359,19 +353,19 @@ void translate(ast *e, Tok type) {
 		case Tok::Prime: e->setOp(Op::Prime); break;
 		case Tok::Negate:
 			e->setOp(Op::Mult);
-			e->insertChild(ast::make(num_FromInt(-1)), 0);
+			e->insertChild(ast::make(num::from(-1)), 0);
 			break;
 		case Tok::Reciprocal:
 			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num_FromInt(-1)));
+			e->appendChild(ast::make(num::from(-1)));
 			break;
 		case Tok::Square:
 			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num_FromInt(2)));
+			e->appendChild(ast::make(num::from(2)));
 			break;
 		case Tok::Cube:
 			e->setOp(Op::Pow);
-			e->appendChild(ast::make(num_FromInt(3)));
+			e->appendChild(ast::make(num::from(3)));
 			break;
 		case Tok::Factorial: e->setOp(Op::Factorial); break;
 		case Tok::LogBase:
@@ -385,11 +379,11 @@ void translate(ast *e, Tok type) {
 		case Tok::Abs: e->setOp(Op::Abs); break;
 		case Tok::Sqrt:
 			e->setOp(Op::Root);
-			e->insertChild(ast::make(num_FromInt(2)), 0);
+			e->insertChild(ast::make(num::from(2)), 0);
 			break;
 		case Tok::CubedRoot:
 			e->setOp(Op::Root);
-			e->insertChild(ast::make(num_FromInt(3)), 0);
+			e->insertChild(ast::make(num::from(3)), 0);
 			break;
 		case Tok::Ln:
 			e->setOp(Op::Log);
@@ -401,11 +395,11 @@ void translate(ast *e, Tok type) {
 			break;
 		case Tok::Log:
 			e->setOp(Op::Log);
-			e->insertChild(ast::make(num_FromInt(10)), 0);
+			e->insertChild(ast::make(num::from(10)), 0);
 			break;
 		case Tok::TenToPower:
 			e->setOp(Op::Pow);
-			e->insertChild(ast::make(num_FromInt(10)), 0);
+			e->insertChild(ast::make(num::from(10)), 0);
 			break;
 		case Tok::Sin: e->setOp(Op::Sin); break;
 		case Tok::Sin_Inv: e->setOp(Op::Sin_Inv); break;
@@ -499,7 +493,7 @@ unsigned parse_list(
 			const Token tok = read_token(equation, i, length, lookup, &consumed);
 
 			if (tok.type == Tok::Number)
-				num_Cleanup(tok.num);
+				num::dispose(tok.number);
 
 			if (tok.type == Tok::OpenPar || is_tok_function(tok.type))
 				depth++;
@@ -556,7 +550,7 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 			operators.push(tok);
 		} else if (tok->type == Tok::Number || tok->type == Tok::Symbol) {
 			if (tok->type == Tok::Number) {
-				expressions.push(ast::make(tok->num));
+				expressions.push(ast::make(tok->number));
 			} else {
 				expressions.push(ast::make(tok->symbol));
 			}

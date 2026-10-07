@@ -5,7 +5,7 @@
 /*A root re, or the pair re ± im*i when im is not nullptr. value is the root when it is rational, otherwise nullptr.*/
 typedef struct {
 	ast *re, *im;
-	mp_rat value;
+	num *value;
 	unsigned multiplicity;
 } root_t;
 
@@ -26,7 +26,7 @@ ast *ln(ast *a);
 ast *exponential(const ast *base, ast *e);
 
 /*Writes e as one fraction num/den, without simplifying*/
-void rational_parts(const ast *e, ast **num, ast **den);
+void rational_parts(const ast *e, ast **numer, ast **denom);
 
 /*True if e simplifies to zero, trying identities only when needed*/
 bool is_zero(const ast *e);
@@ -83,24 +83,24 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution);
 Error solve_reduction_of_order(DiffEq *de, ast **solution);
 
 /*Returns the value of e if it is a rational number, otherwise nullptr*/
-mp_rat rational_value(const ast *e);
+num *rational_value(const ast *e);
 
 /*Sets value to p(r), where p has degree n*/
-void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value);
+void evaluate(num **p, unsigned n, num *r, num *value);
 
-bool is_root(mp_rat *p, unsigned n, mp_rat r);
+bool is_root(num **p, unsigned n, num *r);
 
 /*Divides p of degree n by m - r, which must be a factor*/
-void deflate(mp_rat *p, unsigned n, mp_rat r);
+void deflate(num **p, unsigned n, num *r);
 
 /*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
-bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count);
+bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
-ast *polynomial(mp_rat *p, unsigned n, const ast *m, mp_rat divisor);
+ast *polynomial(num **p, unsigned n, const ast *m, num *divisor);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
-ast *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned count, const ast *m);
+ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast *m);
 
 /*Fills constants with n letters that do not appear in the equation or in exclude unless it is nullptr. Returns false if there are not enough.*/
 bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, unsigned n);

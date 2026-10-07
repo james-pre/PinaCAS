@@ -51,7 +51,7 @@ static ast *gcd_div(const ast *div, const ast *b) {
 		den2 = b->childAt(1);
 	} else {
 		num2 = b;
-		den2 = one = ast::make(num_FromInt(1));
+		den2 = one = ast::make(num::from(1));
 	}
 
 	ast *num_g = gcd(num1, num2);
@@ -75,18 +75,18 @@ static ast *gcd_pow(const ast *pow, const ast *b) {
 		const ast *power2 = b->childAt(1);
 
 		if (power1->isNumber() && power2->isNumber()) {
-			const bool use_first = mp_rat_compare(power1->num(), power2->num()) < 0;
+			const bool use_first = power1->num() < power2->num();
 
 			ast *current_gcd = gcd(base1, base2);
 
 			return ast::make(Op::Pow, current_gcd, use_first ? power1->copy() : power2->copy());
 		}
 
-	} else if (power1->isNumber() && mp_rat_compare_value(power1->num(), 1, 1) >= 0 && base1->compare(*b)) {
+	} else if (power1->isNumber() && power1->num() >= 1 && base1->compare(*b)) {
 		return b->copy();
 	}
 
-	return ast::make(num_FromInt(1));
+	return ast::make(num::from(1));
 }
 
 ast *gcd(const ast *a, const ast *b) {
@@ -96,10 +96,10 @@ ast *gcd(const ast *a, const ast *b) {
 		return a->copy();
 
 	if (a->isNumber() && b->isNumber()) {
-		if (mp_rat_is_integer(a->num()) && mp_rat_is_integer(b->num())) {
-			mp_rat gcd = num_FromInt(1);
+		if (a->num().isInteger() && b->num().isInteger()) {
+			num *gcd = num::from(1);
 
-			mp_int_gcd(&a->num()->num, &b->num()->num, &gcd->num);
+			mp_int_gcd(MP_NUMER_P(&a->num()), MP_NUMER_P(&b->num()), MP_NUMER_P(gcd));
 
 			return ast::make(gcd);
 		}
@@ -128,7 +128,7 @@ ast *gcd(const ast *a, const ast *b) {
 		return ret;
 	}
 
-	return ast::make(num_FromInt(1));
+	return ast::make(num::from(1));
 }
 
 /*Collects the non-numeric factors of e, with divisors in den*/
