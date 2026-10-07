@@ -384,24 +384,24 @@ static ast *unwrap_product(ast *product) {
 }
 
 /*Splits e into a base and a numeric exponent, which is 1 unless e is a power of a number*/
-static const ast *power_base(const ast *e, num **exponent) {
+static const ast *power_base(const ast *e, num &exponent) {
 	if (e->isOp(Op::Pow) && e->childAt(1)->isNumber()) {
-		*exponent = e->childAt(1)->num().copy();
+		exponent = e->childAt(1)->num();
 		return e->firstChild();
 	}
 
-	*exponent = num::from(1);
+	exponent = num(1);
 	return e;
 }
 
 /*Replaces the factor at index i of product with base raised to exponent, or removes it if exponent is 0*/
-static void set_power(ast *product, unsigned i, const ast *base, const num *exponent) {
+static void set_power(ast *product, unsigned i, const ast *base, const num &exponent) {
 	ast *replacement = nullptr;
 
-	if (*exponent == 1)
+	if (exponent == 1)
 		replacement = base->copy();
-	else if (*exponent != 0)
-		replacement = ast::make(Op::Pow, base->copy(), ast::make(exponent->copy()));
+	else if (exponent != 0)
+		replacement = ast::make(Op::Pow, base->copy(), ast::make(exponent.copy()));
 
 	ast::dispose(product->removeChildAt(i));
 	if (replacement != nullptr)
@@ -415,38 +415,30 @@ static bool remove_common_factors(const ast *a, const ast *b, ast **rest_a, ast 
 	unsigned i = 0;
 
 	while (i < fa->childCount()) {
-		num *exponent_a;
-		const ast *base_a = power_base(fa->childAt(i), &exponent_a);
+		num exponent_a;
+		const ast *base_a = power_base(fa->childAt(i), exponent_a);
 		bool factor_gone = false;
 
 		for (unsigned j = 0; j < fb->childCount(); j++) {
-			num *exponent_b;
-			const ast *base_b = power_base(fb->childAt(j), &exponent_b);
-			const bool shared = base_a->compare(*base_b) && *exponent_a > 0 && *exponent_b > 0;
+			num exponent_b;
+			const ast *base_b = power_base(fb->childAt(j), exponent_b);
 
-			if (shared) {
-				num *common = (*exponent_a < *exponent_b ? exponent_a : exponent_b)->copy();
+			if (base_a->compare(*base_b) && exponent_a > 0 && exponent_b > 0) {
+				const num common = exponent_a < exponent_b ? exponent_a : exponent_b;
 				ast *base = base_a->copy();
 
-				*exponent_a -= *common;
-				*exponent_b -= *common;
-				factor_gone = *exponent_a == 0;
+				exponent_a -= common;
+				exponent_b -= common;
+				factor_gone = exponent_a == 0;
 
 				set_power(fb, j, base, exponent_b);
 				set_power(fa, i, base, exponent_a);
 
-				num::dispose(common);
 				ast::dispose(base);
 				removed = true;
-			}
-
-			num::dispose(exponent_b);
-
-			if (shared)
 				break;
+			}
 		}
-
-		num::dispose(exponent_a);
 
 		if (!factor_gone)
 			i++;

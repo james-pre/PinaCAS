@@ -69,11 +69,11 @@ static Box *integer_box(const mpz_t *z) {
 	return b;
 }
 
-static Box *number_box(const num *r) {
-	if (r->isInteger())
-		return integer_box(MP_NUMER_P(r));
+static Box *number_box(const num &r) {
+	if (r.isInteger())
+		return integer_box(MP_NUMER_P(&r));
 
-	return pair(Box::Type::Fraction, integer_box(MP_NUMER_P(r)), integer_box(MP_DENOM_P(r)));
+	return pair(Box::Type::Fraction, integer_box(MP_NUMER_P(&r)), integer_box(MP_DENOM_P(&r)));
 }
 
 static Box *symbol_box(Sym symbol) {
@@ -123,30 +123,27 @@ static Box *convert(const ast *e);
 
 /*Writes a numeric fraction on one line, as in an exponent, or returns nullptr if e is not one*/
 static Box *inline_fraction(const ast *e) {
-	num *value;
+	num value;
 
-	if (e->isNumber() && !e->num().isInteger()) {
-		value = e->num().copy();
-	} else if (e->isOp(Op::Div) && e->firstChild()->isNumber() && e->firstChild()->next()->isNumber()) {
-		value = e->firstChild()->num().copy();
-		*value /= e->firstChild()->next()->num();
-	} else {
+	if (e->isNumber() && !e->num().isInteger())
+		value = e->num();
+	else if (e->isOp(Op::Div) && e->firstChild()->isNumber() && e->firstChild()->next()->isNumber())
+		value = e->firstChild()->num() / e->firstChild()->next()->num();
+	else
 		return nullptr;
-	}
 
 	Box *line = row();
-	if (*value < 0) {
+	if (value < 0) {
 		line->append(text("-"));
-		mp_rat_abs(value, value);
+		value = -value;
 	}
 
-	line->append(integer_box(MP_NUMER_P(value)));
-	if (!value->isInteger()) {
+	line->append(integer_box(MP_NUMER_P(&value)));
+	if (!value.isInteger()) {
 		line->append(text("/"));
-		line->append(integer_box(MP_DENOM_P(value)));
+		line->append(integer_box(MP_DENOM_P(&value)));
 	}
 
-	num::dispose(value);
 	return line;
 }
 
@@ -308,7 +305,7 @@ static Box *convert(const ast *e) {
 	}
 
 	switch (e->type()) {
-		case ast::Type::Number: return number_box(&e->num());
+		case ast::Type::Number: return number_box(e->num());
 		case ast::Type::Symbol: return symbol_box(e->symbol());
 		default: return operator_box(e);
 	}

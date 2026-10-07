@@ -86,18 +86,18 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution);
 num *rational_value(const ast *e);
 
 /*Sets value to p(r), where p has degree n*/
-void evaluate(num **p, unsigned n, num *r, num *value);
+void evaluate(num **p, unsigned n, const num &r, num &value);
 
-bool is_root(num **p, unsigned n, num *r);
+bool is_root(num **p, unsigned n, const num &r);
 
 /*Divides p of degree n by m - r, which must be a factor*/
-void deflate(num **p, unsigned n, num *r);
+void deflate(num **p, unsigned n, const num &r);
 
 /*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
 bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
-ast *polynomial(num **p, unsigned n, const ast *m, num *divisor);
+ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
 ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast *m);

@@ -203,6 +203,10 @@ inline mp_result mp_int_root(const mpz_t *a, mp_small b, mp_int c) {
 	return mp_int_root(const_cast<mp_int>(a), b, c);
 }
 
+inline mp_result mp_int_sqrt(const mpz_t *a, mp_int c) {
+	return mp_int_sqrt(const_cast<mp_int>(a), c);
+}
+
 inline int mp_int_compare(const mpz_t *a, const mpz_t *b) {
 	return mp_int_compare(const_cast<mp_int>(a), const_cast<mp_int>(b));
 }

@@ -143,13 +143,13 @@ static ast *falling(const series_t *s, int top, unsigned k) {
 }
 
 /*Sets r to (m + top)(m + top - 1)...(m + top - k + 1)*/
-static void falling_value(num *r, int m, int top, unsigned k) {
+static void falling_value(num &r, int m, int top, unsigned k) {
 	num factor;
 
-	mp_rat_set_value(r, 1, 1);
+	mp_rat_set_value(&r, 1, 1);
 	for (unsigned i = 0; i < k; i++) {
 		mp_rat_set_value(&factor, m + top - (int)i, 1);
-		*r *= factor;
+		r *= factor;
 	}
 }
 
@@ -163,9 +163,9 @@ static ast *base_power(const series_t *s, ast *exponent) {
 }
 
 /*Returns the sum of term from the index equal to lower to infinity, written with a minus sign in front when p is negative. Takes ownership of term.*/
-static ast *series_sum(const series_t *s, num *p, ast *term, unsigned lower) {
+static ast *series_sum(const series_t *s, const num &p, ast *term, unsigned lower) {
 	ast *sum = ast::make(Op::Sum);
-	num *magnitude = p->copy();
+	num *magnitude = p.copy();
 
 	mp_rat_abs(magnitude, magnitude);
 	term = tidy(ast::make(Op::Mult, ast::make(magnitude), term));
@@ -174,7 +174,7 @@ static ast *series_sum(const series_t *s, num *p, ast *term, unsigned lower) {
 	sum->appendChild(s->index->copy());
 	sum->appendChild(integer(lower));
 
-	return *p < 0 ? negate(sum) : sum;
+	return p < 0 ? negate(sum) : sum;
 }
 
 /*Returns the right side as a polynomial in the base*/
@@ -183,7 +183,7 @@ static ast *right_side(const series_t *s) {
 		return integer(0);
 
 	num one(1);
-	ast *g = polynomial((num **)s->g, (unsigned)s->g_degree, s->base, &one);
+	ast *g = polynomial((num **)s->g, (unsigned)s->g_degree, s->base, one);
 
 	return g;
 }
@@ -199,11 +199,11 @@ static void record_sums(const series_t *s, const char *text, bool shifted) {
 		if (shifted) {
 			term = ast::make(Op::Mult, falling(s, shift, t->k), coefficient(s, index_plus(s, shift)));
 			term = ast::make(Op::Mult, term, base_power(s, s->index->copy()));
-			left->appendChild(series_sum(s, t->p, term, t->j));
+			left->appendChild(series_sum(s, *t->p, term, t->j));
 		} else {
 			term = ast::make(Op::Mult, falling(s, 0, t->k), coefficient(s, s->index->copy()));
 			term = ast::make(Op::Mult, term, base_power(s, tidy(index_plus(s, -shift))));
-			left->appendChild(series_sum(s, t->p, term, t->k));
+			left->appendChild(series_sum(s, *t->p, term, t->k));
 		}
 	}
 
@@ -245,7 +245,7 @@ static void record_substitution(const series_t *s) {
 	for (unsigned k = 0; k <= s->de->order; k++) {
 		ast *term = ast::make(Op::Mult, falling(s, 0, k), coefficient(s, s->index->copy()));
 		term = ast::make(Op::Mult, term, base_power(s, tidy(index_plus(s, -(int)k))));
-		ast *sum = series_sum(s, &one, term, k);
+		ast *sum = series_sum(s, one, term, k);
 		ast *left = DiffEq::derivative(s->de->y, k);
 		work::step(work::Step::Type::Equation, k == 0 ? "Power series" : k == 1 ? "Differentiate" : nullptr, left, sum);
 		ast::dispose(left);
@@ -257,12 +257,12 @@ static void record_substitution(const series_t *s) {
 }
 
 /*Adds p times the polynomial in the index n, of degree n_degree, to sum, multiplying by (n + top)...(n + top - k + 1)*/
-static void add_falling(num **sum, num *p, int top, unsigned k) {
+static void add_falling(num **sum, const num &p, int top, unsigned k) {
 	num *product[DiffEq::max_order + 1], *factor = num::from(0);
 
 	for (unsigned d = 0; d <= DiffEq::max_order; d++)
 		product[d] = num::from(0);
-	mp_rat_copy(p, product[0]);
+	mp_rat_copy(&p, product[0]);
 
 	for (unsigned i = 0; i < k; i++) {
 		for (unsigned d = i + 1; d > 0; d--) {
@@ -325,7 +325,7 @@ static void record_recurrence(series_t *s) {
 				continue;
 
 			const int shift = (int)s->terms[i].k - (int)s->terms[i].j;
-			falling_value(value, (int)m, shift, s->terms[i].k);
+			falling_value(*value, (int)m, shift, s->terms[i].k);
 			*value *= *s->terms[i].p;
 			e->appendChild(ast::make(Op::Mult, ast::make(value->copy()), coefficient(s, integer((int)m + shift))));
 		}
@@ -346,7 +346,7 @@ static void record_recurrence(series_t *s) {
 
 		for (unsigned i = 0; i < s->count; i++) {
 			if ((int)s->terms[i].k - (int)s->terms[i].j == shift)
-				add_falling(P, s->terms[i].p, shift, s->terms[i].k);
+				add_falling(P, *s->terms[i].p, shift, s->terms[i].k);
 		}
 
 		int n = degree_of(P);
@@ -359,9 +359,9 @@ static void record_recurrence(series_t *s) {
 				bool cancelled[DiffEq::max_order + 1];
 				for (unsigned d = 1; d <= order; d++) {
 					mp_rat_set_value(r, -(int)d, 1);
-					cancelled[d] = n > 0 && is_root(P, (unsigned)n, r);
+					cancelled[d] = n > 0 && is_root(P, (unsigned)n, *r);
 					if (cancelled[d])
-						deflate(P, (unsigned)n--, r);
+						deflate(P, (unsigned)n--, *r);
 				}
 
 				ast *denominator = ast::make(Op::Mult);
@@ -420,13 +420,13 @@ static ast *combination_of(num **c, ast **constants, unsigned free_count) {
 }
 
 /*Returns c times the base to the power i, keeping a factor of 1 on a sum so that it stays one term*/
-static ast *series_term(const series_t *s, num *c, unsigned i) {
+static ast *series_term(const series_t *s, const num &c, unsigned i) {
 	ast *power = i == 0 ? nullptr : i == 1 ? s->base->copy() : base_power(s, integer((int)i));
 
 	if (power == nullptr)
-		return ast::make(c->copy());
+		return ast::make(c.copy());
 
-	return *c == 1 && !power->isOperator() ? power : ast::make(Op::Mult, ast::make(c->copy()), power);
+	return c == 1 && !power->isOperator() ? power : ast::make(Op::Mult, ast::make(c.copy()), power);
 }
 
 /*Returns the only term of sum if it has one, otherwise sum. Takes ownership of sum.*/
@@ -563,7 +563,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 			err = Error::DeUnsolved;
 		}
 
-		falling_value(&value, (int)k, 0, k);
+		falling_value(value, (int)k, 0, k);
 		*coefficients[k][free_count] /= value;
 
 		ast *e = ast::make(Op::At, DiffEq::derivative(de->y, k), center->copy());
@@ -600,7 +600,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		const unsigned t = m + order;
 		coefficients[t] = static_cast<num **>(malloc(sizeof(num *) * components));
 
-		falling_value(&denominator, (int)m, (int)order, order);
+		falling_value(denominator, (int)m, (int)order, order);
 		denominator *= *s.lead;
 
 		for (unsigned b = 0; b < components; b++) {
@@ -615,7 +615,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 				if (s.terms[i].j > m || (s.terms[i].k == order && s.terms[i].j == 0))
 					continue;
 
-				falling_value(&value, (int)m, shift, s.terms[i].k);
+				falling_value(value, (int)m, shift, s.terms[i].k);
 				value *= *s.terms[i].p;
 				value *= *coefficients[(int)m + shift][b];
 				*coefficients[t][b] -= value;
@@ -659,7 +659,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		ast *part = b < free_count ? ast::make(Op::Add) : answer;
 		for (unsigned i = 0; i <= last[b] && i < computed; i++) {
 			if (*coefficients[i][b] != 0)
-				part->appendChild(series_term(&s, coefficients[i][b], i));
+				part->appendChild(series_term(&s, *coefficients[i][b], i));
 		}
 
 		if (part == answer)

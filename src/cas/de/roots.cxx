@@ -6,7 +6,7 @@
 
 static const char *multiplicity_names[] = {nullptr, nullptr, "Double root", "Triple root"};
 
-static ast *integer_node(mp_int z) {
+static ast *integer_node(const mpz_t *z) {
 	num *n = num::from(0);
 
 	mp_int_copy(z, MP_NUMER_P(n));
@@ -42,29 +42,29 @@ num *rational_value(const ast *e) {
 	return value;
 }
 
-void evaluate(num **p, unsigned n, num *r, num *value) {
-	mp_rat_copy(p[n], value);
+void evaluate(num **p, unsigned n, const num &r, num &value) {
+	mp_rat_copy(p[n], &value);
 
 	for (unsigned k = n; k-- > 0;) {
-		*value *= *r;
-		*value += *p[k];
+		value *= r;
+		value += *p[k];
 	}
 }
 
-bool is_root(num **p, unsigned n, num *r) {
+bool is_root(num **p, unsigned n, const num &r) {
 	num value;
 
-	evaluate(p, n, r, &value);
+	evaluate(p, n, r, value);
 	const bool root = value == 0;
 
 	return root;
 }
 
-void deflate(num **p, unsigned n, num *r) {
+void deflate(num **p, unsigned n, const num &r) {
 	num t;
 
 	for (unsigned k = n; k-- > 0;) {
-		mp_rat_mul(p[k + 1], r, &t);
+		mp_rat_mul(p[k + 1], &r, &t);
 		*p[k] += t;
 	}
 
@@ -96,17 +96,17 @@ static bool integer_ends(num **p, unsigned n, mp_small *lead, mp_small *constant
 }
 
 /*True if a/b or -a/b is a root of p, setting root to it*/
-static bool test_candidate(num **p, unsigned n, mp_small a, mp_small b, num *root) {
-	mp_rat_set_value(root, a, b);
+static bool test_candidate(num **p, unsigned n, mp_small a, mp_small b, num &root) {
+	mp_rat_set_value(&root, a, b);
 	if (is_root(p, n, root))
 		return true;
 
-	mp_rat_neg(root, root);
+	mp_rat_neg(&root, &root);
 	return is_root(p, n, root);
 }
 
 /*Finds a rational root a/b of p, with a dividing the constant term and b the leading coefficient*/
-static bool rational_root(num **p, unsigned n, num *root) {
+static bool rational_root(num **p, unsigned n, num &root) {
 	mp_small lead, constant;
 
 	if (!integer_ends(p, n, &lead, &constant))
@@ -128,29 +128,29 @@ static bool rational_root(num **p, unsigned n, num *root) {
 }
 
 /*Sets root to the square root of q, which is not negative, and returns true if it is rational*/
-static bool rational_sqrt(num *q, num *root) {
+static bool rational_sqrt(const num &q, num &root) {
 	num square;
 
-	mp_int_sqrt(MP_NUMER_P(q), MP_NUMER_P(root));
-	mp_int_sqrt(MP_DENOM_P(q), MP_DENOM_P(root));
-	mp_rat_mul(root, root, &square);
-	const bool exact = square == *q;
+	mp_int_sqrt(MP_NUMER_P(&q), MP_NUMER_P(&root));
+	mp_int_sqrt(MP_DENOM_P(&q), MP_DENOM_P(&root));
+	mp_rat_mul(&root, &root, &square);
+	const bool exact = square == q;
 
 	return exact;
 }
 
 /*Returns the square root of q, which is positive, as a rational multiple of the square root of a square-free integer*/
-static ast *square_root(num *q) {
+static ast *square_root(const num &q) {
 	num *root = num::from(0);
 
-	if (rational_sqrt(q, root))
+	if (rational_sqrt(q, *root))
 		return ast::make(root);
 
 	num::dispose(root);
 
 	mp_small numerator, denominator;
-	if (mp_rat_to_ints(q, &numerator, &denominator) != MP_OK || numerator > LONG_MAX / denominator)
-		return ast::make(Op::Pow, ast::make(q->copy()), ast::make(num::from(1, 2)));
+	if (mp_rat_to_ints(&q, &numerator, &denominator) != MP_OK || numerator > LONG_MAX / denominator)
+		return ast::make(Op::Pow, ast::make(q.copy()), ast::make(num::from(1, 2)));
 
 	mp_small radicand = numerator * denominator, scale = 1;
 
@@ -169,7 +169,7 @@ static ast *square_root(num *q) {
 }
 
 /*Records a root, merging it with an equal real root. Takes ownership of re and im.*/
-static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, num *value, unsigned multiplicity) {
+static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, const num *value, unsigned multiplicity) {
 	work::pause();
 	simplify(re, Simp::Basic);
 	if (im != nullptr)
@@ -192,60 +192,66 @@ static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, num *valu
 }
 
 /*Records the rational root r of p and divides it out*/
-static void divide_root(num **p, unsigned *n, num *r, root_t *roots, unsigned *count) {
+static void divide_root(num **p, unsigned *n, const num &r, root_t *roots, unsigned *count) {
 	deflate(p, (*n)--, r);
-	add_root(roots, count, ast::make(r->copy()), nullptr, r, 1);
+	add_root(roots, count, ast::make(r.copy()), nullptr, &r, 1);
 }
 
 /*Sets d to b^2 - 4ac and v to -b/(2a)*/
-static void discriminant(num *a, num *b, num *c, num *d, num *v) {
+static void discriminant(const num &a, const num &b, const num &c, num &d, num &v) {
 	num t(4);
 
-	t *= *a;
-	t *= *c;
-	mp_rat_mul(b, b, d);
-	*d -= t;
+	t *= a;
+	t *= c;
+	mp_rat_mul(&b, &b, &d);
+	d -= t;
 
-	mp_rat_add(a, a, &t);
-	mp_rat_div(b, &t, v);
-	mp_rat_neg(v, v);
+	mp_rat_add(&a, &a, &t);
+	mp_rat_div(&b, &t, &v);
+	mp_rat_neg(&v, &v);
 }
 
 /*Records the roots v ± sqrt(d)/(2a), real when d is positive and complex otherwise*/
-static void add_irrational_roots(num *v, num *d, num *a, unsigned multiplicity, root_t *roots, unsigned *count) {
-	num *magnitude = d->copy(), *denominator = num::from(0);
-	const bool real = *d > 0;
+static void add_irrational_roots(
+	const num &v,
+	const num &d,
+	const num &a,
+	unsigned multiplicity,
+	root_t *roots,
+	unsigned *count
+) {
+	num magnitude = d;
+	num *denominator = num::from(0);
+	const bool real = d > 0;
 
-	mp_rat_abs(magnitude, magnitude);
-	mp_rat_add(a, a, denominator);
+	mp_rat_abs(&magnitude, &magnitude);
+	mp_rat_add(&a, &a, denominator);
 	mp_rat_abs(denominator, denominator);
 	ast *w = ast::make(Op::Div, square_root(magnitude), ast::make(denominator));
 
 	if (real) {
-		add_root(roots, count, ast::make(Op::Add, ast::make(v->copy()), w->copy()), nullptr, nullptr, multiplicity);
-		add_root(roots, count, difference(ast::make(v->copy()), w), nullptr, nullptr, multiplicity);
+		add_root(roots, count, ast::make(Op::Add, ast::make(v.copy()), w->copy()), nullptr, nullptr, multiplicity);
+		add_root(roots, count, difference(ast::make(v.copy()), w), nullptr, nullptr, multiplicity);
 	} else {
-		add_root(roots, count, ast::make(v->copy()), w, nullptr, multiplicity);
+		add_root(roots, count, ast::make(v.copy()), w, nullptr, multiplicity);
 	}
-
-	num::dispose(magnitude);
 }
 
 /*Finds the roots of the quadratic p with the quadratic formula, dividing out the rational ones*/
 static void quadratic(num **p, unsigned *n, root_t *roots, unsigned *count) {
 	num d, v, s, r;
 
-	discriminant(p[2], p[1], p[0], &d, &v);
+	discriminant(*p[2], *p[1], *p[0], d, v);
 
-	if (d >= 0 && rational_sqrt(&d, &s)) {
+	if (d >= 0 && rational_sqrt(d, s)) {
 		mp_rat_add(p[2], p[2], &r);
 		s /= r;
 		mp_rat_add(&v, &s, &r);
-		divide_root(p, n, &r, roots, count);
+		divide_root(p, n, r, roots, count);
 		mp_rat_sub(&v, &s, &r);
-		divide_root(p, n, &r, roots, count);
+		divide_root(p, n, r, roots, count);
 	} else {
-		add_irrational_roots(&v, &d, p[2], 1, roots, count);
+		add_irrational_roots(v, d, *p[2], 1, roots, count);
 	}
 }
 
@@ -256,8 +262,8 @@ static bool biquadratic(num **p, root_t *roots, unsigned *count) {
 	bool rational = *p[1] == 0 && *p[3] == 0;
 
 	if (rational) {
-		discriminant(p[4], p[2], p[0], &d, &v);
-		rational = d >= 0 && rational_sqrt(&d, &s);
+		discriminant(*p[4], *p[2], *p[0], d, v);
+		rational = d >= 0 && rational_sqrt(d, s);
 	}
 
 	if (rational) {
@@ -270,7 +276,7 @@ static bool biquadratic(num **p, root_t *roots, unsigned *count) {
 		for (unsigned i = 0; i < 3 - multiplicity; i++) {
 			mp_rat_set_value(&d, 4, 1);
 			d *= *u[i];
-			add_irrational_roots(&zero, &d, &one, multiplicity, roots, count);
+			add_irrational_roots(zero, d, one, multiplicity, roots, count);
 		}
 	}
 
@@ -285,15 +291,15 @@ bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count) {
 	bool found = true;
 
 	while (*n > 0 && *p[0] == 0)
-		divide_root(p, n, &r, roots, count);
+		divide_root(p, n, r, roots, count);
 
-	while (*n >= 3 && rational_root(p, *n, &r))
-		divide_root(p, n, &r, roots, count);
+	while (*n >= 3 && rational_root(p, *n, r))
+		divide_root(p, n, r, roots, count);
 
 	if (*n == 1) {
 		mp_rat_div(p[0], p[1], &r);
 		mp_rat_neg(&r, &r);
-		divide_root(p, n, &r, roots, count);
+		divide_root(p, n, r, roots, count);
 	} else if (*n == 2) {
 		quadratic(p, n, roots, count);
 	} else if (*n == 4) {
@@ -305,7 +311,7 @@ bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count) {
 	return found;
 }
 
-ast *polynomial(num **p, unsigned n, const ast *m, num *divisor) {
+ast *polynomial(num **p, unsigned n, const ast *m, const num &divisor) {
 	ast *sum = ast::make(Op::Add);
 
 	for (unsigned k = n + 1; k-- > 0;) {
@@ -313,7 +319,7 @@ ast *polynomial(num **p, unsigned n, const ast *m, num *divisor) {
 			continue;
 
 		num *c = p[k]->copy();
-		*c /= *divisor;
+		*c /= divisor;
 
 		ast *term;
 		if (k == 0) {
@@ -338,14 +344,15 @@ ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, con
 	num scale(1), t;
 
 	for (unsigned i = 0; i < count; i++) {
-		num *r = roots[i].value;
-		if (r == nullptr)
+		if (roots[i].value == nullptr)
 			continue;
 
+		const num &r = *roots[i].value;
+
 		ast *factor = difference(
-			mp_int_compare_value(MP_DENOM_P(r), 1) == 0 ? m->copy()
-														: ast::make(Op::Mult, integer_node(MP_DENOM_P(r)), m->copy()),
-			integer_node(MP_NUMER_P(r))
+			mp_int_compare_value(MP_DENOM_P(&r), 1) == 0 ? m->copy()
+														 : ast::make(Op::Mult, integer_node(MP_DENOM_P(&r)), m->copy()),
+			integer_node(MP_NUMER_P(&r))
 		);
 
 		if (roots[i].multiplicity > 1)
@@ -354,12 +361,12 @@ ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, con
 		product->appendChild(factor);
 
 		mp_rat_set_value(&t, 1, 1);
-		mp_int_copy(MP_DENOM_P(r), MP_NUMER_P(&t));
+		mp_int_copy(MP_DENOM_P(&r), MP_NUMER_P(&t));
 		for (unsigned k = 0; k < roots[i].multiplicity; k++)
 			scale *= t;
 	}
 
-	ast *rest = polynomial(p, n, m, &scale);
+	ast *rest = polynomial(p, n, m, scale);
 
 	if (n > 0)
 		product->appendChild(rest);
@@ -484,7 +491,7 @@ Error characteristic_roots(DiffEq *de, const ast *m, root_t *roots, unsigned *co
 	ast *zero = integer(0);
 	num one(1);
 
-	ast *left = polynomial(p, n, m, &one);
+	ast *left = polynomial(p, n, m, one);
 	work::step(work::Step::Type::Equation, "Characteristic equation", left, zero);
 	ast::dispose(left);
 
