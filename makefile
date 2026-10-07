@@ -10,8 +10,8 @@ DESCRIPTION  = "PinaCAS v$(VERSION)"
 APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
-CFLAGS       = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
-CXXFLAGS     = -Wall -Oz -Ilib -DUSE_32BIT_WORDS
+CFLAGS       = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
+CXXFLAGS     = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
 
 EXTRA_CSOURCES = lib/imath/imath.c lib/imath/imrat.c
 

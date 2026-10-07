@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-typedef enum { NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR } NodeType;
+typedef enum : unsigned char { NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR } NodeType;
 
 #define is_op_commutative(op) ((op) == OP_ADD || (op) == OP_MULT)
 
@@ -16,7 +16,7 @@ typedef enum { NODE_NUMBER, NODE_SYMBOL, NODE_OPERATOR } NodeType;
 #define is_op_nary(op) ((op) >= OP_ADD && (op) <= OP_LOG)
 #define is_op_unary(op) ((op) >= OP_FACTORIAL && (op) <= OP_TANH_INV)
 
-typedef enum {
+typedef enum : unsigned char {
 	/*nary*/
 	OP_ADD,
 	OP_MULT,
@@ -67,7 +67,7 @@ typedef enum {
 
 #define AMOUNT_SYMBOLS 30
 
-typedef enum {
+typedef enum : unsigned char {
 	SYM_A = 'A',
 	SYM_B,
 	SYM_C,

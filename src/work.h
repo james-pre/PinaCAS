@@ -3,7 +3,7 @@
 #include "ast.h"
 #include "typeset.h"
 
-typedef enum {
+typedef enum : unsigned char {
 	/*after is a snapshot of the whole expression being worked on*/
 	STEP_STATE,
 	/*before is a derivative node, after is its value*/

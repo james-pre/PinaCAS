@@ -8,7 +8,7 @@
 #define TS_DOT '\x03'
 #define TS_INFINITY '\x04'
 
-typedef enum {
+typedef enum : unsigned char {
 	BOX_TEXT,
 	/*Children side by side on a common baseline*/
 	BOX_ROW,

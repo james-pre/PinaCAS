@@ -7,7 +7,7 @@
 #include "../ast.h"
 #include "../cas/de.h"
 
-typedef enum { CALCULUS_DERIVATIVE, CALCULUS_INTEGRAL, CALCULUS_DE } Calculus;
+typedef enum : unsigned char { CALCULUS_DERIVATIVE, CALCULUS_INTEGRAL, CALCULUS_DE } Calculus;
 
 /*Most expressions in one input: an equation and its initial conditions*/
 #define MAX_ITEMS (DE_MAX_CONDITIONS + 1)

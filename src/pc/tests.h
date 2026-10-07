@@ -10,7 +10,7 @@
 /*Max tests we will have*/
 #define MAX_TESTS 1024
 
-typedef enum {
+typedef enum : unsigned char {
 	TEST_SIMPLIFY,
 	TEST_GCD,
 	TEST_FACTOR,

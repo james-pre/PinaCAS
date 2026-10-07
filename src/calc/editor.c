@@ -33,7 +33,7 @@
 /*Deeper expressions are not previewed, since simplifying and laying them out can overflow the stack*/
 #define MAX_PREVIEW_DEPTH 24
 
-typedef enum { MODE_NORMAL, MODE_SECOND, MODE_ALPHA, MODE_ALPHA_LOCK } key_mode_t;
+typedef enum : unsigned char { MODE_NORMAL, MODE_SECOND, MODE_ALPHA, MODE_ALPHA_LOCK } key_mode_t;
 
 /*Tokens are big endian, with 0 for none*/
 static const struct key_tokens {

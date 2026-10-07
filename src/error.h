@@ -1,6 +1,6 @@
 #pragma once
 
-typedef enum {
+typedef enum : unsigned char {
 	E_SUCCESS,
 
 	/*Because of bad programming*/

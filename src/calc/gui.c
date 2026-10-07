@@ -61,7 +61,7 @@ static bool is_ans(unsigned variable) {
 	return strcmp(variables[variable].name, "Ans") == 0;
 }
 
-typedef enum {
+typedef enum : unsigned char {
 	ELEMENT_END,
 	ELEMENT_TEXT,
 	ELEMENT_CHECKBOX,
@@ -102,11 +102,11 @@ static char digit_key(uint8_t key);
 #define VARIABLE(text, state) {ELEMENT_VARIABLE, text, .variable = (state)}
 #define LETTER(text, state)                                                                                            \
 	{                                                                                                                  \
-		ELEMENT_CHARACTER, text, .character = {(state), letter_key }                                                   \
+		ELEMENT_CHARACTER, text, .character = {(state), letter_key}                                                    \
 	}
 #define DIGIT(text, state)                                                                                             \
 	{                                                                                                                  \
-		ELEMENT_CHARACTER, text, .character = {(state), digit_key }                                                    \
+		ELEMENT_CHARACTER, text, .character = {(state), digit_key}                                                     \
 	}
 #define BUTTON(text, function) {ELEMENT_BUTTON, text, .action = (function)}
 #define CONTENT(...) ((const element_t[]){__VA_ARGS__, END})
@@ -211,7 +211,7 @@ static const menu_t menus[] = {
 
 static const element_t console_content[] = {BUTTON("Close", close_console), END};
 
-typedef enum { FOCUS_HEADER, FOCUS_MENUS, FOCUS_OPTIONS } focus_t;
+typedef enum : unsigned char { FOCUS_HEADER, FOCUS_MENUS, FOCUS_OPTIONS } focus_t;
 
 static focus_t focus = FOCUS_MENUS;
 static unsigned menu = 0;
@@ -669,7 +669,7 @@ void gui_Run(void) {
 	id_UnloadAll();
 }
 
-typedef enum {
+typedef enum : unsigned char {
 	CID_GENERAL = 1 << 0,
 	CID_TRIG = 1 << 1,
 	CID_TRIG_CONSTANTS = 1 << 2,
