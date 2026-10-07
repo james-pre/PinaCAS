@@ -252,16 +252,13 @@ pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent) {
 	if (parent->type != NODE_OPERATOR)
 		return NULL;
 
-	if (opbase(parent) == NULL) {
+	if (opbase(parent) == NULL)
 		return NULL;
-	} else {
-		pcas_ast_t *current = opbase(parent);
-		while (current->next != NULL)
-			current = current->next;
-		return current;
-	}
 
-	return NULL;
+	pcas_ast_t *current = opbase(parent);
+	while (current->next != NULL)
+		current = current->next;
+	return current;
 }
 
 pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, size_t index) {
