@@ -11,7 +11,8 @@ APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
 CFLAGS       = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
-CXXFLAGS     = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
+CXXFLAGS     = -std=c++23 -fno-rtti -Wall -Oz -Ilib -DUSE_32BIT_WORDS
+CPP_EXTENSION = cxx
 
 EXTRA_CSOURCES = lib/imath/imath.c lib/imath/imrat.c
 
@@ -60,13 +61,17 @@ endif
 # PC
 # ----------------------------
 
-PC_TARGET  = bin/pinacas
-PC_CC      = gcc
-PC_CFLAGS  = -std=c23 -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
-PC_LFLAGS  = -lm
-PC_OBJDIR  = obj/pc
-PC_SOURCES := $(wildcard src/*.c src/*/*.c src/*/*/*.c) lib/imath/imath.c lib/imath/imrat.c
-PC_OBJECTS := $(PC_SOURCES:%.c=$(PC_OBJDIR)/%.o)
+PC_TARGET   = bin/pinacas
+PC_CC      := $(if $(shell command -v clang 2>/dev/null),clang,gcc)
+PC_CXX     := $(if $(shell command -v clang++ 2>/dev/null),clang++,g++)
+PC_FLAGS    = -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
+PC_CFLAGS   = -std=c23 $(PC_FLAGS)
+PC_CXXFLAGS = -std=c++23 -fno-rtti -fno-exceptions $(PC_FLAGS)
+PC_LFLAGS   = -lm
+PC_OBJDIR   = obj/pc
+PC_SOURCES := $(wildcard src/*.cxx src/*/*.cxx src/*/*/*.cxx)
+PC_LIBS    := lib/imath/imath.c lib/imath/imrat.c
+PC_OBJECTS := $(PC_SOURCES:%.cxx=$(PC_OBJDIR)/%.o) $(PC_LIBS:%.c=$(PC_OBJDIR)/%.o)
 
 .PHONY: pc check format
 
@@ -74,10 +79,15 @@ pc: $(PC_TARGET)
 
 $(PC_TARGET): $(PC_OBJECTS)
 	@mkdir -p $(@D)
-	@$(PC_CC) $(PC_OBJECTS) $(PC_LFLAGS) -o $@
+	@$(PC_CXX) $(PC_OBJECTS) $(PC_LFLAGS) -o $@
 	@echo "Linked $@"
 
-$(PC_OBJECTS): $(PC_OBJDIR)/%.o: %.c
+$(PC_OBJDIR)/%.o: %.cxx
+	@mkdir -p $(@D)
+	@$(PC_CXX) $(PC_CXXFLAGS) -c $< -o $@
+	@echo "Compiled $<"
+
+$(PC_OBJDIR)/%.o: %.c
 	@mkdir -p $(@D)
 	@$(PC_CC) $(PC_CFLAGS) -c $< -o $@
 	@echo "Compiled $<"
@@ -88,4 +98,4 @@ check: $(PC_TARGET)
 	$(PC_TARGET) test tests.txt
 
 format:
-	clang-format -i $(wildcard src/*.[ch] src/*/*.[ch] src/*/*/*.[ch])
+	clang-format -i $(wildcard src/*.[ch] src/*/*.[ch] src/*/*/*.[ch] src/*.[ch]xx src/*/*.[ch]xx src/*/*/*.[ch]xx)

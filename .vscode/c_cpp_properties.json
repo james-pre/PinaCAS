@@ -3,19 +3,22 @@
 		{
 			"name": "TI-84 Plus CE",
 			"compilerPath": "/opt/CEdev/bin/ez80-clang",
-			"compilerArgs": ["-nostdinc"],
-			"includePath": ["${workspaceFolder}/src", "${workspaceFolder}/lib", "/opt/CEdev/include"],
+			"compilerArgs": ["-nostdinc", "-fno-exceptions", "-fno-rtti"],
+			"includePath": ["${workspaceFolder}/src", "${workspaceFolder}/lib", "/opt/CEdev/include/c++", "/opt/CEdev/include"],
 			"defines": ["__TICE__=1", "USE_32BIT_WORDS"],
-			"cStandard": "c17",
+			"cStandard": "c23",
+			"cppStandard": "c++23",
 			"intelliSenseMode": "clang-x86"
 		},
 		{
 			"name": "PC",
-			"compilerPath": "/usr/bin/gcc",
+			"compilerPath": "/usr/bin/clang++",
+			"compilerArgs": ["-fno-exceptions", "-fno-rtti"],
 			"includePath": ["${workspaceFolder}/src", "${workspaceFolder}/src/cas", "${workspaceFolder}/lib", "${workspaceFolder}/src/pc"],
 			"defines": ["COMPILE_PC", "DEBUG", "USE_32BIT_WORDS"],
-			"cStandard": "c17",
-			"intelliSenseMode": "linux-gcc-x64"
+			"cStandard": "c23",
+			"cppStandard": "c++23",
+			"intelliSenseMode": "linux-clang-x64"
 		}
 	],
 	"version": 4

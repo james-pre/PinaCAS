@@ -1,9 +1,24 @@
 cmake_minimum_required(VERSION 3.12)
-project(PinaCAS C)
 
-set(CMAKE_C_FLAGS "-std=c23 -Wall -Wextra -Werror -Wno-missing-field-initializers -DCOMPILE_PC -DUSE_32BIT_WORDS")
+find_program(CLANG_CXX clang++)
+find_program(CLANG_C clang)
+if(CLANG_CXX AND NOT CMAKE_CXX_COMPILER)
+    set(CMAKE_CXX_COMPILER ${CLANG_CXX})
+endif()
+if(CLANG_C AND NOT CMAKE_C_COMPILER)
+    set(CMAKE_C_COMPILER ${CLANG_C})
+endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG")
+project(PinaCAS C CXX)
+
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_compile_options(-Wall -Wextra -Werror -Wno-missing-field-initializers)
+add_compile_definitions(COMPILE_PC USE_32BIT_WORDS DEBUG)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
 
 include_directories(
     src
@@ -12,7 +27,7 @@ include_directories(
     src/pc
 )
 
-file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.[ch]" "src/*/*.[ch]" "src/*/*/*.[ch]" "lib/imath/imath.[ch]" "lib/imath/imrat.[ch]")
+file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.[ch]xx" "src/*/*.[ch]xx" "src/*/*/*.[ch]xx" "lib/imath/imath.[ch]" "lib/imath/imrat.[ch]")
 
 add_executable(pinacas ${SOURCE_FILES})
 
