@@ -39,9 +39,6 @@ pcas_ast_t *de_Derivative(const pcas_ast_t *y, unsigned order) {
 
 /*Finds the function that primes are applied to and the highest number of primes on it*/
 static pcas_error_t find_function(pcas_ast_t *e, pcas_ast_t **y, unsigned *order) {
-	pcas_ast_t *child;
-	pcas_error_t err;
-
 	if (isoptype(e, OP_PRIME)) {
 		unsigned primes = 0;
 
@@ -61,8 +58,9 @@ static pcas_error_t find_function(pcas_ast_t *e, pcas_ast_t **y, unsigned *order
 	}
 
 	if (e->type == NODE_OPERATOR) {
-		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
-			if ((err = find_function(child, y, order)) != E_SUCCESS)
+		for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
+			const pcas_error_t err = find_function(child, y, order);
+			if (err != E_SUCCESS)
 				return err;
 		}
 	}
@@ -72,9 +70,8 @@ static pcas_error_t find_function(pcas_ast_t *e, pcas_ast_t **y, unsigned *order
 
 void derivatives_to_symbols(pcas_de_t *de, pcas_ast_t *f, pcas_ast_t **symbols) {
 	pcas_ast_t *scope = ast_MakeBinary(OP_ADD, ast_Copy(f), ast_Copy(de->x));
-	unsigned k;
 
-	for (k = de->order; k > 0; k--) {
+	for (unsigned k = de->order; k > 0; k--) {
 		pcas_ast_t *derivative = de_Derivative(de->y, k);
 
 		symbols[k] = ast_MakeSymbol(fresh_symbol(scope));
@@ -91,25 +88,24 @@ void derivatives_to_symbols(pcas_de_t *de, pcas_ast_t *f, pcas_ast_t **symbols) 
 /*Fills in the coefficients if f, the left side minus the right side, is linear in the derivatives*/
 static bool linear_form(pcas_de_t *de, pcas_ast_t *f) {
 	pcas_ast_t *symbols[DE_MAX_ORDER + 1];
-	unsigned j, k;
 	bool linear = true;
 
 	derivatives_to_symbols(de, f, symbols);
 	simplify(f, SIMP_BASIC);
 
-	for (k = 0; k <= de->order; k++) {
+	for (unsigned k = 0; k <= de->order; k++) {
 		de->a[k] = ast_Copy(f);
 		derivative(de->a[k], symbols[k], symbols[k]);
 		simplify(de->a[k], SIMP_BASIC);
 
-		for (j = 0; j <= de->order; j++)
+		for (unsigned j = 0; j <= de->order; j++)
 			linear &= is_constant(de->a[k], symbols[j]);
 	}
 
 	if (linear) {
 		de->g = negate(ast_Copy(f));
 
-		for (k = 0; k <= de->order; k++) {
+		for (unsigned k = 0; k <= de->order; k++) {
 			pcas_ast_t *zero = ast_MakeNumber(num_FromInt(0));
 			substitute(de->g, symbols[k], zero);
 			ast_Cleanup(zero);
@@ -117,23 +113,19 @@ static bool linear_form(pcas_de_t *de, pcas_ast_t *f) {
 
 		simplify(de->g, SIMP_BASIC);
 	} else {
-		for (k = 0; k <= de->order; k++) {
+		for (unsigned k = 0; k <= de->order; k++) {
 			ast_Cleanup(de->a[k]);
 			de->a[k] = NULL;
 		}
 	}
 
-	for (k = 0; k <= de->order; k++)
+	for (unsigned k = 0; k <= de->order; k++)
 		ast_Cleanup(symbols[k]);
 
 	return linear;
 }
 
 pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t *x) {
-	pcas_ast_t *f, *y = NULL;
-	pcas_error_t err;
-	unsigned k;
-
 	de->x = ast_Copy(x);
 	de->y = NULL;
 	de->order = 0;
@@ -146,7 +138,7 @@ pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t
 	de->terms = DE_DEFAULT_TERMS;
 	de->method = NULL;
 	de->nested = false;
-	for (k = 0; k <= DE_MAX_ORDER; k++)
+	for (unsigned k = 0; k <= DE_MAX_ORDER; k++)
 		de->a[k] = NULL;
 
 	if (isoptype(equation, OP_EQUALS))
@@ -154,7 +146,9 @@ pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t
 	else
 		de->equation = ast_MakeBinary(OP_EQUALS, ast_Copy(equation), ast_MakeNumber(num_FromInt(0)));
 
-	if ((err = find_function(de->equation, &y, &de->order)) != E_SUCCESS)
+	pcas_ast_t *y = NULL;
+	const pcas_error_t err = find_function(de->equation, &y, &de->order);
+	if (err != E_SUCCESS)
 		return err;
 	if (y == NULL)
 		return E_DE_NO_DERIVATIVE;
@@ -168,7 +162,7 @@ pcas_error_t de_Load(pcas_de_t *de, const pcas_ast_t *equation, const pcas_ast_t
 
 	work_Step(STEP_EQUATION, NULL, ast_ChildGet(de->equation, 0), ast_ChildGet(de->equation, 1));
 
-	f = difference(ast_Copy(ast_ChildGet(de->equation, 0)), ast_Copy(ast_ChildGet(de->equation, 1)));
+	pcas_ast_t *f = difference(ast_Copy(ast_ChildGet(de->equation, 0)), ast_Copy(ast_ChildGet(de->equation, 1)));
 
 	work_Pause();
 	de->linear = linear_form(de, f);
@@ -192,8 +186,6 @@ void de_Classify(pcas_de_t *de) {
 }
 
 void de_Cleanup(pcas_de_t *de) {
-	unsigned k;
-
 	ast_Cleanup(de->equation);
 	ast_Cleanup(de->x);
 	ast_Cleanup(de->y);
@@ -201,10 +193,10 @@ void de_Cleanup(pcas_de_t *de) {
 	ast_Cleanup(de->known);
 	ast_Cleanup(de->center);
 
-	for (k = 0; k <= DE_MAX_ORDER; k++)
+	for (unsigned k = 0; k <= DE_MAX_ORDER; k++)
 		ast_Cleanup(de->a[k]);
 
-	for (k = 0; k < de->condition_count; k++) {
+	for (unsigned k = 0; k < de->condition_count; k++) {
 		ast_Cleanup(de->conditions[k].at);
 		ast_Cleanup(de->conditions[k].value);
 	}
@@ -215,9 +207,8 @@ void de_Cleanup(pcas_de_t *de) {
 
 pcas_ast_t *de_StandardForm(pcas_de_t *de) {
 	pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
-	unsigned k;
 
-	for (k = de->order + 1; k-- > 0;) {
+	for (unsigned k = de->order + 1; k-- > 0;) {
 		if (!is_ast_int(de->a[k], 0))
 			ast_ChildAppend(sum, ast_MakeBinary(OP_MULT, ast_Copy(de->a[k]), de_Derivative(de->y, k)));
 	}
@@ -242,12 +233,9 @@ static int derivative_order(const pcas_ast_t *e, const pcas_ast_t *y) {
 }
 
 pcas_error_t de_LoadList(pcas_de_t *de, pcas_ast_t **items, unsigned count, const pcas_ast_t *x) {
-	pcas_error_t err;
-	unsigned i;
+	pcas_error_t err = de_Load(de, items[0], x);
 
-	err = de_Load(de, items[0], x);
-
-	for (i = 1; i < count && err == E_SUCCESS; i++) {
+	for (unsigned i = 1; i < count && err == E_SUCCESS; i++) {
 		if (isoptype(items[i], OP_EQUALS) && ast_Compare(opbase(items[i]), de->y))
 			err = de_AddKnownSolution(de, items[i]);
 		else if (isoptype(items[i], OP_EQUALS) && ast_Compare(opbase(items[i]), de->x))
@@ -290,23 +278,19 @@ pcas_error_t de_AddKnownSolution(pcas_de_t *de, const pcas_ast_t *solution) {
 }
 
 pcas_error_t de_AddCondition(pcas_de_t *de, const pcas_ast_t *condition) {
-	pcas_ast_t *left;
-	pcas_condition_t *c;
-	int order;
-
 	if (de->condition_count == DE_MAX_CONDITIONS || !isoptype(condition, OP_EQUALS))
 		return E_DE_BAD_CONDITION;
 
 	/*Y(0) is parsed as Y*0*/
-	left = opbase(condition);
+	const pcas_ast_t *left = opbase(condition);
 	if (!isoptype(left, OP_MULT) || ast_ChildLength(left) != 2)
 		return E_DE_BAD_CONDITION;
 
-	order = derivative_order(opbase(left), de->y);
+	const int order = derivative_order(opbase(left), de->y);
 	if (order < 0)
 		return E_DE_BAD_CONDITION;
 
-	c = &de->conditions[de->condition_count++];
+	pcas_condition_t *c = &de->conditions[de->condition_count++];
 	c->order = (unsigned)order;
 	c->at = ast_Copy(opbase(left)->next);
 	c->value = ast_Copy(left->next);
@@ -328,7 +312,7 @@ pcas_ast_t *ln(pcas_ast_t *a) {
 }
 
 pcas_ast_t *exponential(const pcas_ast_t *base, pcas_ast_t *e) {
-	pcas_ast_t *result, *child;
+	pcas_ast_t *result;
 
 	if (is_euler(base) && isoptype(e, OP_LOG) && is_euler(opbase(e))) {
 		result = ast_Copy(opbase(e)->next);
@@ -339,7 +323,7 @@ pcas_ast_t *exponential(const pcas_ast_t *base, pcas_ast_t *e) {
 		result = ast_MakeBinary(OP_POW, ast_Copy(opbase(opbase(e)->next)->next), ast_Copy(opbase(e)));
 	} else if (is_euler(base) && isoptype(e, OP_ADD)) {
 		result = ast_MakeOperator(OP_MULT);
-		for (child = opbase(e); child != NULL; child = child->next)
+		for (const pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 			ast_ChildAppend(result, exponential(base, ast_Copy(child)));
 	} else {
 		return ast_MakeBinary(OP_POW, ast_Copy(base), e);
@@ -351,12 +335,10 @@ pcas_ast_t *exponential(const pcas_ast_t *base, pcas_ast_t *e) {
 
 /*Rewrites every power of e with exponential*/
 static void split_exponentials(pcas_ast_t *e) {
-	pcas_ast_t *child;
-
 	if (e->type != NODE_OPERATOR)
 		return;
 
-	for (child = opbase(e); child != NULL; child = child->next)
+	for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 		split_exponentials(child);
 
 	if (isoptype(e, OP_POW) && is_euler(opbase(e)))
@@ -364,8 +346,6 @@ static void split_exponentials(pcas_ast_t *e) {
 }
 
 void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
-	pcas_ast_t *child;
-
 	if (isoptype(e, OP_DIV)) {
 		pcas_ast_t *n1, *d1, *n2, *d2;
 
@@ -378,7 +358,7 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 		*num = ast_MakeOperator(OP_MULT);
 		*den = ast_MakeOperator(OP_MULT);
 
-		for (child = opbase(e); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next) {
 			pcas_ast_t *n, *d;
 			rational_parts(child, &n, &d);
 			ast_ChildAppend(*num, n);
@@ -386,14 +366,15 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 		}
 	} else if (isoptype(e, OP_ADD)) {
 		pcas_ast_t *nums = ast_MakeOperator(OP_ADD), *dens = ast_MakeOperator(OP_MULT);
-		pcas_ast_t *distinct = ast_MakeOperator(OP_MULT), *n, *d, *other;
-		bool skipped;
+		pcas_ast_t *distinct = ast_MakeOperator(OP_MULT);
 
-		for (child = opbase(e); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next) {
+			pcas_ast_t *n, *d;
 			rational_parts(child, &n, &d);
 			ast_ChildAppend(nums, n);
 			ast_ChildAppend(dens, d);
 
+			const pcas_ast_t *other;
 			for (other = opbase(distinct); other != NULL && !ast_Compare(other, d); other = other->next)
 				;
 			if (other == NULL)
@@ -402,12 +383,12 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 
 		*num = ast_MakeOperator(OP_ADD);
 
-		for (n = opbase(nums), d = opbase(dens); n != NULL; n = n->next, d = d->next) {
+		for (const pcas_ast_t *n = opbase(nums), *d = opbase(dens); n != NULL; n = n->next, d = d->next) {
 			pcas_ast_t *term = ast_MakeOperator(OP_MULT);
 
 			ast_ChildAppend(term, ast_Copy(n));
-			skipped = false;
-			for (other = opbase(distinct); other != NULL; other = other->next) {
+			bool skipped = false;
+			for (const pcas_ast_t *other = opbase(distinct); other != NULL; other = other->next) {
 				if (!skipped && ast_Compare(other, d))
 					skipped = true;
 				else
@@ -423,7 +404,7 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 	} else if (isoptype(e, OP_POW) && opbase(e)->next->type == NODE_NUMBER) {
 		pcas_ast_t *n, *d;
 		mp_rat exponent = num_Copy(opbase(e)->next->op.num);
-		bool negative = mp_rat_compare_zero(exponent) < 0;
+		const bool negative = mp_rat_compare_zero(exponent) < 0;
 
 		mp_rat_abs(exponent, exponent);
 		rational_parts(opbase(e), &n, &d);
@@ -438,12 +419,10 @@ void rational_parts(pcas_ast_t *e, pcas_ast_t **num, pcas_ast_t **den) {
 
 /*Rewrites each tan(u) in e as sin(u)/cos(u)*/
 static void tangents_to_sines(pcas_ast_t *e) {
-	pcas_ast_t *child;
-
 	if (e->type != NODE_OPERATOR)
 		return;
 
-	for (child = opbase(e); child != NULL; child = child->next)
+	for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 		tangents_to_sines(child);
 
 	if (isoptype(e, OP_TAN))
@@ -457,26 +436,24 @@ static void tangents_to_sines(pcas_ast_t *e) {
 
 /*Returns how many terms e has once expanded, or more than limit if that is over limit*/
 static unsigned long expanded_terms(const pcas_ast_t *e, unsigned long limit) {
-	pcas_ast_t *child;
-	unsigned long terms, base;
-	mp_small n;
-
 	if (isoptype(e, OP_ADD) || isoptype(e, OP_MULT)) {
-		terms = isoptype(e, OP_ADD) ? 0 : 1;
+		unsigned long terms = isoptype(e, OP_ADD) ? 0 : 1;
 
-		for (child = opbase(e); child != NULL && terms <= limit; child = child->next) {
-			base = expanded_terms(child, limit);
+		for (const pcas_ast_t *child = opbase(e); child != NULL && terms <= limit; child = child->next) {
+			const unsigned long base = expanded_terms(child, limit);
 			terms = isoptype(e, OP_ADD) ? terms + base : terms * base;
 		}
 
 		return terms;
 	}
 
+	mp_small n;
 	if (isoptype(e, OP_POW) && opbase(e)->next->type == NODE_NUMBER && mp_rat_is_integer(opbase(e)->next->op.num) &&
 		mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &n) == MP_OK && n > 1) {
-		base = expanded_terms(opbase(e), limit);
+		const unsigned long base = expanded_terms(opbase(e), limit);
+		unsigned long terms = 1;
 
-		for (terms = 1; n-- > 0 && terms <= limit;)
+		while (n-- > 0 && terms <= limit)
 			terms *= base;
 
 		return terms;
@@ -487,20 +464,19 @@ static unsigned long expanded_terms(const pcas_ast_t *e, unsigned long limit) {
 
 /*Replaces each sin(u)^n with n at least 2 by (1 - cos(u)^2)sin(u)^(n - 2), returning whether it changed e*/
 static bool reduce_sine_powers(pcas_ast_t *e) {
-	pcas_ast_t *child, *sine;
-	mp_small n;
 	bool changed = false;
 
 	if (e->type != NODE_OPERATOR)
 		return false;
 
-	for (child = opbase(e); child != NULL; child = child->next)
+	for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 		changed |= reduce_sine_powers(child);
 
+	mp_small n;
 	if (isoptype(e, OP_POW) && isoptype(opbase(e), OP_SIN) && opbase(e)->next->type == NODE_NUMBER &&
 		mp_rat_is_integer(opbase(e)->next->op.num) && mp_int_to_int(MP_NUMER_P(opbase(e)->next->op.num), &n) == MP_OK &&
 		n >= 2) {
-		sine = opbase(e);
+		const pcas_ast_t *sine = opbase(e);
 		replace_node(
 			e,
 			ast_MakeBinary(
@@ -520,7 +496,6 @@ static bool reduce_sine_powers(pcas_ast_t *e) {
 /*True if the numerator of e over a common denominator expands to zero after simplifying e with flags, giving up when it would expand past MAX_EXPANDED_TERMS*/
 static bool numerator_vanishes(const pcas_ast_t *e, simplify_flags flags) {
 	pcas_ast_t *copy = ast_Copy(e), *numerator, *denominator;
-	bool zero;
 
 	simplify(copy, flags);
 	tangents_to_sines(copy);
@@ -550,7 +525,7 @@ static bool numerator_vanishes(const pcas_ast_t *e, simplify_flags flags) {
 		simplify(numerator, SIMP_BASIC);
 	}
 
-	zero = is_ast_int(numerator, 0);
+	const bool zero = is_ast_int(numerator, 0);
 
 	ast_Cleanup(copy);
 	ast_Cleanup(numerator);
@@ -560,23 +535,19 @@ static bool numerator_vanishes(const pcas_ast_t *e, simplify_flags flags) {
 }
 
 bool is_zero(const pcas_ast_t *e) {
-	bool zero;
-
 	work_Pause();
-	zero = numerator_vanishes(e, SIMP_BASIC) || numerator_vanishes(e, SIMP_ALL);
+	const bool zero = numerator_vanishes(e, SIMP_BASIC) || numerator_vanishes(e, SIMP_ALL);
 	work_Resume();
 
 	return zero;
 }
 
 bool involves(const pcas_ast_t *e, const pcas_ast_t *v) {
-	pcas_ast_t *child;
-
 	if (ast_Compare(e, v))
 		return true;
 
 	if (e->type == NODE_OPERATOR) {
-		for (child = opbase(e); child != NULL; child = child->next) {
+		for (const pcas_ast_t *child = opbase(e); child != NULL; child = child->next) {
 			if (involves(child, v))
 				return true;
 		}
@@ -587,9 +558,7 @@ bool involves(const pcas_ast_t *e, const pcas_ast_t *v) {
 
 /*Replaces each derivative of y in e with its value in derivatives*/
 static void substitute_derivatives(pcas_de_t *de, pcas_ast_t *e, pcas_ast_t **derivatives) {
-	unsigned k;
-
-	for (k = de->order + 1; k-- > 0;) {
+	for (unsigned k = de->order + 1; k-- > 0;) {
 		pcas_ast_t *d = de_Derivative(de->y, k);
 		substitute(e, d, derivatives[k]);
 		ast_Cleanup(d);
@@ -617,21 +586,19 @@ static pcas_ast_t *evaluate_side(pcas_de_t *de, const pcas_ast_t *side, pcas_ast
 }
 
 static bool check_condition(pcas_de_t *de, pcas_condition_t *c, pcas_ast_t **derivatives) {
-	pcas_ast_t *at, *substituted, *value, *chain;
-	bool holds;
-
-	at = ast_MakeBinary(OP_AT, de_Derivative(de->y, c->order), ast_Copy(c->at));
-	substituted = ast_Copy(derivatives[c->order]);
+	pcas_ast_t *at = ast_MakeBinary(OP_AT, de_Derivative(de->y, c->order), ast_Copy(c->at));
+	pcas_ast_t *substituted = ast_Copy(derivatives[c->order]);
 
 	work_Pause();
 	substitute(substituted, de->x, c->at);
-	value = ast_Copy(substituted);
+	pcas_ast_t *value = ast_Copy(substituted);
 	simplify(value, SIMP_BASIC);
 	if (!ast_Compare(value, c->value))
 		simplify(value, SIMP_ALL);
 	work_Resume();
 
-	holds = is_zero(chain = difference(ast_Copy(value), ast_Copy(c->value)));
+	pcas_ast_t *chain = difference(ast_Copy(value), ast_Copy(c->value));
+	const bool holds = is_zero(chain);
 	ast_Cleanup(chain);
 
 	chain = ast_MakeBinary(OP_EQUALS, substituted, value);
@@ -667,12 +634,10 @@ pcas_ast_t *derivative_node(pcas_ast_t *e, const pcas_ast_t *v) {
 
 /*Replaces each |u| in e with u*/
 static void drop_absolute_values(pcas_ast_t *e) {
-	pcas_ast_t *child;
-
 	if (e->type != NODE_OPERATOR)
 		return;
 
-	for (child = opbase(e); child != NULL; child = child->next)
+	for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 		drop_absolute_values(child);
 
 	if (isoptype(e, OP_ABS))
@@ -680,7 +645,7 @@ static void drop_absolute_values(pcas_ast_t *e) {
 }
 
 pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v) {
-	pcas_ast_t *G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(v)), *power, *mu;
+	pcas_ast_t *G = ast_MakeBinary(OP_INTEGRAL, P, ast_Copy(v));
 
 	eval_integrals(G);
 
@@ -691,9 +656,9 @@ pcas_ast_t *exponential_of_integral(pcas_ast_t *P, const pcas_ast_t *v) {
 
 	work_Pause();
 	simplify(G, SIMP_BASIC);
-	power = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
+	pcas_ast_t *power = ast_MakeBinary(OP_POW, ast_MakeSymbol(SYM_EULER), ast_Copy(G));
 	drop_absolute_values(G);
-	mu = exponential(opbase(power), G);
+	pcas_ast_t *mu = exponential(opbase(power), G);
 	simplify(mu, SIMP_BASIC);
 	G = ast_Copy(power);
 	simplify(G, SIMP_BASIC);
@@ -718,7 +683,7 @@ pcas_ast_t *tidy(pcas_ast_t *e) {
 }
 
 void single_fraction(pcas_ast_t *e) {
-	pcas_ast_t *numerator, *denominator, *cancelled;
+	pcas_ast_t *numerator, *denominator;
 
 	work_Pause();
 	simplify(e, SIMP_BASIC);
@@ -727,7 +692,7 @@ void single_fraction(pcas_ast_t *e) {
 	replace_node(e, ast_MakeBinary(OP_DIV, numerator, denominator));
 	simplify(e, SIMP_BASIC);
 
-	cancelled = ast_Copy(e);
+	pcas_ast_t *cancelled = ast_Copy(e);
 	factor_cancel(cancelled);
 	work_Resume();
 
@@ -739,7 +704,7 @@ void single_fraction(pcas_ast_t *e) {
 
 pcas_ast_t *substitution_symbol(const pcas_de_t *de, Symbol preferred) {
 	pcas_ast_t *scope = ast_MakeBinary(OP_ADD, ast_Copy(de->equation), ast_Copy(de->x));
-	Symbol symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
+	const Symbol symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
 
 	ast_Cleanup(scope);
 
@@ -753,10 +718,7 @@ pcas_error_t check_solution(
 	bool conditions,
 	bool *satisfied
 ) {
-	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
-	pcas_ast_t *left, *right, *remainder;
 	const pcas_ast_t *f = solution;
-	unsigned k;
 
 	if (isoptype(f, OP_EQUALS) && ast_Compare(opbase(f), de->y))
 		f = opbase(f)->next;
@@ -766,16 +728,16 @@ pcas_error_t check_solution(
 
 	work_Step(STEP_EQUATION, text, de->y, f);
 
+	pcas_ast_t *derivatives[DE_MAX_ORDER + 1];
 	derivatives[0] = ast_Copy(f);
 
 	work_Pause();
 	simplify(derivatives[0], SIMP_NORMALIZE);
 	work_Resume();
 
-	for (k = 1; k <= de->order; k++) {
+	for (unsigned k = 1; k <= de->order; k++) {
 		pcas_ast_t *d = ast_Copy(derivatives[k - 1]);
 		pcas_ast_t *prime = de_Derivative(de->y, k);
-		pcas_ast_t *chain;
 
 		work_Pause();
 		derivative(d, de->x, de->x);
@@ -783,7 +745,8 @@ pcas_error_t check_solution(
 		expand_if_smaller(d);
 		work_Resume();
 
-		chain = ast_MakeBinary(OP_EQUALS, derivative_node(ast_Copy(derivatives[k - 1]), de->x), ast_Copy(d));
+		pcas_ast_t *chain =
+			ast_MakeBinary(OP_EQUALS, derivative_node(ast_Copy(derivatives[k - 1]), de->x), ast_Copy(d));
 
 		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, prime, chain);
 
@@ -793,21 +756,21 @@ pcas_error_t check_solution(
 		derivatives[k] = d;
 	}
 
-	left = evaluate_side(de, opbase(de->equation), derivatives, "Left side");
-	right = evaluate_side(de, opbase(de->equation)->next, derivatives, "Right side");
+	pcas_ast_t *left = evaluate_side(de, opbase(de->equation), derivatives, "Left side");
+	pcas_ast_t *right = evaluate_side(de, opbase(de->equation)->next, derivatives, "Right side");
 
-	remainder = difference(ast_Copy(left), ast_Copy(right));
+	pcas_ast_t *remainder = difference(ast_Copy(left), ast_Copy(right));
 	*satisfied = is_zero(remainder);
 	ast_Cleanup(remainder);
 
 	work_Step(STEP_EQUATION, *satisfied ? "Satisfies the equation" : "Does not satisfy the equation", left, right);
 
-	for (k = 0; conditions && k < de->condition_count; k++)
+	for (unsigned k = 0; conditions && k < de->condition_count; k++)
 		*satisfied &= check_condition(de, &de->conditions[k], derivatives);
 
 	work_Text(*satisfied ? "It is a solution" : "It is not a solution");
 
-	for (k = 0; k <= de->order; k++)
+	for (unsigned k = 0; k <= de->order; k++)
 		ast_Cleanup(derivatives[k]);
 	ast_Cleanup(left);
 	ast_Cleanup(right);
@@ -820,15 +783,12 @@ pcas_error_t de_Verify(pcas_de_t *de, const pcas_ast_t *solution, bool *satisfie
 }
 
 pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
-	pcas_error_t err;
-	unsigned k;
-
 	*solution = NULL;
 
 	if (de->condition_count > de->order)
 		return E_DE_BAD_CONDITION;
 
-	for (k = 0; k < de->condition_count; k++) {
+	for (unsigned k = 0; k < de->condition_count; k++) {
 		if (de->conditions[k].order >= de->order)
 			return E_DE_BAD_CONDITION;
 	}
@@ -842,7 +802,8 @@ pcas_error_t de_Solve(pcas_de_t *de, pcas_ast_t **solution) {
 	if (de->known != NULL)
 		return solve_reduction_of_order(de, solution);
 
-	if ((err = solve_constant_coefficients(de, solution)) != E_DE_UNSOLVED || !de->linear)
+	pcas_error_t err = solve_constant_coefficients(de, solution);
+	if (err != E_DE_UNSOLVED || !de->linear)
 		return err;
 
 	err = solve_power_series(de, solution);

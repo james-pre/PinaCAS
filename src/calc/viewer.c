@@ -144,15 +144,13 @@ static void draw_title(const char *title) {
 }
 
 static void draw_entries(entry_t *entries, unsigned count, int scroll_x, int scroll_y) {
-	unsigned i;
-
 	gfx_SetClipRegion(0, 0, LCD_WIDTH, LCD_HEIGHT);
 	gfx_SetColor(COLOR_BACKGROUND);
 	gfx_FillRectangle(0, TITLE_HEIGHT, LCD_WIDTH, LCD_HEIGHT - TITLE_HEIGHT);
 	gfx_SetClipRegion(VIEW_LEFT, VIEW_TOP, VIEW_RIGHT, VIEW_BOTTOM);
 
-	for (i = 0; i < count; i++) {
-		entry_t *entry = &entries[i];
+	for (unsigned i = 0; i < count; i++) {
+		const entry_t *entry = &entries[i];
 		int top = VIEW_TOP + entry->y - scroll_y;
 
 		if (top + entry->height < VIEW_TOP || top >= VIEW_BOTTOM)
@@ -173,21 +171,17 @@ static void draw_entries(entry_t *entries, unsigned count, int scroll_x, int scr
 }
 
 void viewer_Show(pcas_work_t *w, const char *title) {
-	pcas_step_t *step, *previous = NULL;
-	entry_t *entries;
-	unsigned count = 0, i;
-	int content_width = 0, content_height = 0;
-	int scroll_x = 0, scroll_y = 0, max_x, max_y;
-	bool redraw = true;
+	unsigned count = 0;
 
-	for (step = w->first; step != NULL; step = step->next)
+	for (const pcas_step_t *step = w->first; step != NULL; step = step->next)
 		count++;
 
-	entries = malloc(sizeof(entry_t) * (count > 0 ? count : 1));
+	entry_t *entries = malloc(sizeof(entry_t) * (count > 0 ? count : 1));
+	entry_t *entry = entries;
+	const pcas_step_t *previous = NULL;
+	int content_width = 0, content_height = 0;
 
-	for (i = 0, step = w->first; step != NULL; previous = step, step = step->next, i++) {
-		entry_t *entry = &entries[i];
-
+	for (pcas_step_t *step = w->first; step != NULL; previous = step, step = step->next, entry++) {
 		entry->label = step->text;
 		entry->box = work_Layout(step, previous != NULL && previous->type == STEP_STATE);
 		entry->y = content_height;
@@ -203,8 +197,8 @@ void viewer_Show(pcas_work_t *w, const char *title) {
 		content_height += entry->height + ENTRY_SPACING;
 	}
 
-	max_x = content_width - (VIEW_RIGHT - VIEW_LEFT);
-	max_y = content_height - (VIEW_BOTTOM - VIEW_TOP);
+	int max_x = content_width - (VIEW_RIGHT - VIEW_LEFT);
+	int max_y = content_height - (VIEW_BOTTOM - VIEW_TOP);
 	if (max_x < 0)
 		max_x = 0;
 	if (max_y < 0)
@@ -215,9 +209,10 @@ void viewer_Show(pcas_work_t *w, const char *title) {
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
 	gfx_SetDrawBuffer();
 
-	while (true) {
-		uint8_t key;
+	int scroll_x = 0, scroll_y = 0;
+	bool redraw = true;
 
+	while (true) {
 		if (redraw) {
 			draw_entries(entries, count, scroll_x, scroll_y);
 			draw_title(title);
@@ -225,7 +220,7 @@ void viewer_Show(pcas_work_t *w, const char *title) {
 			redraw = false;
 		}
 
-		key = os_GetCSC();
+		const uint8_t key = os_GetCSC();
 
 		if (key == sk_Clear || key == sk_Enter || key == sk_Del)
 			break;
@@ -254,7 +249,7 @@ void viewer_Show(pcas_work_t *w, const char *title) {
 	gfx_SetClipRegion(0, 0, LCD_WIDTH, LCD_HEIGHT);
 	gfx_SetTextConfig(0);
 
-	for (i = 0; i < count; i++)
+	for (unsigned i = 0; i < count; i++)
 		ts_Cleanup(entries[i].box);
 	free(entries);
 }

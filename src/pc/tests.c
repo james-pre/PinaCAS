@@ -13,17 +13,16 @@
 
 /*Trim null terminated string*/
 static char *trim(char *str) {
-	unsigned i, trimmed_len = 0, trim_index = 0;
-	char *trimmed;
+	unsigned trimmed_len = 0, trim_index = 0;
 
-	for (i = 0; i < strlen(str) + 1; i++) {
+	for (unsigned i = 0; i < strlen(str) + 1; i++) {
 		if (str[i] != ' ' && str[i] != '\t' && str[i] != '\n')
 			trimmed_len++;
 	}
 
-	trimmed = malloc(trimmed_len * sizeof(char));
+	char *trimmed = malloc(trimmed_len * sizeof(char));
 
-	for (i = 0; i < strlen(str) + 1; i++) {
+	for (unsigned i = 0; i < strlen(str) + 1; i++) {
 		if (str[i] != ' ' && str[i] != '\t' && str[i] != '\n')
 			trimmed[trim_index++] = str[i];
 	}
@@ -63,18 +62,16 @@ TestType resolve_type(char *type) {
 }
 
 test_t *test_Parse(char *line) {
-	char *pt, *trimmed;
-	unsigned i;
 	test_t *t = malloc(sizeof(test_t));
 
-	pt = strtok(line, ";");
-	for (i = 0; i < 3; i++) {
+	char *pt = strtok(line, ";");
+	for (unsigned i = 0; i < 3; i++) {
 		if (pt == NULL) {
 			free(t);
 			return NULL;
 		}
 
-		trimmed = trim(pt);
+		char *trimmed = trim(pt);
 
 		if (i == 0)
 			t->type = resolve_type(trimmed);
@@ -89,7 +86,7 @@ test_t *test_Parse(char *line) {
 	}
 
 	if (pt != NULL) {
-		trimmed = trim(pt);
+		char *trimmed = trim(pt);
 		strncpy(t->arg3, trimmed, MAX_PAR);
 		free(trimmed);
 	} else {
@@ -100,27 +97,23 @@ test_t *test_Parse(char *line) {
 }
 
 test_t **test_Load(char *file, unsigned *len) {
-	FILE *f;
-	unsigned i = 0, cur_line = 1;
-	test_t **arr;
-	char line[MAX_LINE];
+	test_t **arr = malloc(sizeof(test_t **) * MAX_TESTS);
 
-	arr = malloc(sizeof(test_t **) * MAX_TESTS);
-
-	f = fopen(file, "r");
+	FILE *f = fopen(file, "r");
 
 	if (f == NULL) {
 		free(arr);
 		return NULL;
 	}
 
-	while (fgets(line, sizeof(line), f) != NULL) {
-		test_t *t;
+	unsigned i = 0, cur_line = 1;
+	char line[MAX_LINE];
 
+	while (fgets(line, sizeof(line), f) != NULL) {
 		if (i >= MAX_TESTS)
 			break;
 
-		t = test_Parse(line);
+		test_t *t = test_Parse(line);
 
 		if (t != NULL && t->type != TEST_INVALID) {
 			arr[i] = t;
@@ -143,14 +136,11 @@ test_t **test_Load(char *file, unsigned *len) {
 }
 
 bool check(test_t *t, pcas_ast_t *actual, pcas_ast_t *expected) {
-	char *output_expected, *output_actual;
-	unsigned expected_len, actual_len;
-
-	pcas_error_t expted_err, actual_err;
-
 	if (!ast_Compare(expected, actual)) {
-		output_expected = (char *)export_to_binary(expected, &expected_len, str_table, &expted_err);
-		output_actual = (char *)export_to_binary(actual, &actual_len, str_table, &actual_err);
+		unsigned expected_len, actual_len;
+		pcas_error_t expted_err, actual_err;
+		char *output_expected = (char *)export_to_binary(expected, &expected_len, str_table, &expted_err);
+		char *output_actual = (char *)export_to_binary(actual, &actual_len, str_table, &actual_err);
 
 		if (expted_err != E_SUCCESS || actual_err != E_SUCCESS) {
 			printf("Test failed on line %u. Error when exporting ast to text.\n", t->line);
@@ -183,15 +173,14 @@ bool check(test_t *t, pcas_ast_t *actual, pcas_ast_t *expected) {
 
 /*arg1 is an equation with initial conditions, arg2 a solution, and arg3 the independent variable*/
 static bool run_verify(test_t *t) {
-	pcas_ast_t *items[MAX_ITEMS], *solution, *x;
+	pcas_ast_t *items[MAX_ITEMS];
 	pcas_error_t err;
 	pcas_de_t de;
-	unsigned count, i;
 	bool satisfied = false, passed = false;
 
-	count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
-	solution = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
-	x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	const unsigned count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	pcas_ast_t *solution = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
+	pcas_ast_t *x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
 
 	if (count == 0 || items[0] == NULL || solution == NULL || x == NULL) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
@@ -208,7 +197,7 @@ static bool run_verify(test_t *t) {
 		de_Cleanup(&de);
 	}
 
-	for (i = 0; i < count; i++)
+	for (unsigned i = 0; i < count; i++)
 		ast_Cleanup(items[i]);
 	ast_Cleanup(solution);
 	ast_Cleanup(x);
@@ -228,15 +217,14 @@ static pcas_error_t solve_test(pcas_de_t *de, const test_t *t, pcas_ast_t **solu
 
 /*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable. An explicit solution must also pass verification.*/
 static bool run_solve(test_t *t) {
-	pcas_ast_t *items[MAX_ITEMS], *expected, *x, *solution = NULL;
+	pcas_ast_t *items[MAX_ITEMS], *solution = NULL;
 	pcas_error_t err;
 	pcas_de_t de;
-	unsigned count, i;
 	bool satisfied = true, passed = false;
 
-	count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
-	expected = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
-	x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	const unsigned count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	pcas_ast_t *expected = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
+	pcas_ast_t *x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
 
 	if (count == 0 || items[0] == NULL || expected == NULL || x == NULL) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
@@ -260,7 +248,7 @@ static bool run_solve(test_t *t) {
 		de_Cleanup(&de);
 	}
 
-	for (i = 0; i < count; i++)
+	for (unsigned i = 0; i < count; i++)
 		ast_Cleanup(items[i]);
 	ast_Cleanup(expected);
 	ast_Cleanup(x);
@@ -270,29 +258,26 @@ static bool run_solve(test_t *t) {
 }
 
 bool test_Run(test_t *t) {
-	pcas_ast_t *a = NULL, *b = NULL, *c = NULL, *expected, *actual;
-	pcas_error_t err;
-	bool passed = false;
-
 	if (t->type == TEST_DE_SOLVES || t->type == TEST_DE_NOT_SOLVES)
 		return run_verify(t);
 	if (t->type == TEST_DE_SOLVE || t->type == TEST_DE_SERIES)
 		return run_solve(t);
 
-	a = parse((uint8_t *)t->arg1, strlen(t->arg1), str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *a = parse((uint8_t *)t->arg1, strlen(t->arg1), str_table, &err);
 	if (err != E_SUCCESS) {
 		printf("Test failed on line %u. Unable to parse first argument %s\n", t->line, t->arg1);
 		return false;
 	}
 
-	b = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
+	pcas_ast_t *b = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
 	if (err != E_SUCCESS) {
 		ast_Cleanup(a);
 		printf("Test failed on line %u. Unable to parse second argument %s\n", t->line, t->arg2);
 		return false;
 	}
 
-	c = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	pcas_ast_t *c = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
 	if (err != E_SUCCESS) {
 		ast_Cleanup(a);
 		ast_Cleanup(b);
@@ -305,6 +290,9 @@ bool test_Run(test_t *t) {
 		printf("Test failed on line %u. Empty %s argument.\n", t->line, a == NULL ? "first" : "second");
 		return false;
 	}
+
+	pcas_ast_t *expected, *actual;
+	bool passed = false;
 
 	switch (t->type) {
 		case TEST_SIMPLIFY:
@@ -463,8 +451,7 @@ void test_Cleanup(test_t *t) {
 }
 
 void test_CleanupArr(test_t **arr, unsigned len) {
-	unsigned i;
-	for (i = 0; i < len; i++) {
+	for (unsigned i = 0; i < len; i++) {
 		test_Cleanup(arr[i]);
 	}
 	free(arr);

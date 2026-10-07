@@ -15,17 +15,19 @@ static pcas_ast_t *integer_node(mp_int z) {
 }
 
 mp_rat rational_value(const pcas_ast_t *e) {
-	pcas_ast_t *child;
-	mp_rat value, factor;
-
 	if (e->type == NODE_NUMBER)
 		return num_Copy(e->op.num);
 
-	if ((!isoptype(e, OP_DIV) && !isoptype(e, OP_MULT)) || (value = rational_value(opbase(e))) == NULL)
+	if (!isoptype(e, OP_DIV) && !isoptype(e, OP_MULT))
 		return NULL;
 
-	for (child = opbase(e)->next; child != NULL; child = child->next) {
-		if ((factor = rational_value(child)) == NULL) {
+	mp_rat value = rational_value(opbase(e));
+	if (value == NULL)
+		return NULL;
+
+	for (const pcas_ast_t *child = opbase(e)->next; child != NULL; child = child->next) {
+		mp_rat factor = rational_value(child);
+		if (factor == NULL) {
 			num_Cleanup(value);
 			return NULL;
 		}
@@ -41,11 +43,9 @@ mp_rat rational_value(const pcas_ast_t *e) {
 }
 
 void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value) {
-	unsigned k;
-
 	mp_rat_copy(p[n], value);
 
-	for (k = n; k-- > 0;) {
+	for (unsigned k = n; k-- > 0;) {
 		mp_rat_mul(value, r, value);
 		mp_rat_add(value, p[k], value);
 	}
@@ -53,10 +53,9 @@ void evaluate(mp_rat *p, unsigned n, mp_rat r, mp_rat value) {
 
 bool is_root(mp_rat *p, unsigned n, mp_rat r) {
 	mp_rat value = num_FromInt(0);
-	bool root;
 
 	evaluate(p, n, r, value);
-	root = mp_rat_compare_zero(value) == 0;
+	const bool root = mp_rat_compare_zero(value) == 0;
 	num_Cleanup(value);
 
 	return root;
@@ -64,9 +63,8 @@ bool is_root(mp_rat *p, unsigned n, mp_rat r) {
 
 void deflate(mp_rat *p, unsigned n, mp_rat r) {
 	mp_rat t = num_FromInt(0);
-	unsigned k;
 
-	for (k = n; k-- > 0;) {
+	for (unsigned k = n; k-- > 0;) {
 		mp_rat_mul(p[k + 1], r, t);
 		mp_rat_add(p[k], t, p[k]);
 	}
@@ -74,7 +72,7 @@ void deflate(mp_rat *p, unsigned n, mp_rat r) {
 	num_Cleanup(p[0]);
 	num_Cleanup(t);
 
-	for (k = 0; k < n; k++)
+	for (unsigned k = 0; k < n; k++)
 		p[k] = p[k + 1];
 	p[n] = NULL;
 }
@@ -82,14 +80,12 @@ void deflate(mp_rat *p, unsigned n, mp_rat r) {
 /*Sets lead and constant to the absolute values of the end coefficients of p scaled to integers. Returns false if they do not fit.*/
 static bool integer_ends(mp_rat *p, unsigned n, mp_small *lead, mp_small *constant) {
 	mp_rat scale = num_FromInt(1), t = num_FromInt(0);
-	unsigned k;
-	bool fits;
 
-	for (k = 0; k <= n; k++)
+	for (unsigned k = 0; k <= n; k++)
 		mp_int_lcm(MP_NUMER_P(scale), MP_DENOM_P(p[k]), MP_NUMER_P(scale));
 
 	mp_rat_mul(p[n], scale, t);
-	fits = mp_int_to_int(MP_NUMER_P(t), lead) == MP_OK;
+	bool fits = mp_int_to_int(MP_NUMER_P(t), lead) == MP_OK;
 	mp_rat_mul(p[0], scale, t);
 	fits = fits && mp_int_to_int(MP_NUMER_P(t), constant) == MP_OK;
 
@@ -116,16 +112,16 @@ static bool test_candidate(mp_rat *p, unsigned n, mp_small a, mp_small b, mp_rat
 
 /*Finds a rational root a/b of p, with a dividing the constant term and b the leading coefficient*/
 static bool rational_root(mp_rat *p, unsigned n, mp_rat root) {
-	mp_small lead, constant, a, b;
+	mp_small lead, constant;
 
 	if (!integer_ends(p, n, &lead, &constant))
 		return false;
 
-	for (a = 1; a <= constant / a; a++) {
+	for (mp_small a = 1; a <= constant / a; a++) {
 		if (constant % a != 0)
 			continue;
 
-		for (b = 1; b <= lead / b; b++) {
+		for (mp_small b = 1; b <= lead / b; b++) {
 			if (lead % b == 0 &&
 				(test_candidate(p, n, a, b, root) || test_candidate(p, n, a, lead / b, root) ||
 				 test_candidate(p, n, constant / a, b, root) || test_candidate(p, n, constant / a, lead / b, root)))
@@ -139,12 +135,11 @@ static bool rational_root(mp_rat *p, unsigned n, mp_rat root) {
 /*Sets root to the square root of q, which is not negative, and returns true if it is rational*/
 static bool rational_sqrt(mp_rat q, mp_rat root) {
 	mp_rat square = num_FromInt(0);
-	bool exact;
 
 	mp_int_sqrt(MP_NUMER_P(q), MP_NUMER_P(root));
 	mp_int_sqrt(MP_DENOM_P(q), MP_DENOM_P(root));
 	mp_rat_mul(root, root, square);
-	exact = mp_rat_compare(square, q) == 0;
+	const bool exact = mp_rat_compare(square, q) == 0;
 	num_Cleanup(square);
 
 	return exact;
@@ -153,19 +148,19 @@ static bool rational_sqrt(mp_rat q, mp_rat root) {
 /*Returns the square root of q, which is positive, as a rational multiple of the square root of a square-free integer*/
 static pcas_ast_t *square_root(mp_rat q) {
 	mp_rat root = num_FromInt(0);
-	mp_small numerator, denominator, radicand, scale = 1, k;
 
 	if (rational_sqrt(q, root))
 		return ast_MakeNumber(root);
 
 	num_Cleanup(root);
 
+	mp_small numerator, denominator;
 	if (mp_rat_to_ints(q, &numerator, &denominator) != MP_OK || numerator > LONG_MAX / denominator)
 		return ast_MakeBinary(OP_POW, ast_MakeNumber(num_Copy(q)), ast_MakeNumber(num_FromFraction(1, 2)));
 
-	radicand = numerator * denominator;
+	mp_small radicand = numerator * denominator, scale = 1;
 
-	for (k = 2; k <= radicand / k; k++) {
+	for (mp_small k = 2; k <= radicand / k; k++) {
 		while (radicand % (k * k) == 0) {
 			radicand /= k * k;
 			scale *= k;
@@ -188,15 +183,13 @@ static void add_root(
 	mp_rat value,
 	unsigned multiplicity
 ) {
-	unsigned i;
-
 	work_Pause();
 	simplify(re, SIMP_BASIC);
 	if (im != NULL)
 		simplify(im, SIMP_BASIC);
 	work_Resume();
 
-	for (i = 0; i < *count; i++) {
+	for (unsigned i = 0; i < *count; i++) {
 		if (im == NULL && roots[i].im == NULL && ast_Compare(roots[i].re, re)) {
 			roots[i].multiplicity += multiplicity;
 			ast_Cleanup(re);
@@ -236,13 +229,12 @@ static void discriminant(mp_rat a, mp_rat b, mp_rat c, mp_rat d, mp_rat v) {
 /*Records the roots v ± sqrt(d)/(2a), real when d is positive and complex otherwise*/
 static void add_irrational_roots(mp_rat v, mp_rat d, mp_rat a, unsigned multiplicity, root_t *roots, unsigned *count) {
 	mp_rat magnitude = num_Copy(d), denominator = num_FromInt(0);
-	pcas_ast_t *w;
-	bool real = mp_rat_compare_zero(d) > 0;
+	const bool real = mp_rat_compare_zero(d) > 0;
 
 	mp_rat_abs(magnitude, magnitude);
 	mp_rat_add(a, a, denominator);
 	mp_rat_abs(denominator, denominator);
-	w = ast_MakeBinary(OP_DIV, square_root(magnitude), ast_MakeNumber(denominator));
+	pcas_ast_t *w = ast_MakeBinary(OP_DIV, square_root(magnitude), ast_MakeNumber(denominator));
 
 	if (real) {
 		add_root(
@@ -283,7 +275,6 @@ static void quadratic(mp_rat *p, unsigned *n, root_t *roots, unsigned *count) {
 static bool biquadratic(mp_rat *p, root_t *roots, unsigned *count) {
 	mp_rat d = num_FromInt(0), v = num_FromInt(0), s = num_FromInt(0), zero = num_FromInt(0), one = num_FromInt(1);
 	mp_rat u[2] = {num_FromInt(0), num_FromInt(0)};
-	unsigned multiplicity, i;
 	bool rational = mp_rat_compare_zero(p[1]) == 0 && mp_rat_compare_zero(p[3]) == 0;
 
 	if (rational) {
@@ -296,9 +287,9 @@ static bool biquadratic(mp_rat *p, root_t *roots, unsigned *count) {
 		mp_rat_div(s, d, s);
 		mp_rat_add(v, s, u[0]);
 		mp_rat_sub(v, s, u[1]);
-		multiplicity = mp_rat_compare_zero(s) == 0 ? 2 : 1;
+		const unsigned multiplicity = mp_rat_compare_zero(s) == 0 ? 2 : 1;
 
-		for (i = 0; i < 3 - multiplicity; i++) {
+		for (unsigned i = 0; i < 3 - multiplicity; i++) {
 			mp_rat_set_value(d, 4, 1);
 			mp_rat_mul(d, u[i], d);
 			add_irrational_roots(zero, d, one, multiplicity, roots, count);
@@ -344,17 +335,16 @@ bool find_roots(mp_rat *p, unsigned *n, root_t *roots, unsigned *count) {
 }
 
 pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat divisor) {
-	pcas_ast_t *sum = ast_MakeOperator(OP_ADD), *term;
-	mp_rat c;
-	unsigned k;
+	pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
 
-	for (k = n + 1; k-- > 0;) {
+	for (unsigned k = n + 1; k-- > 0;) {
 		if (mp_rat_compare_zero(p[k]) == 0)
 			continue;
 
-		c = num_Copy(p[k]);
+		mp_rat c = num_Copy(p[k]);
 		mp_rat_div(c, divisor, c);
 
+		pcas_ast_t *term;
 		if (k == 0) {
 			term = ast_MakeNumber(c);
 		} else {
@@ -373,15 +363,15 @@ pcas_ast_t *polynomial(mp_rat *p, unsigned n, const pcas_ast_t *m, mp_rat diviso
 }
 
 pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned count, const pcas_ast_t *m) {
-	pcas_ast_t *product = ast_MakeOperator(OP_MULT), *factor, *rest;
-	mp_rat scale = num_FromInt(1), t = num_FromInt(0), r;
-	unsigned i, k;
+	pcas_ast_t *product = ast_MakeOperator(OP_MULT);
+	mp_rat scale = num_FromInt(1), t = num_FromInt(0);
 
-	for (i = 0; i < count; i++) {
-		if ((r = roots[i].value) == NULL)
+	for (unsigned i = 0; i < count; i++) {
+		mp_rat r = roots[i].value;
+		if (r == NULL)
 			continue;
 
-		factor = difference(
+		pcas_ast_t *factor = difference(
 			mp_int_compare_value(MP_DENOM_P(r), 1) == 0
 				? ast_Copy(m)
 				: ast_MakeBinary(OP_MULT, integer_node(MP_DENOM_P(r)), ast_Copy(m)),
@@ -395,11 +385,11 @@ pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned c
 
 		mp_rat_set_value(t, 1, 1);
 		mp_int_copy(MP_DENOM_P(r), MP_NUMER_P(t));
-		for (k = 0; k < roots[i].multiplicity; k++)
+		for (unsigned k = 0; k < roots[i].multiplicity; k++)
 			mp_rat_mul(scale, t, scale);
 	}
 
-	rest = polynomial(p, n, m, scale);
+	pcas_ast_t *rest = polynomial(p, n, m, scale);
 
 	if (n > 0)
 		ast_ChildAppend(product, rest);
@@ -415,25 +405,21 @@ pcas_ast_t *factored_form(mp_rat *p, unsigned n, const root_t *roots, unsigned c
 }
 
 static void record_roots(const root_t *roots, unsigned count, const pcas_ast_t *m) {
-	pcas_ast_t *value, *imaginary;
-	const char *text;
-	unsigned i;
-	int sign;
-
-	for (i = 0; i < count; i++) {
-		text = roots[i].multiplicity < 4 ? multiplicity_names[roots[i].multiplicity] : "Repeated root";
+	for (unsigned i = 0; i < count; i++) {
+		const char *text = roots[i].multiplicity < 4 ? multiplicity_names[roots[i].multiplicity] : "Repeated root";
 
 		if (roots[i].im == NULL) {
 			work_Step(STEP_EQUATION, text, m, roots[i].re);
 			continue;
 		}
 
-		for (sign = 1; sign >= -1; sign -= 2) {
-			imaginary = ast_MakeBinary(OP_MULT, ast_Copy(roots[i].im), ast_MakeSymbol(SYM_IMAG));
+		for (int sign = 1; sign >= -1; sign -= 2) {
+			pcas_ast_t *imaginary = ast_MakeBinary(OP_MULT, ast_Copy(roots[i].im), ast_MakeSymbol(SYM_IMAG));
 			if (sign < 0)
 				imaginary = negate(imaginary);
 
-			value = is_ast_int(roots[i].re, 0) ? imaginary : ast_MakeBinary(OP_ADD, ast_Copy(roots[i].re), imaginary);
+			pcas_ast_t *value =
+				is_ast_int(roots[i].re, 0) ? imaginary : ast_MakeBinary(OP_ADD, ast_Copy(roots[i].re), imaginary);
 			work_Step(STEP_EQUATION, sign > 0 ? text : NULL, m, tidy(value));
 			ast_Cleanup(value);
 		}
@@ -466,13 +452,12 @@ pcas_ast_t *basis_function(const pcas_de_t *de, unsigned j, const pcas_ast_t *r,
 }
 
 unsigned fill_basis(const pcas_de_t *de, const root_t *roots, unsigned count, pcas_ast_t **basis) {
-	const root_t *root;
-	unsigned i, j, n = 0;
+	unsigned n = 0;
 
-	for (i = 0; i < count; i++) {
-		root = &roots[i];
+	for (unsigned i = 0; i < count; i++) {
+		const root_t *root = &roots[i];
 
-		for (j = 0; j < root->multiplicity; j++) {
+		for (unsigned j = 0; j < root->multiplicity; j++) {
 			if (root->im == NULL) {
 				basis[n++] = basis_function(de, j, root->re, NULL);
 			} else {
@@ -491,17 +476,15 @@ unsigned fill_basis(const pcas_de_t *de, const root_t *roots, unsigned count, pc
 
 /*Finds the roots of a2m^2 + a0 = 0 as ±i*sqrt(a0/a2), assuming that a0/a2 is positive, when the coefficients are constants that are not all rational*/
 static pcas_error_t oscillator_roots(pcas_de_t *de, const pcas_ast_t *m, root_t *roots, unsigned *count) {
-	pcas_ast_t *left, *zero;
-
 	if (de->order != 2 || !is_ast_int(de->a[1], 0) || involves(de->a[0], de->x) || involves(de->a[2], de->x))
 		return E_DE_UNSOLVED;
 
-	left = ast_MakeBinary(
+	pcas_ast_t *left = ast_MakeBinary(
 		OP_ADD,
 		ast_MakeBinary(OP_MULT, ast_Copy(de->a[2]), ast_MakeBinary(OP_POW, ast_Copy(m), integer(2))),
 		ast_Copy(de->a[0])
 	);
-	zero = integer(0);
+	pcas_ast_t *zero = integer(0);
 	work_Step(STEP_EQUATION, "Characteristic equation", tidy(left), zero);
 	ast_Cleanup(left);
 	ast_Cleanup(zero);
@@ -524,32 +507,31 @@ static pcas_error_t oscillator_roots(pcas_de_t *de, const pcas_ast_t *m, root_t 
 }
 
 pcas_error_t characteristic_roots(pcas_de_t *de, const pcas_ast_t *m, root_t *roots, unsigned *count) {
-	mp_rat p[DE_MAX_ORDER + 1], one;
-	pcas_ast_t *left, *zero;
-	unsigned n = de->order, k;
-	pcas_error_t err = E_SUCCESS;
+	mp_rat p[DE_MAX_ORDER + 1];
+	unsigned n = de->order;
 
 	*count = 0;
 	canonical_SetFunction(m->op.symbol);
 
-	for (k = 0; k <= de->order; k++) {
+	for (unsigned k = 0; k <= de->order; k++) {
 		if ((p[k] = rational_value(de->a[k])) == NULL) {
 			while (k > 0)
 				num_Cleanup(p[--k]);
 
-			err = oscillator_roots(de, m, roots, count);
+			const pcas_error_t err = oscillator_roots(de, m, roots, count);
 			canonical_SetFunction(de->y->op.symbol);
 			return err;
 		}
 	}
 
-	zero = integer(0);
-	one = num_FromInt(1);
+	pcas_ast_t *zero = integer(0);
+	mp_rat one = num_FromInt(1);
 
-	left = polynomial(p, n, m, one);
+	pcas_ast_t *left = polynomial(p, n, m, one);
 	work_Step(STEP_EQUATION, "Characteristic equation", left, zero);
 	ast_Cleanup(left);
 
+	pcas_error_t err = E_SUCCESS;
 	if (!find_roots(p, &n, roots, count))
 		err = E_DE_ROOTS;
 
@@ -564,7 +546,7 @@ pcas_error_t characteristic_roots(pcas_de_t *de, const pcas_ast_t *m, root_t *ro
 
 	canonical_SetFunction(de->y->op.symbol);
 
-	for (k = 0; k <= de->order; k++)
+	for (unsigned k = 0; k <= de->order; k++)
 		num_Cleanup(p[k]);
 
 	num_Cleanup(one);
@@ -574,9 +556,7 @@ pcas_error_t characteristic_roots(pcas_de_t *de, const pcas_ast_t *m, root_t *ro
 }
 
 void free_roots(root_t *roots, unsigned count) {
-	unsigned i;
-
-	for (i = 0; i < count; i++) {
+	for (unsigned i = 0; i < count; i++) {
 		ast_Cleanup(roots[i].re);
 		ast_Cleanup(roots[i].im);
 		num_Cleanup(roots[i].value);

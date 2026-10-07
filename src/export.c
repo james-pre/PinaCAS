@@ -14,8 +14,7 @@ which could be easily copied here. */
 	} while (0)
 #define add_token(token)                                                                                               \
 	do {                                                                                                               \
-		uint8_t _tmp_i;                                                                                                \
-		for (_tmp_i = 0; _tmp_i < lookup[(token)].length; _tmp_i++)                                                    \
+		for (uint8_t _tmp_i = 0; _tmp_i < lookup[(token)].length; _tmp_i++)                                            \
 			add_byte(lookup[token].bytes[_tmp_i]);                                                                     \
 	} while (0)
 
@@ -77,9 +76,7 @@ static const pcas_ast_t *leftmost(const pcas_ast_t *e) {
 
 /*True if every factor of the multiplication is 1 or -1*/
 static bool only_units(const pcas_ast_t *e) {
-	pcas_ast_t *child;
-
-	for (child = opbase(e); child != NULL; child = child->next) {
+	for (const pcas_ast_t *child = opbase(e); child != NULL; child = child->next) {
 		if (!is_ast_int(child, 1) && !is_ast_int(child, -1))
 			return false;
 	}
@@ -97,12 +94,9 @@ static unsigned _to_binary(
 ) {
 	switch (e->type) {
 		case NODE_NUMBER: {
-			char *buffer;
-			unsigned i;
+			char *buffer = num_ToString(e->op.num, 6);
 
-			buffer = num_ToString(e->op.num, 6);
-
-			for (i = 0; i < strlen(buffer); i++) {
+			for (unsigned i = 0; i < strlen(buffer); i++) {
 				uint8_t c = (uint8_t)buffer[i];
 				if (c == '.')
 					c = lookup[TOK_PERIOD].bytes[0];
@@ -126,18 +120,13 @@ static unsigned _to_binary(
 
 			break;
 		case NODE_OPERATOR: {
-			unsigned i;
-
 			switch (optype(e)) {
 				case OP_ADD: {
-					pcas_ast_t *child;
 					pcas_ast_t *e_copy = ast_Copy(e);
 
-					for (i = 0; i < ast_ChildLength(e_copy) - 1; i++) {
-						pcas_ast_t *next;
-
-						child = ast_ChildGet(e_copy, i);
-						next = child->next;
+					for (unsigned i = 0; i < ast_ChildLength(e_copy) - 1; i++) {
+						const pcas_ast_t *child = ast_ChildGet(e_copy, i);
+						pcas_ast_t *next = child->next;
 
 						if (need_paren(e_copy, child))
 							add_token(TOK_OPEN_PAR);
@@ -151,7 +140,7 @@ static unsigned _to_binary(
 							add_token(TOK_PLUS);
 					}
 
-					child = ast_ChildGetLast(e_copy);
+					const pcas_ast_t *child = ast_ChildGetLast(e_copy);
 
 					if (need_paren(e_copy, child))
 						add_token(TOK_OPEN_PAR);
@@ -164,19 +153,14 @@ static unsigned _to_binary(
 					break;
 				}
 				case OP_MULT: {
-					pcas_ast_t *child;
-					bool needs_mult;
-					bool root_special_case;
-
-					for (i = 0; i < ast_ChildLength(e) - 1; i++) {
-						pcas_ast_t *next;
-
-						child = ast_ChildGet(e, i);
-						next = child->next;
+					for (unsigned i = 0; i < ast_ChildLength(e) - 1; i++) {
+						const pcas_ast_t *child = ast_ChildGet(e, i);
+						const pcas_ast_t *next = child->next;
 
 						/*Always put parentheses around root operator unless it is sqrt(
                 For example, -1 * 3root2 should be -(3root2) */
-						root_special_case = isoptype(child, OP_ROOT) && !is_ast_int(ast_ChildGet(child, 0), 2);
+						const bool root_special_case =
+							isoptype(child, OP_ROOT) && !is_ast_int(ast_ChildGet(child, 0), 2);
 
 						if (is_ast_int(child, -1)) {
 							add_token(TOK_NEGATE);
@@ -193,7 +177,7 @@ static unsigned _to_binary(
 								add_token(TOK_CLOSE_PAR);
 						}
 
-						needs_mult =
+						const bool needs_mult =
 							!need_paren(e, child) && !root_special_case &&
 							((rightmost(child)->type == NODE_NUMBER && !is_ast_int(rightmost(child), -1) &&
 							  leftmost(next)->type == NODE_NUMBER)
@@ -204,8 +188,8 @@ static unsigned _to_binary(
 							add_token(TOK_MULTIPLY);
 					}
 
-					child = ast_ChildGetLast(e);
-					root_special_case = isoptype(child, OP_ROOT) && !is_ast_int(ast_ChildGet(child, 0), 2);
+					const pcas_ast_t *child = ast_ChildGetLast(e);
+					const bool root_special_case = isoptype(child, OP_ROOT) && !is_ast_int(ast_ChildGet(child, 0), 2);
 
 					if (!is_ast_int(child, 1) || only_units(e)) {
 						if (need_paren(e, child) || root_special_case)
@@ -219,10 +203,8 @@ static unsigned _to_binary(
 				}
 				case OP_DIV:
 				case OP_POW: {
-					pcas_ast_t *a, *b;
-
-					a = ast_ChildGet(e, 0);
-					b = ast_ChildGet(e, 1);
+					const pcas_ast_t *a = ast_ChildGet(e, 0);
+					const pcas_ast_t *b = ast_ChildGet(e, 1);
 
 					if (need_paren(e, a))
 						add_token(TOK_OPEN_PAR);
@@ -241,10 +223,8 @@ static unsigned _to_binary(
 					break;
 				}
 				case OP_ROOT: {
-					pcas_ast_t *a, *b;
-
-					a = ast_ChildGet(e, 0);
-					b = ast_ChildGet(e, 1);
+					const pcas_ast_t *a = ast_ChildGet(e, 0);
+					const pcas_ast_t *b = ast_ChildGet(e, 1);
 
 					if (is_ast_int(a, 2)) {
 						add_token(TOK_SQRT);
@@ -275,10 +255,8 @@ static unsigned _to_binary(
 					break;
 				}
 				case OP_LOG: {
-					pcas_ast_t *a, *b;
-
-					a = ast_ChildGet(e, 0);
-					b = ast_ChildGet(e, 1);
+					const pcas_ast_t *a = ast_ChildGet(e, 0);
+					const pcas_ast_t *b = ast_ChildGet(e, 1);
 
 					if (a->type == NODE_SYMBOL && a->op.symbol == SYM_EULER) {
 						add_token(TOK_LN);
@@ -301,11 +279,9 @@ static unsigned _to_binary(
 					break;
 				}
 				case OP_DERIV: {
-					pcas_ast_t *a, *b, *c;
-
-					a = ast_ChildGet(e, 0);
-					b = ast_ChildGet(e, 1);
-					c = ast_ChildGet(e, 2);
+					const pcas_ast_t *a = ast_ChildGet(e, 0);
+					const pcas_ast_t *b = ast_ChildGet(e, 1);
+					const pcas_ast_t *c = ast_ChildGet(e, 2);
 
 					add_token(TOK_DERIV);
 					index = _to_binary(a, data, index, lookup, err);
@@ -340,9 +316,7 @@ static unsigned _to_binary(
 				}
 				case OP_FACTORIAL:
 				case OP_PRIME: {
-					pcas_ast_t *a;
-
-					a = ast_ChildGet(e, 0);
+					const pcas_ast_t *a = ast_ChildGet(e, 0);
 
 					if (need_paren(e, a))
 						add_token(TOK_OPEN_PAR);

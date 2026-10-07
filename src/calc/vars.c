@@ -72,8 +72,7 @@ void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, 
 	/*If var is a yvar, enable it*/
 	if (var <= 9) {
 		/*Thanks Mateo: https://www.cemetech.net/forum/viewtopic.php?t=15947*/
-		uint8_t *status;
-		status = ti_GetVATPtr(var);
+		uint8_t *status = ti_GetVATPtr(var);
 		status--;
 		*status |= 1;
 	}

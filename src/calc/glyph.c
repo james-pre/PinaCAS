@@ -15,11 +15,9 @@ const glyph_t glyph_inverse = {8, {0x02, 0x06, 0xE2, 0x02, 0x07, 0x00, 0x00, 0x0
 const glyph_t glyph_negative = {4, {0x00, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00}};
 
 void glyph_draw(int x, int y, const glyph_t *g, int left, int top, int right, int bottom) {
-	int row, column;
-
-	for (row = 0; row < 8; row++) {
-		for (column = 0; column < 8; column++) {
-			int px = x + column, py = y + row;
+	for (int row = 0; row < 8; row++) {
+		for (int column = 0; column < 8; column++) {
+			const int px = x + column, py = y + row;
 
 			if ((g->rows[row] & (0x80 >> column)) && px >= left && px < right && py >= top && py < bottom)
 				gfx_SetPixel(px, py);

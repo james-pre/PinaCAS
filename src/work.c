@@ -45,12 +45,10 @@ void work_Resume(void) {
 }
 
 static pcas_ast_t *display_copy(const pcas_ast_t *e) {
-	pcas_ast_t *copy;
-
 	if (e == NULL)
 		return NULL;
 
-	copy = ast_Copy(e);
+	pcas_ast_t *copy = ast_Copy(e);
 
 	paused++;
 	simplify(copy, SIMP_COMMUTATIVE);
@@ -82,15 +80,12 @@ static pcas_step_t *make_step(StepType type, const char *text, pcas_ast_t *befor
 
 /*True if a and b are drawn the same way*/
 static bool same_display(const pcas_ast_t *a, const pcas_ast_t *b) {
-	ts_box_t *box_a, *box_b;
-	bool same;
-
 	if (ast_Compare(a, b))
 		return true;
 
-	box_a = ts_FromAst(a);
-	box_b = ts_FromAst(b);
-	same = ts_Equal(box_a, box_b);
+	ts_box_t *box_a = ts_FromAst(a);
+	ts_box_t *box_b = ts_FromAst(b);
+	const bool same = ts_Equal(box_a, box_b);
 
 	ts_Cleanup(box_a);
 	ts_Cleanup(box_b);

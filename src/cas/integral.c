@@ -43,33 +43,30 @@ static pcas_ast_t *integral_node(pcas_ast_t *f, const pcas_ast_t *x) {
 }
 
 /*Returns the value of e if it is a number or a quotient of numbers, otherwise NULL*/
-static mp_rat number_value(pcas_ast_t *e) {
-	mp_rat value;
-
+static mp_rat number_value(const pcas_ast_t *e) {
 	if (e->type == NODE_NUMBER)
 		return num_Copy(e->op.num);
 
 	if (!isoptype(e, OP_DIV) || ast_ChildGet(e, 0)->type != NODE_NUMBER || ast_ChildGet(e, 1)->type != NODE_NUMBER)
 		return NULL;
 
-	value = num_Copy(ast_ChildGet(e, 0)->op.num);
+	mp_rat value = num_Copy(ast_ChildGet(e, 0)->op.num);
 	mp_rat_div(value, ast_ChildGet(e, 1)->op.num, value);
 	return value;
 }
 
-static bool is_ast_fraction(pcas_ast_t *e, mp_small num, mp_small den) {
+static bool is_ast_fraction(const pcas_ast_t *e, mp_small num, mp_small den) {
 	mp_rat value = number_value(e);
-	bool equal;
 
 	if (value == NULL)
 		return false;
 
-	equal = mp_rat_compare_value(value, num, den) == 0;
+	const bool equal = mp_rat_compare_value(value, num, den) == 0;
 	num_Cleanup(value);
 	return equal;
 }
 
-static bool is_ast_symbol(pcas_ast_t *e, Symbol symbol) {
+static bool is_ast_symbol(const pcas_ast_t *e, Symbol symbol) {
 	return e->type == NODE_SYMBOL && e->op.symbol == symbol;
 }
 
@@ -92,12 +89,10 @@ static pcas_ast_t *derivative_of(pcas_ast_t *e, pcas_ast_t *x) {
 
 /*Returns the slope of e if e is linear in x, otherwise NULL*/
 static pcas_ast_t *linear_slope(pcas_ast_t *e, pcas_ast_t *x) {
-	pcas_ast_t *d;
-
 	if (is_constant(e, x))
 		return NULL;
 
-	d = derivative_of(e, x);
+	pcas_ast_t *d = derivative_of(e, x);
 
 	if (is_constant(d, x) && !is_ast_int(d, 0))
 		return d;
@@ -107,13 +102,11 @@ static pcas_ast_t *linear_slope(pcas_ast_t *e, pcas_ast_t *x) {
 }
 
 static bool is_polynomial(pcas_ast_t *e, pcas_ast_t *x) {
-	pcas_ast_t *child;
-
 	if (is_constant(e, x) || ast_Compare(e, x))
 		return true;
 
 	if (isoptype(e, OP_ADD) || isoptype(e, OP_MULT)) {
-		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next) {
 			if (!is_polynomial(child, x))
 				return false;
 		}
@@ -121,7 +114,7 @@ static bool is_polynomial(pcas_ast_t *e, pcas_ast_t *x) {
 	}
 
 	if (isoptype(e, OP_POW)) {
-		pcas_ast_t *exponent = ast_ChildGet(e, 1);
+		const pcas_ast_t *exponent = ast_ChildGet(e, 1);
 		return exponent->type == NODE_NUMBER && mp_rat_is_integer(exponent->op.num) &&
 			   mp_rat_compare_zero(exponent->op.num) >= 0 && is_polynomial(ast_ChildGet(e, 0), x);
 	}
@@ -147,10 +140,8 @@ static pcas_ast_t *reciprocal(pcas_ast_t *e) {
 }
 
 static void collect_factors(pcas_ast_t *e, pcas_ast_t *product, bool inverted) {
-	pcas_ast_t *child;
-
 	if (isoptype(e, OP_MULT)) {
-		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+		for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next)
 			collect_factors(child, product, inverted);
 	} else if (isoptype(e, OP_DIV)) {
 		collect_factors(ast_ChildGet(e, 0), product, inverted);
@@ -180,27 +171,24 @@ static pcas_ast_t *times(pcas_ast_t *product, pcas_ast_t *e) {
 
 /*Takes ownership of product. Returns its only factor, 1 if it has none, or product itself.*/
 static pcas_ast_t *unwrap(pcas_ast_t *product) {
-	pcas_ast_t *only;
-
 	switch (ast_ChildLength(product)) {
 		case 0: ast_Cleanup(product); return integer(1);
-		case 1:
-			only = ast_ChildRemoveIndex(product, 0);
+		case 1: {
+			pcas_ast_t *only = ast_ChildRemoveIndex(product, 0);
 			ast_Cleanup(product);
 			return only;
+		}
 		default: return product;
 	}
 }
 
 /*Returns v if e is c + k*v^2 where k is 1 or -1, otherwise NULL*/
 static pcas_ast_t *match_square_sum(pcas_ast_t *e, mp_small c, mp_small k) {
-	pcas_ast_t *constant, *square;
-
 	if (!isoptype(e, OP_ADD) || ast_ChildLength(e) != 2)
 		return NULL;
 
-	constant = ast_ChildGet(e, 0);
-	square = ast_ChildGet(e, 1);
+	pcas_ast_t *constant = ast_ChildGet(e, 0);
+	pcas_ast_t *square = ast_ChildGet(e, 1);
 
 	if (!is_ast_int(constant, c)) {
 		pcas_ast_t *swap = constant;
@@ -231,15 +219,12 @@ static pcas_ast_t *match_square_sum(pcas_ast_t *e, mp_small c, mp_small k) {
 
 /*Returns v if e is c + k*v^2 for positive numbers c and k, setting them, otherwise NULL*/
 static pcas_ast_t *match_positive_square_sum(pcas_ast_t *e, mp_rat *c, mp_rat *k) {
-	pcas_ast_t *square;
-	unsigned i;
-
 	if (!isoptype(e, OP_ADD) || ast_ChildLength(e) != 2)
 		return NULL;
 
-	for (i = 0; i < 2; i++) {
+	for (unsigned i = 0; i < 2; i++) {
 		*c = number_value(ast_ChildGet(e, i));
-		square = ast_ChildGet(e, 1 - i);
+		pcas_ast_t *square = ast_ChildGet(e, 1 - i);
 
 		if (*c == NULL)
 			continue;
@@ -276,12 +261,11 @@ static pcas_ast_t *over_slope(pcas_ast_t *F, pcas_ast_t *u, pcas_ast_t *x) {
 
 /*Antiderivatives of u^n where u is not linear*/
 static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t *x) {
-	pcas_ast_t *v, *F;
-	mp_rat c, k;
+	pcas_ast_t *v;
 
 	if (is_ast_fraction(n, 2, 1) && (isoptype(u, OP_SIN) || isoptype(u, OP_COS))) {
 		v = ast_ChildGet(u, 0);
-		F = quotient(ast_MakeUnary(OP_SIN, mul(integer(2), ast_Copy(v))), integer(4));
+		pcas_ast_t *F = quotient(ast_MakeUnary(OP_SIN, mul(integer(2), ast_Copy(v))), integer(4));
 		if (isoptype(u, OP_SIN))
 			F = negate(F);
 		return over_slope(add(quotient(ast_Copy(v), integer(2)), F), v, x);
@@ -306,8 +290,9 @@ static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t 
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != NULL)
 		return over_slope(ast_MakeUnary(OP_TAN_INV, ast_Copy(v)), v, x);
 
+	mp_rat c, k;
 	if (is_ast_fraction(n, -1, 1) && (v = match_positive_square_sum(u, &c, &k)) != NULL) {
-		F = ast_MakeNumber(num_Copy(k));
+		pcas_ast_t *F = ast_MakeNumber(num_Copy(k));
 		F = power(quotient(F, ast_MakeNumber(num_Copy(c))), ast_MakeNumber(num_FromFraction(1, 2)));
 		F = ast_MakeUnary(OP_TAN_INV, mul(F, ast_Copy(v)));
 		mp_rat_mul(c, k, c);
@@ -318,7 +303,7 @@ static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t 
 
 	if (is_ast_fraction(n, -1, 1) && u->type == NODE_OPERATOR && (optype(u) == OP_COS || optype(u) == OP_SIN)) {
 		v = ast_ChildGet(u, 0);
-		F = power(ast_Copy(u), integer(-1));
+		pcas_ast_t *F = power(ast_Copy(u), integer(-1));
 
 		if (optype(u) == OP_COS)
 			F = ln(ast_MakeUnary(OP_ABS, add(F, ast_MakeUnary(OP_TAN, ast_Copy(v)))));
@@ -342,7 +327,7 @@ static pcas_ast_t *table_special_power(pcas_ast_t *u, pcas_ast_t *n, pcas_ast_t 
 
 /*Antiderivative of a single non-constant factor h from the table of elementary integrals*/
 static pcas_ast_t *table(pcas_ast_t *h, pcas_ast_t *x) {
-	pcas_ast_t *u, *n;
+	pcas_ast_t *u;
 
 	if (ast_Compare(h, x))
 		return quotient(power(ast_Copy(x), integer(2)), integer(2));
@@ -351,9 +336,9 @@ static pcas_ast_t *table(pcas_ast_t *h, pcas_ast_t *x) {
 		return NULL;
 
 	switch (optype(h)) {
-		case OP_POW:
+		case OP_POW: {
 			u = ast_ChildGet(h, 0);
-			n = ast_ChildGet(h, 1);
+			pcas_ast_t *n = ast_ChildGet(h, 1);
 
 			if (is_constant(n, x)) {
 				pcas_ast_t *slope = linear_slope(u, x);
@@ -376,16 +361,16 @@ static pcas_ast_t *table(pcas_ast_t *h, pcas_ast_t *x) {
 			}
 
 			return NULL;
+		}
 		case OP_LOG: {
-			pcas_ast_t *base = ast_ChildGet(h, 0);
-			pcas_ast_t *F;
+			const pcas_ast_t *base = ast_ChildGet(h, 0);
 
 			u = ast_ChildGet(h, 1);
 
 			if (!is_constant(base, x))
 				return NULL;
 
-			F = add(mul(ast_Copy(u), ln(ast_Copy(u))), negate(ast_Copy(u)));
+			pcas_ast_t *F = add(mul(ast_Copy(u), ln(ast_Copy(u))), negate(ast_Copy(u)));
 
 			if (!is_ast_symbol(base, SYM_EULER))
 				F = quotient(F, ln(ast_Copy(base)));
@@ -413,16 +398,13 @@ static void expand_quietly(pcas_ast_t *e) {
 
 /*Antiderivative using linearity, the table, and polynomial expansion, or NULL*/
 static pcas_ast_t *elementary(pcas_ast_t *f, pcas_ast_t *x) {
-	pcas_ast_t *product, *constants, *variable = NULL, *child, *F = NULL;
-	unsigned variables = 0;
-
 	if (is_constant(f, x))
 		return mul(ast_Copy(f), ast_Copy(x));
 
 	if (isoptype(f, OP_ADD)) {
-		F = ast_MakeOperator(OP_ADD);
+		pcas_ast_t *F = ast_MakeOperator(OP_ADD);
 
-		for (child = ast_ChildGet(f, 0); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = ast_ChildGet(f, 0); child != NULL; child = child->next) {
 			pcas_ast_t *term = elementary(child, x);
 
 			if (term == NULL) {
@@ -436,10 +418,12 @@ static pcas_ast_t *elementary(pcas_ast_t *f, pcas_ast_t *x) {
 		return F;
 	}
 
-	product = factors_of(f);
-	constants = ast_MakeOperator(OP_MULT);
+	pcas_ast_t *product = factors_of(f);
+	pcas_ast_t *constants = ast_MakeOperator(OP_MULT);
+	pcas_ast_t *variable = NULL;
+	unsigned variables = 0;
 
-	for (child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
+	for (pcas_ast_t *child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
 		if (is_constant(child, x)) {
 			if (!is_ast_int(child, 1))
 				ast_ChildAppend(constants, ast_Copy(child));
@@ -449,6 +433,7 @@ static pcas_ast_t *elementary(pcas_ast_t *f, pcas_ast_t *x) {
 		}
 	}
 
+	pcas_ast_t *F = NULL;
 	if (variables == 1 && (F = table(variable, x)) != NULL)
 		F = times(constants, F);
 	else
@@ -474,9 +459,8 @@ static pcas_ast_t *pull_constants(pcas_ast_t *f, pcas_ast_t *x, bool *pulled) {
 	pcas_ast_t *product = factors_of(f);
 	pcas_ast_t *constants = ast_MakeOperator(OP_MULT);
 	pcas_ast_t *rest = ast_MakeOperator(OP_MULT);
-	pcas_ast_t *child;
 
-	for (child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
+	for (const pcas_ast_t *child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
 		if (!is_constant(child, x))
 			ast_ChildAppend(rest, ast_Copy(child));
 		else if (!is_ast_int(child, 1))
@@ -493,14 +477,12 @@ static pcas_ast_t *pull_constants(pcas_ast_t *f, pcas_ast_t *x, bool *pulled) {
 
 /*Integrates the terms of f that are elementary and pulls out constant factors, leaving integral nodes for the rest*/
 static pcas_ast_t *split(pcas_ast_t *f, pcas_ast_t *x, bool *progress) {
-	pcas_ast_t *child;
-
 	if (isoptype(f, OP_ADD)) {
 		pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
 
 		*progress = true;
 
-		for (child = ast_ChildGet(f, 0); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = ast_ChildGet(f, 0); child != NULL; child = child->next) {
 			pcas_ast_t *F = elementary(child, x);
 			ast_ChildAppend(sum, F != NULL ? F : pull_constants(child, x, progress));
 		}
@@ -532,31 +514,31 @@ static pcas_ast_t *inner_candidate(pcas_ast_t *h, pcas_ast_t *x) {
 static pcas_ast_t *substitution(pcas_ast_t *f, pcas_ast_t *x) {
 	pcas_ast_t *product = factors_of(f);
 	pcas_ast_t *result = NULL;
-	unsigned i, length = ast_ChildLength(product);
-	Symbol symbol = fresh_symbol(f);
+	const unsigned length = ast_ChildLength(product);
+	const Symbol symbol = fresh_symbol(f);
 
 	if (symbol == SYM_INVALID) {
 		ast_Cleanup(product);
 		return NULL;
 	}
 
-	for (i = 0; i < length && result == NULL; i++) {
+	for (unsigned i = 0; i < length && result == NULL; i++) {
 		pcas_ast_t *h = ast_ChildGet(product, i);
 		pcas_ast_t *v = inner_candidate(h, x);
-		pcas_ast_t *rest, *ratio, *u, *g, *G, *slope;
 
 		if (v == NULL || is_constant(v, x))
 			continue;
 
-		if ((slope = linear_slope(v, x)) != NULL) {
+		pcas_ast_t *slope = linear_slope(v, x);
+		if (slope != NULL) {
 			ast_Cleanup(slope);
 			continue;
 		}
 
-		rest = ast_Copy(product);
+		pcas_ast_t *rest = ast_Copy(product);
 		ast_Cleanup(ast_ChildRemoveIndex(rest, i));
 
-		ratio = quotient(unwrap(rest), derivative_of(v, x));
+		pcas_ast_t *ratio = quotient(unwrap(rest), derivative_of(v, x));
 		simplify_quietly(ratio);
 
 		if (!is_constant(ratio, x)) {
@@ -564,14 +546,15 @@ static pcas_ast_t *substitution(pcas_ast_t *f, pcas_ast_t *x) {
 			continue;
 		}
 
-		u = ast_MakeSymbol(symbol);
-		g = ast_Copy(h);
+		pcas_ast_t *u = ast_MakeSymbol(symbol);
+		pcas_ast_t *g = ast_Copy(h);
 
 		work_Pause();
 		substitute(g, v, u);
 		simplify(g, SIMP_BASIC);
 		work_Resume();
 
+		pcas_ast_t *G;
 		if (is_constant(g, x) && (G = elementary(g, u)) != NULL) {
 			pcas_ast_t *before = integral_node(ast_Copy(f), x);
 			pcas_ast_t *rewritten = mul(ast_Copy(ratio), integral_node(ast_Copy(g), u));
@@ -615,8 +598,6 @@ static int coefficients(pcas_ast_t *e, pcas_ast_t *x, pcas_ast_t **c) {
 	mp_small factorial = 1;
 
 	for (k = 0; k <= MAX_DEGREE + 1 && !is_ast_int(d, 0); k++) {
-		pcas_ast_t *next;
-
 		if (k == MAX_DEGREE + 1) {
 			while (k-- > 0)
 				ast_Cleanup(c[k]);
@@ -632,7 +613,7 @@ static int coefficients(pcas_ast_t *e, pcas_ast_t *x, pcas_ast_t **c) {
 		c[k] = quotient(c[k], integer(factorial));
 		simplify(c[k], SIMP_BASIC);
 
-		next = ast_Copy(d);
+		pcas_ast_t *next = ast_Copy(d);
 		derivative(next, x, x);
 		simplify(next, SIMP_BASIC);
 		ast_Cleanup(d);
@@ -648,9 +629,8 @@ static int coefficients(pcas_ast_t *e, pcas_ast_t *x, pcas_ast_t **c) {
 /*Returns the sum of c[k]*x^k for k up to degree. Takes ownership of the coefficients.*/
 static pcas_ast_t *polynomial(pcas_ast_t **c, int degree, pcas_ast_t *x) {
 	pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
-	int k;
 
-	for (k = degree; k >= 0; k--)
+	for (int k = degree; k >= 0; k--)
 		ast_ChildAppend(sum, mul(c[k], power(ast_Copy(x), integer(k))));
 
 	ast_ChildAppend(sum, integer(0));
@@ -661,10 +641,7 @@ static pcas_ast_t *polynomial(pcas_ast_t **c, int degree, pcas_ast_t *x) {
 static pcas_ast_t *divide(pcas_ast_t *f, pcas_ast_t *x) {
 	pcas_ast_t *product = factors_of(f), *numerator = ast_MakeOperator(OP_MULT),
 			   *denominator = ast_MakeOperator(OP_MULT);
-	pcas_ast_t *n[MAX_DEGREE + 1], *d[MAX_DEGREE + 1], *q[MAX_DEGREE + 1], *child, *rewritten = NULL, *before;
-	int nd = -1, dd = -1, j, k;
-
-	for (child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
+	for (pcas_ast_t *child = ast_ChildGet(product, 0); child != NULL; child = child->next) {
 		mp_rat exponent;
 
 		if (isoptype(child, OP_POW) && (exponent = number_value(ast_ChildGet(child, 1))) != NULL) {
@@ -680,35 +657,38 @@ static pcas_ast_t *divide(pcas_ast_t *f, pcas_ast_t *x) {
 
 	ast_Cleanup(product);
 
+	pcas_ast_t *n[MAX_DEGREE + 1], *d[MAX_DEGREE + 1], *q[MAX_DEGREE + 1], *rewritten = NULL;
+	int nd = -1, dd = -1;
+
 	work_Pause();
 
 	if (ast_ChildLength(denominator) > 0 && is_polynomial(numerator, x) && is_polynomial(denominator, x) &&
 		(dd = coefficients(denominator, x, d)) >= 1) {
 		if ((nd = coefficients(numerator, x, n)) < dd) {
-			for (k = 0; k <= nd; k++)
+			for (int k = 0; k <= nd; k++)
 				ast_Cleanup(n[k]);
 		} else {
-			for (k = nd - dd; k >= 0; k--) {
+			for (int k = nd - dd; k >= 0; k--) {
 				q[k] = quotient(ast_Copy(n[k + dd]), ast_Copy(d[dd]));
 				simplify(q[k], SIMP_BASIC);
 
-				for (j = 0; j <= dd; j++) {
+				for (int j = 0; j <= dd; j++) {
 					n[k + j] = add(n[k + j], negate(mul(ast_Copy(q[k]), ast_Copy(d[j]))));
 					simplify(n[k + j], SIMP_BASIC);
 				}
 			}
 
-			for (k = dd; k <= nd; k++)
+			for (int k = dd; k <= nd; k++)
 				ast_Cleanup(n[k]);
 
-			child = quotient(polynomial(n, dd - 1, x), ast_Copy(denominator));
-			simplify(child, SIMP_BASIC);
-			factor_cancel(child);
-			rewritten = add(polynomial(q, nd - dd, x), child);
+			pcas_ast_t *remainder = quotient(polynomial(n, dd - 1, x), ast_Copy(denominator));
+			simplify(remainder, SIMP_BASIC);
+			factor_cancel(remainder);
+			rewritten = add(polynomial(q, nd - dd, x), remainder);
 			simplify(rewritten, SIMP_BASIC);
 		}
 
-		for (k = 0; k <= dd; k++)
+		for (int k = 0; k <= dd; k++)
 			ast_Cleanup(d[k]);
 	}
 
@@ -716,7 +696,7 @@ static pcas_ast_t *divide(pcas_ast_t *f, pcas_ast_t *x) {
 
 	if (rewritten != NULL) {
 		rewritten = integral_node(rewritten, x);
-		before = integral_node(ast_Copy(f), x);
+		pcas_ast_t *before = integral_node(ast_Copy(f), x);
 		work_Step(STEP_INTEGRAL, "Divide", before, rewritten);
 		ast_Cleanup(before);
 	}
@@ -752,18 +732,15 @@ static unsigned liate_rank(pcas_ast_t *h, pcas_ast_t *x) {
 /*Rewrites the integral of f by parts, choosing u by LIATE. Records the step.*/
 static pcas_ast_t *by_parts(pcas_ast_t *f, pcas_ast_t *x) {
 	pcas_ast_t *product = factors_of(f);
-	pcas_ast_t *u = NULL, *dv, *v, *du, *remaining, *rewritten, *before;
-	unsigned i, best = 0, best_index = 0;
-	bool pulled = false;
+	unsigned best = 0, best_index = 0;
 
-	for (i = 0; i < ast_ChildLength(product); i++) {
+	for (unsigned i = 0; i < ast_ChildLength(product); i++) {
 		pcas_ast_t *factor = ast_ChildGet(product, i);
-		unsigned rank;
 
 		if (is_constant(factor, x))
 			continue;
 
-		rank = liate_rank(factor, x);
+		const unsigned rank = liate_rank(factor, x);
 		if (rank > best) {
 			best = rank;
 			best_index = i;
@@ -775,26 +752,28 @@ static pcas_ast_t *by_parts(pcas_ast_t *f, pcas_ast_t *x) {
 		return NULL;
 	}
 
-	u = ast_ChildRemoveIndex(product, best_index);
-	dv = unwrap(product);
+	pcas_ast_t *u = ast_ChildRemoveIndex(product, best_index);
+	pcas_ast_t *dv = unwrap(product);
 
-	if ((v = elementary(dv, x)) == NULL) {
+	pcas_ast_t *v = elementary(dv, x);
+	if (v == NULL) {
 		ast_Cleanup(u);
 		ast_Cleanup(dv);
 		return NULL;
 	}
 
 	simplify_quietly(v);
-	du = derivative_of(u, x);
+	pcas_ast_t *du = derivative_of(u, x);
 
-	remaining = mul(ast_Copy(v), du);
+	pcas_ast_t *remaining = mul(ast_Copy(v), du);
 	simplify_quietly(remaining);
 
-	rewritten = add(mul(u, v), negate(pull_constants(remaining, x, &pulled)));
+	bool pulled = false;
+	pcas_ast_t *rewritten = add(mul(u, v), negate(pull_constants(remaining, x, &pulled)));
 	ast_Cleanup(remaining);
 	simplify_quietly(rewritten);
 
-	before = integral_node(ast_Copy(f), x);
+	pcas_ast_t *before = integral_node(ast_Copy(f), x);
 	work_Step(STEP_INTEGRAL, "By parts", before, rewritten);
 	ast_Cleanup(before);
 
@@ -806,18 +785,18 @@ static bool integrate_all(pcas_ast_t *e, unsigned budget);
 
 /*Evaluates the integral node e in place. Returns true if anything was integrated.*/
 static bool integrate_node(pcas_ast_t *e, unsigned budget) {
-	pcas_ast_t *f, *x, *F, *before;
 	bool progress = false;
 
 	if (budget == 0)
 		return false;
 
-	f = ast_Copy(ast_ChildGet(e, 0));
-	x = ast_Copy(ast_ChildGet(e, 1));
-	before = ast_Copy(e);
+	pcas_ast_t *f = ast_Copy(ast_ChildGet(e, 0));
+	pcas_ast_t *x = ast_Copy(ast_ChildGet(e, 1));
+	pcas_ast_t *before = ast_Copy(e);
 
 	simplify_quietly(f);
 
+	pcas_ast_t *F;
 	if ((F = elementary(f, x)) != NULL) {
 		simplify_quietly(F);
 		work_Step(STEP_INTEGRAL, NULL, before, F);
@@ -866,13 +845,12 @@ static bool integrate_node(pcas_ast_t *e, unsigned budget) {
 }
 
 static bool integrate_all(pcas_ast_t *e, unsigned budget) {
-	pcas_ast_t *child;
 	bool changed = false;
 
 	if (e->type != NODE_OPERATOR)
 		return false;
 
-	for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+	for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next)
 		changed |= integrate_all(child, budget);
 
 	if (isoptype(e, OP_INTEGRAL))
@@ -886,13 +864,11 @@ bool eval_integrals(pcas_ast_t *e) {
 }
 
 bool contains_integral(const pcas_ast_t *e) {
-	pcas_ast_t *child;
-
 	if (isoptype(e, OP_INTEGRAL))
 		return true;
 
 	if (e->type == NODE_OPERATOR) {
-		for (child = opbase(e); child != NULL; child = child->next) {
+		for (const pcas_ast_t *child = opbase(e); child != NULL; child = child->next) {
 			if (contains_integral(child))
 				return true;
 		}
@@ -902,11 +878,9 @@ bool contains_integral(const pcas_ast_t *e) {
 }
 
 static void antiderivative(pcas_ast_t *e, const pcas_ast_t *respect_to, bool constant) {
-	pcas_ast_t *node;
-
 	work_Enter(e);
 
-	node = integral_node(ast_Copy(e), respect_to);
+	pcas_ast_t *node = integral_node(ast_Copy(e), respect_to);
 	eval_integrals(node);
 
 	if (constant && !contains_integral(node)) {

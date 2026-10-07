@@ -115,25 +115,20 @@ mp_rat read_num(
 	const struct Identifier *lookup,
 	unsigned *consumed
 ) {
-	mp_rat num;
-
 	unsigned size = 0;
-	unsigned i;
 
-	char *buffer;
-
-	for (i = index; i < length; i++) {
+	for (unsigned i = index; i < length; i++) {
 		if (is_num(equation[i]))
 			size++;
 		else
 			break;
 	}
 
-	buffer = malloc(size + 1);
+	char *buffer = malloc(size + 1);
 
 	/*Copy digits, but replace Ti's '.' with ascii '.'*/
-	for (i = 0; i < size; i++) {
-		char digit = equation[i + index];
+	for (unsigned i = 0; i < size; i++) {
+		const char digit = equation[i + index];
 
 		if (digit == lookup[TOK_PERIOD].bytes[0])
 			buffer[i] = '.';
@@ -143,7 +138,7 @@ mp_rat read_num(
 
 	buffer[size] = '\0';
 
-	num = num_FromString(buffer);
+	mp_rat num = num_FromString(buffer);
 
 	free(buffer);
 
@@ -159,19 +154,16 @@ TokenType read_type(
 	const struct Identifier *lookup,
 	unsigned *consumed
 ) {
-	unsigned identifier_index;
-
-	for (identifier_index = TOK_PLUS; identifier_index < AMOUNT_TOKENS; identifier_index++) {
-		struct Identifier current = lookup[identifier_index];
+	for (unsigned identifier_index = TOK_PLUS; identifier_index < AMOUNT_TOKENS; identifier_index++) {
+		const struct Identifier current = lookup[identifier_index];
 		bool matches = true;
-		unsigned i;
 
 		/*If there is not enough bytes left in the equation for this multi-byte token*/
 		if (length - index < current.length)
 			continue;
 
 		/*Check if each byte matches*/
-		for (i = index; i < index + current.length; i++) {
+		for (unsigned i = index; i < index + current.length; i++) {
 			matches &= equation[i] == current.bytes[i - index];
 			if (!matches)
 				break;
@@ -247,10 +239,8 @@ pcas_error_t _tokenize(
 	unsigned i = 0;
 
 	while (i < length) {
-		token_t tok;
 		unsigned consumed;
-
-		tok = read_token(equation, i, length, lookup, &consumed);
+		const token_t tok = read_token(equation, i, length, lookup, &consumed);
 
 		if (tok.type == TOK_INVALID)
 			return E_TOK_INVALID;
@@ -272,10 +262,8 @@ pcas_error_t _tokenize(
 }
 
 pcas_error_t tokenize(tokenizer_t *t, const uint8_t *equation, unsigned length, const struct Identifier *lookup) {
-	pcas_error_t err;
-
 	/*Determine the amount of tokens to malloc()*/
-	err = _tokenize(NULL, equation, length, &t->amount, lookup);
+	pcas_error_t err = _tokenize(NULL, equation, length, &t->amount, lookup);
 
 	if (err != E_SUCCESS)
 		return err;
@@ -315,7 +303,7 @@ For example: 5(2 + 3) and 5x
 */
 bool should_multiply_by_next_token(tokenizer_t *tokenizer, unsigned index) {
 	if (index + 1 < tokenizer->amount) {
-		token_t next = tokenizer->tokens[index + 1];
+		const token_t next = tokenizer->tokens[index + 1];
 
 		/*5(2 + x)*/
 		return next.type == TOK_OPEN_PAR
@@ -362,11 +350,9 @@ void translate(pcas_ast_t *e) {
 		case TOK_PROPER: optype(e) = OP_ADD; break;
 		case TOK_POWER: optype(e) = OP_POW; break;
 		case TOK_SCIENTIFIC: {
-			pcas_ast_t *op2;
-
 			optype(e) = OP_MULT;
 
-			op2 = ast_MakeBinary(OP_POW, ast_MakeNumber(num_FromInt(10)), ast_ChildGet(e, 1));
+			pcas_ast_t *op2 = ast_MakeBinary(OP_POW, ast_MakeNumber(num_FromInt(10)), ast_ChildGet(e, 1));
 			ast_ChildRemoveIndex(e, 1);
 			ast_ChildAppend(e, op2);
 
@@ -443,10 +429,6 @@ void translate(pcas_ast_t *e) {
 
 bool collapse_precedence(pcas_stack_t *operators, pcas_stack_t *expressions, TokenType type) {
 	while (operators->top > 0) {
-		pcas_ast_t *collapsed;
-		token_t *op;
-		unsigned i;
-
 		/*Break when we meet the corresponding (*/
 		if (type == TOK_CLOSE_PAR && ((token_t *)stack_Peek(operators))->type == TOK_OPEN_PAR)
 			break;
@@ -460,7 +442,7 @@ bool collapse_precedence(pcas_stack_t *operators, pcas_stack_t *expressions, Tok
 		)
 			break;
 
-		op = stack_Pop(operators);
+		const token_t *op = stack_Pop(operators);
 
 		/*Occurs when we collapse_all() at the end with not enough closing
         parentheses. This is an acceptable TI format, so we accept it too.*/
@@ -469,8 +451,8 @@ bool collapse_precedence(pcas_stack_t *operators, pcas_stack_t *expressions, Tok
 
 		/*Store the token type into the operand type. This will
         Be fixed in make_operator*/
-		collapsed = ast_MakeOperator((OperatorType)op->type);
-		for (i = 0; i < operand_count(op->type); i++) {
+		pcas_ast_t *collapsed = ast_MakeOperator((OperatorType)op->type);
+		for (unsigned i = 0; i < operand_count(op->type); i++) {
 			pcas_ast_t *operand = stack_Pop(expressions);
 
 			if (operand == NULL) {
@@ -526,7 +508,7 @@ unsigned parse_list(
 		bool end = i >= length;
 
 		if (!end) {
-			token_t tok = read_token(equation, i, length, lookup, &consumed);
+			const token_t tok = read_token(equation, i, length, lookup, &consumed);
 
 			if (tok.type == TOK_NUMBER)
 				num_Cleanup(tok.op.num);
@@ -566,24 +548,21 @@ unsigned parse_list(
 
 pcas_ast_t *parse(const uint8_t *equation, unsigned length, const struct Identifier *lookup, pcas_error_t *e) {
 	tokenizer_t tokenizer = {0};
-	pcas_stack_t operators, expressions;
-	pcas_ast_t *root;
-
-	/*Create instances to push on the stacks as pointers*/
-	token_t mult = {TOK_MULTIPLY};
-	token_t open_par = {TOK_OPEN_PAR};
-
-	unsigned i;
 
 	*e = tokenize(&tokenizer, equation, length, lookup);
 
 	if (*e != E_SUCCESS)
 		return NULL;
 
+	pcas_stack_t operators, expressions;
 	stack_Create(&operators);
 	stack_Create(&expressions);
 
-	for (i = 0; i < tokenizer.amount; i++) {
+	/*Create instances to push on the stacks as pointers*/
+	token_t mult = {TOK_MULTIPLY};
+	token_t open_par = {TOK_OPEN_PAR};
+
+	for (unsigned i = 0; i < tokenizer.amount; i++) {
 		token_t *tok = &tokenizer.tokens[i];
 
 		if (tok->type == TOK_OPEN_PAR) {
@@ -644,7 +623,7 @@ pcas_ast_t *parse(const uint8_t *equation, unsigned length, const struct Identif
 
 	parse_assert(collapse_all(&operators, &expressions), E_PARSE_BAD_OPERATOR);
 
-	root = stack_Pop(&expressions);
+	pcas_ast_t *root = stack_Pop(&expressions);
 
 	parse_assert(operators.top == 0, E_GENERIC);
 	parse_assert(expressions.top == 0, E_GENERIC);

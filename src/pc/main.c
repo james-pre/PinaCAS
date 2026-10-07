@@ -49,17 +49,16 @@ void display_help(void) {
 
 /*Trim null terminated string*/
 uint8_t *trim(char *input, unsigned *len) {
-	unsigned i, trimmed_len = 0, trim_index = 0;
-	uint8_t *trimmed;
+	unsigned trimmed_len = 0, trim_index = 0;
 
-	for (i = 0; i < strlen(input) + 1; i++) {
+	for (unsigned i = 0; i < strlen(input) + 1; i++) {
 		if (input[i] != ' ' && input[i] != '\t')
 			trimmed_len++;
 	}
 
-	trimmed = malloc(trimmed_len * sizeof(uint8_t));
+	uint8_t *trimmed = malloc(trimmed_len * sizeof(uint8_t));
 
-	for (i = 0; i < strlen(input) + 1; i++) {
+	for (unsigned i = 0; i < strlen(input) + 1; i++) {
 		if (input[i] != ' ' && input[i] != '\t')
 			trimmed[trim_index++] = (uint8_t)input[i];
 	}
@@ -70,25 +69,18 @@ uint8_t *trim(char *input, unsigned *len) {
 }
 
 int run_gcd(int argc, char **argv) {
-	uint8_t *trimmed_a, *trimmed_b;
-	unsigned trimmed_a_len, trimmed_b_len;
-
-	pcas_error_t err;
-	pcas_ast_t *a, *b, *g;
-
-	uint8_t *output;
-	unsigned output_len;
-
 	if (argc <= 3) {
 		display_help();
 		return -1;
 	}
 
-	trimmed_a = trim(argv[2], &trimmed_a_len);
+	unsigned trimmed_a_len;
+	uint8_t *trimmed_a = trim(argv[2], &trimmed_a_len);
 
 	printf("Parsing \"%s\"\n", trimmed_a);
 
-	a = parse(trimmed_a, trimmed_a_len, str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *a = parse(trimmed_a, trimmed_a_len, str_table, &err);
 
 	printf("%s\n", error_text[err]);
 
@@ -97,11 +89,12 @@ int run_gcd(int argc, char **argv) {
 
 	simplify(a, SIMP_ALL);
 
-	trimmed_b = trim(argv[3], &trimmed_b_len);
+	unsigned trimmed_b_len;
+	uint8_t *trimmed_b = trim(argv[3], &trimmed_b_len);
 
 	printf("Parsing \"%s\"\n", trimmed_b);
 
-	b = parse(trimmed_b, trimmed_b_len, str_table, &err);
+	pcas_ast_t *b = parse(trimmed_b, trimmed_b_len, str_table, &err);
 
 	printf("%s\n", error_text[err]);
 
@@ -112,7 +105,7 @@ int run_gcd(int argc, char **argv) {
 
 	printf("Computing gcd...\n\n");
 
-	g = gcd(a, b);
+	pcas_ast_t *g = gcd(a, b);
 
 	simplify(g, SIMP_ALL);
 	simplify_canonical_form(g, CANONICAL_ALL);
@@ -121,7 +114,8 @@ int run_gcd(int argc, char **argv) {
 
 	printf("\n");
 
-	output = export_to_binary(g, &output_len, str_table, &err);
+	unsigned output_len;
+	uint8_t *output = export_to_binary(g, &output_len, str_table, &err);
 
 	if (err == E_SUCCESS && output != NULL) {
 		printf("Output: ");
@@ -141,25 +135,18 @@ int run_gcd(int argc, char **argv) {
 }
 extern bool simplify_periodic(pcas_ast_t *e);
 int run_simplify(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len;
-
-	pcas_error_t err;
-	pcas_ast_t *e;
-
-	uint8_t *output;
-	unsigned output_len;
-
 	if (argc <= 2) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *e = parse(trimmed, trimmed_len, str_table, &err);
 
 	printf("%s\n", error_text[err]);
 
@@ -178,7 +165,8 @@ int run_simplify(int argc, char **argv) {
 
 		printf("\n");
 
-		output = export_to_binary(e, &output_len, str_table, &err);
+		unsigned output_len;
+		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
 
 		if (err == E_SUCCESS && output != NULL) {
 			printf("Output: ");
@@ -195,25 +183,18 @@ int run_simplify(int argc, char **argv) {
 }
 
 int run_factor(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len;
-
-	pcas_error_t err;
-	pcas_ast_t *e;
-
-	uint8_t *output;
-	unsigned output_len;
-
 	if (argc <= 2) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *e = parse(trimmed, trimmed_len, str_table, &err);
 
 	printf("%s\n", error_text[err]);
 
@@ -241,7 +222,8 @@ int run_factor(int argc, char **argv) {
 		dbg_print_tree(e, 4);
 		printf("\n");
 
-		output = export_to_binary(e, &output_len, str_table, &err);
+		unsigned output_len;
+		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
 
 		if (err == E_SUCCESS && output != NULL) {
 			printf("Output: ");
@@ -258,25 +240,18 @@ int run_factor(int argc, char **argv) {
 }
 
 int run_expand(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len;
-
-	pcas_error_t err;
-	pcas_ast_t *e;
-
-	uint8_t *output;
-	unsigned output_len;
-
 	if (argc <= 2) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *e = parse(trimmed, trimmed_len, str_table, &err);
 
 	printf("%s\n", error_text[err]);
 
@@ -304,7 +279,8 @@ int run_expand(int argc, char **argv) {
 		dbg_print_tree(e, 4);
 		printf("\n");
 
-		output = export_to_binary(e, &output_len, str_table, &err);
+		unsigned output_len;
+		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
 
 		if (err == E_SUCCESS && output != NULL) {
 			printf("Output: ");
@@ -321,17 +297,13 @@ int run_expand(int argc, char **argv) {
 }
 
 int run_test(int argc, char **argv) {
-	unsigned len, i, failed = 0, passed = 0;
-	test_t **arr;
-
-	clock_t delta;
-
 	if (argc < 3) {
 		display_help();
 		return -1;
 	}
 
-	arr = test_Load(argv[2], &len);
+	unsigned len, failed = 0, passed = 0;
+	test_t **arr = test_Load(argv[2], &len);
 
 	if (arr == NULL) {
 		printf("Could not load test file.\n");
@@ -340,8 +312,8 @@ int run_test(int argc, char **argv) {
 
 	printf("Running tests...\n");
 
-	delta = clock();
-	for (i = 0; i < len; i++) {
+	clock_t delta = clock();
+	for (unsigned i = 0; i < len; i++) {
 		test_t *t = arr[i];
 		printf("Running test %d/%d on line %d... ", i + 1, len, t->line);
 		if (!test_Run(t)) {
@@ -368,23 +340,18 @@ int run_test(int argc, char **argv) {
 }
 
 int run_derivative(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len;
-
-	pcas_error_t err;
-	pcas_ast_t *e = NULL, *respect_to = NULL, *at = NULL;
-
-	uint8_t *output;
-	unsigned output_len;
-
 	if (argc <= 3) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
+	pcas_ast_t *respect_to = NULL, *at = NULL;
+
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
 	printf("Parsing \"%s\"\n", trimmed);
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	pcas_error_t err;
+	pcas_ast_t *e = parse(trimmed, trimmed_len, str_table, &err);
 	printf("%s\n", error_text[err]);
 	free(trimmed);
 
@@ -434,7 +401,8 @@ int run_derivative(int argc, char **argv) {
 		dbg_print_tree(e, 4);
 		printf("\n");
 
-		output = export_to_binary(e, &output_len, str_table, &err);
+		unsigned output_len;
+		uint8_t *output = export_to_binary(e, &output_len, str_table, &err);
 
 		if (err == E_SUCCESS && output != NULL) {
 			printf("Output: ");
@@ -463,11 +431,11 @@ static void print_ast(pcas_ast_t *e) {
 }
 
 static void print_work(pcas_work_t *w) {
-	pcas_step_t *step, *previous = NULL;
+	const pcas_step_t *previous = NULL;
 
 	printf("Work:\n\n");
 
-	for (step = w->first; step != NULL; previous = step, step = step->next) {
+	for (pcas_step_t *step = w->first; step != NULL; previous = step, step = step->next) {
 		ts_box_t *line = work_Layout(step, previous != NULL && previous->type == STEP_STATE);
 
 		if (step->text != NULL)
@@ -483,19 +451,17 @@ static void print_work(pcas_work_t *w) {
 }
 
 int run_integral(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len;
-
-	pcas_error_t err;
-	pcas_ast_t *e = NULL, *respect_to = NULL;
-
 	if (argc <= 3) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
-	e = parse(trimmed, trimmed_len, str_table, &err);
+	pcas_ast_t *respect_to = NULL;
+
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	pcas_error_t err;
+	pcas_ast_t *e = parse(trimmed, trimmed_len, str_table, &err);
 	free(trimmed);
 
 	if (err == E_SUCCESS) {
@@ -526,20 +492,17 @@ int run_integral(int argc, char **argv) {
 #define MAX_ITEMS (DE_MAX_CONDITIONS + 1)
 
 int run_de(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len, count = 0;
-
-	pcas_error_t err;
-	pcas_ast_t *items[MAX_ITEMS], *x = NULL, *solution = NULL;
-	pcas_de_t de;
-
 	if (argc <= 2) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
-	count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
+	pcas_ast_t *items[MAX_ITEMS], *x = NULL, *solution = NULL;
+
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	pcas_error_t err;
+	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
 	free(trimmed);
 
 	if (err == E_SUCCESS) {
@@ -553,6 +516,7 @@ int run_de(int argc, char **argv) {
 	}
 
 	if (err == E_SUCCESS && count > 0 && items[0] != NULL && x != NULL) {
+		pcas_de_t de;
 		err = de_LoadList(&de, items, count, x);
 
 		if (err == E_SUCCESS) {
@@ -605,21 +569,18 @@ int run_de(int argc, char **argv) {
 }
 
 int run_verify(int argc, char **argv) {
-	uint8_t *trimmed;
-	unsigned trimmed_len, count, i;
-
-	pcas_error_t err;
-	pcas_ast_t *items[MAX_ITEMS], *solution = NULL, *x = NULL;
-	pcas_de_t de;
-	bool satisfied = false;
-
 	if (argc <= 3) {
 		display_help();
 		return -1;
 	}
 
-	trimmed = trim(argv[2], &trimmed_len);
-	count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
+	pcas_ast_t *items[MAX_ITEMS], *solution = NULL, *x = NULL;
+	bool satisfied = false;
+
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	pcas_error_t err;
+	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
 	free(trimmed);
 
 	if (err == E_SUCCESS) {
@@ -639,6 +600,7 @@ int run_verify(int argc, char **argv) {
 	}
 
 	if (err == E_SUCCESS && count > 0 && items[0] != NULL && solution != NULL && x != NULL) {
+		pcas_de_t de;
 		err = de_LoadList(&de, items, count, x);
 
 		if (err == E_SUCCESS)
@@ -651,7 +613,7 @@ int run_verify(int argc, char **argv) {
 		printf("%s\n", error_text[err]);
 	}
 
-	for (i = 0; i < count; i++)
+	for (unsigned i = 0; i < count; i++)
 		ast_Cleanup(items[i]);
 	ast_Cleanup(solution);
 	ast_Cleanup(x);
@@ -660,9 +622,8 @@ int run_verify(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	int ret;
 	pcas_work_t work;
-	bool show_work = argc > 1 && !strcmp(argv[1], "--work");
+	const bool show_work = argc > 1 && !strcmp(argv[1], "--work");
 
 	if (show_work) {
 		argc--;
@@ -671,6 +632,7 @@ int main(int argc, char **argv) {
 	}
 
 	if (argc > 1) {
+		int ret;
 		if (!strcmp(argv[1], "test"))
 			ret = run_test(argc, argv);
 		else if (!strcmp(argv[1], "simplify"))

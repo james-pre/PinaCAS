@@ -35,13 +35,12 @@ static free_block_t *large;
 static void (*on_failure)(void);
 
 void heap_Init(void) {
-	size_t free_ram = os_MemChk(NULL);
-	uint8_t *block;
+	const size_t free_ram = os_MemChk(NULL);
 
 	if (region_count > 1 || free_ram <= RAM_MARGIN + SMALL_LIMIT)
 		return;
 
-	block = ram_Reserve(free_ram - RAM_MARGIN);
+	uint8_t *block = ram_Reserve(free_ram - RAM_MARGIN);
 	regions[region_count].next = block;
 	regions[region_count].end = block + free_ram - RAM_MARGIN;
 	region_count++;
@@ -69,10 +68,8 @@ static void release(free_block_t *block) {
 
 /*Takes a block of at least total bytes from the large list, splitting off the rest*/
 static free_block_t *take_large(size_t total) {
-	free_block_t **link, *block, *rest;
-
-	for (link = &large; *link != NULL; link = &(*link)->next) {
-		block = *link;
+	for (free_block_t **link = &large; *link != NULL; link = &(*link)->next) {
+		free_block_t *block = *link;
 
 		if (block->size < total)
 			continue;
@@ -80,7 +77,7 @@ static free_block_t *take_large(size_t total) {
 		*link = block->next;
 
 		if (block->size - total >= sizeof(free_block_t)) {
-			rest = (free_block_t *)((uint8_t *)block + total);
+			free_block_t *rest = (free_block_t *)((uint8_t *)block + total);
 			rest->size = block->size - total;
 			block->size = total;
 			release(rest);
@@ -93,12 +90,9 @@ static free_block_t *take_large(size_t total) {
 }
 
 static free_block_t *bump(size_t total) {
-	free_block_t *block;
-	unsigned i;
-
-	for (i = 0; i < region_count; i++) {
+	for (unsigned i = 0; i < region_count; i++) {
 		if ((size_t)(regions[i].end - regions[i].next) >= total) {
-			block = (free_block_t *)regions[i].next;
+			free_block_t *block = (free_block_t *)regions[i].next;
 			regions[i].next += total;
 			block->size = total;
 			return block;
@@ -128,19 +122,17 @@ static free_block_t *merge(free_block_t *a, free_block_t *b) {
 }
 
 static free_block_t *sort(free_block_t *list) {
-	free_block_t *slow, *fast, *second;
-
 	if (list == NULL || list->next == NULL)
 		return list;
 
-	slow = list;
-	fast = list->next;
+	free_block_t *slow = list;
+	free_block_t *fast = list->next;
 	while (fast != NULL && fast->next != NULL) {
 		slow = slow->next;
 		fast = fast->next->next;
 	}
 
-	second = slow->next;
+	free_block_t *second = slow->next;
 	slow->next = NULL;
 
 	return merge(sort(list), sort(second));
@@ -148,10 +140,10 @@ static free_block_t *sort(free_block_t *list) {
 
 /*Joins adjacent free blocks, returns those at the end of a region to it, and refills the lists*/
 static void coalesce(void) {
-	free_block_t *all = large, *block, *next;
-	unsigned i;
+	free_block_t *all = large;
 
-	for (i = 0; i < BINS; i++) {
+	for (unsigned i = 0; i < BINS; i++) {
+		free_block_t *block;
 		while ((block = bins[i]) != NULL) {
 			bins[i] = block->next;
 			block->next = all;
@@ -162,7 +154,7 @@ static void coalesce(void) {
 	large = NULL;
 	all = sort(all);
 
-	for (block = all; block != NULL; block = next) {
+	for (free_block_t *block = all, *next; block != NULL; block = next) {
 		while (block->next != NULL && (uint8_t *)block + block->size == (uint8_t *)block->next) {
 			block->size += block->next->size;
 			block->next = block->next->next;
@@ -170,6 +162,7 @@ static void coalesce(void) {
 
 		next = block->next;
 
+		unsigned i;
 		for (i = 0; i < region_count; i++) {
 			if ((uint8_t *)block + block->size == regions[i].next) {
 				regions[i].next = (uint8_t *)block;
@@ -200,7 +193,7 @@ static free_block_t *allocate(size_t total) {
 }
 
 void *malloc(size_t size) {
-	size_t total = block_size(size);
+	const size_t total = block_size(size);
 	free_block_t *block = allocate(total);
 
 	if (block == NULL) {
@@ -223,18 +216,15 @@ void free(void *pointer) {
 }
 
 void *realloc(void *pointer, size_t size) {
-	free_block_t *block;
-	void *moved;
-
 	if (pointer == NULL)
 		return malloc(size);
 
-	block = (free_block_t *)((uint8_t *)pointer - HEADER);
+	free_block_t *block = (free_block_t *)((uint8_t *)pointer - HEADER);
 
 	if (block->size >= block_size(size))
 		return pointer;
 
-	moved = malloc(size);
+	void *moved = malloc(size);
 	if (moved != NULL) {
 		memcpy(moved, pointer, block->size - HEADER);
 		free(pointer);
@@ -244,19 +234,17 @@ void *realloc(void *pointer, size_t size) {
 }
 
 size_t heap_Available(void) {
-	free_block_t *block;
 	size_t available = 0;
-	unsigned i;
 
-	for (i = 0; i < region_count; i++)
+	for (unsigned i = 0; i < region_count; i++)
 		available += regions[i].end - regions[i].next;
 
-	for (i = 0; i < BINS; i++) {
-		for (block = bins[i]; block != NULL; block = block->next)
+	for (unsigned i = 0; i < BINS; i++) {
+		for (const free_block_t *block = bins[i]; block != NULL; block = block->next)
 			available += block->size;
 	}
 
-	for (block = large; block != NULL; block = block->next)
+	for (const free_block_t *block = large; block != NULL; block = block->next)
 		available += block->size;
 
 	return available;

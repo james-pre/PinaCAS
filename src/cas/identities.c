@@ -169,8 +169,7 @@ typedef pcas_ast_t **Dictionary;
 #define dict_Get(dict, ast_symbol) dict[(ast_symbol)->op.symbol - 'A']
 
 void dict_Copy(Dictionary dest, Dictionary source) {
-	unsigned i;
-	for (i = 0; i < AMOUNT_SYMBOLS; i++) {
+	for (unsigned i = 0; i < AMOUNT_SYMBOLS; i++) {
 		if (source[i] != NULL)
 			dest[i] = ast_Copy(source[i]);
 		else
@@ -183,8 +182,7 @@ void dict_Write(Dictionary dest, Dictionary source) {
 }
 
 void dict_Cleanup(Dictionary dict) {
-	unsigned i;
-	for (i = 0; i < AMOUNT_SYMBOLS; i++) {
+	for (unsigned i = 0; i < AMOUNT_SYMBOLS; i++) {
 		if (dict[i] != NULL)
 			ast_Cleanup(dict[i]);
 		dict[i] = NULL;
@@ -193,17 +191,15 @@ void dict_Cleanup(Dictionary dict) {
 
 /*Simplifies 2N, 4 to N, 2 to correctly set N*/
 bool divide_numerical_constants(pcas_ast_t *id, pcas_ast_t *e) {
-	pcas_ast_t *child;
-
 	if (!isoptype(id, OP_MULT))
 		return false;
 
 	if (is_ast_int(e, 0))
 		return false;
 
-	for (child = ast_ChildGet(id, 0); child != NULL; child = child->next) {
+	for (const pcas_ast_t *child = ast_ChildGet(id, 0); child != NULL; child = child->next) {
 		if (child->type == NODE_NUMBER) {
-			bool negates_e = is_ast_int(child, -1) && !is_negative_for_sure(e);
+			const bool negates_e = is_ast_int(child, -1) && !is_negative_for_sure(e);
 
 			replace_node(e, ast_MakeBinary(OP_DIV, ast_Copy(e), ast_Copy(child)));
 			replace_node(id, ast_MakeBinary(OP_DIV, ast_Copy(id), ast_Copy(child)));
@@ -228,8 +224,7 @@ void fill(pcas_ast_t *to, Dictionary dict) {
 		if (dict_Get(dict, to) != NULL)
 			replace_node(to, ast_Copy(dict_Get(dict, to)));
 	} else if (to->type == NODE_OPERATOR) {
-		pcas_ast_t *child;
-		for (child = ast_ChildGet(to, 0); child != NULL; child = child->next) {
+		for (pcas_ast_t *child = ast_ChildGet(to, 0); child != NULL; child = child->next) {
 			fill(child, dict);
 		}
 	}
@@ -265,14 +260,11 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 
 		if (is_op_commutative(optype(id))) {
 			/*Order does not matter*/
-			unsigned i, j;
-			bool matched, combined = false, *matched_e_children, *matched_id_children;
+			bool combined = false;
 			char combined_character = '\0';
 
-			pcas_ast_t *id_copy, *e_copy;
-
-			id_copy = ast_Copy(id);
-			e_copy = ast_Copy(e);
+			pcas_ast_t *id_copy = ast_Copy(id);
+			pcas_ast_t *e_copy = ast_Copy(e);
 
 			/*Divide numerical constants from each side.*/
 			while (divide_numerical_constants(id_copy, e_copy))
@@ -294,8 +286,8 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 				replace_node(id_copy, ast_MakeUnary(id->op.operator.type, ast_Copy(id_copy)));
 
 			/*Remove the symbol. Do not simplify commutative. id_copy may be a node with one child.*/
-			for (i = 0; i < ast_ChildLength(id_copy); i++) {
-				pcas_ast_t *child = ast_ChildGet(id_copy, i);
+			for (unsigned i = 0; i < ast_ChildLength(id_copy); i++) {
+				const pcas_ast_t *child = ast_ChildGet(id_copy, i);
 
 				if (child->type == NODE_SYMBOL && child->op.symbol < SYM_IMAG && child->op.symbol != 'N') {
 					combined = true;
@@ -333,19 +325,20 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 
 			/*Loop through all children and match them and record which children got matched.*/
 
-			matched_e_children = calloc(ast_ChildLength(e_copy), sizeof(bool));
-			matched_id_children = calloc(ast_ChildLength(id_copy), sizeof(bool));
+			bool *matched_e_children = calloc(ast_ChildLength(e_copy), sizeof(bool));
+			bool *matched_id_children = calloc(ast_ChildLength(id_copy), sizeof(bool));
+			bool matched;
 
 			do {
 				matched = false;
 
-				for (i = 0; i < ast_ChildLength(e_copy); i++) {
+				for (unsigned i = 0; i < ast_ChildLength(e_copy); i++) {
 					pcas_ast_t *e_child = ast_ChildGet(e_copy, i);
 
 					if (matched_e_children[i])
 						continue;
 
-					for (j = 0; j < ast_ChildLength(id_copy); j++) {
+					for (unsigned j = 0; j < ast_ChildLength(id_copy); j++) {
 						pcas_ast_t *dict_copy_copy[AMOUNT_SYMBOLS];
 						pcas_ast_t *id_child = ast_ChildGet(id_copy, j);
 
@@ -376,17 +369,15 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 			/*Check if we have matched every id child. We don't have to match
             every e child due to commutative nature.*/
 			matched = true;
-			for (i = 0; i < ast_ChildLength(id_copy); i++)
+			for (unsigned i = 0; i < ast_ChildLength(id_copy); i++)
 				matched &= matched_id_children[i];
 
 			/*Make the grouped variable set equal to the nodes not included matched_e_children*/
 			if (matched && combined) {
-				pcas_ast_t *c;
+				pcas_ast_t *c = ast_MakeOperator(id->op.operator.type);
 
-				c = ast_MakeOperator(id->op.operator.type);
-
-				for (i = 0; i < ast_ChildLength(e_copy); i++) {
-					pcas_ast_t *child = ast_ChildGet(e_copy, i);
+				for (unsigned i = 0; i < ast_ChildLength(e_copy); i++) {
+					const pcas_ast_t *child = ast_ChildGet(e_copy, i);
 
 					if (!matched_e_children[i])
 						ast_ChildAppend(c, ast_Copy(child));
@@ -429,8 +420,6 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 
 		} else {
 			/*Order and length do matter*/
-			int i;
-
 			if (e->type != NODE_OPERATOR) {
 				dict_Cleanup(dict_copy);
 				return false;
@@ -442,7 +431,7 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
 			}
 
 			/*Reverse loop to better guess variables for derivative nodes*/
-			for (i = ast_ChildLength(e) - 1; i >= 0; i--) {
+			for (int i = ast_ChildLength(e) - 1; i >= 0; i--) {
 				pcas_ast_t *e_child = ast_ChildGet(e, i);
 				pcas_ast_t *id_child = ast_ChildGet(id, i);
 				if (!matches(id_child, e_child, dict_copy)) {
@@ -466,7 +455,6 @@ bool matches(pcas_ast_t *id, pcas_ast_t *e, Dictionary dict) {
     Requires that constants are already evaluated.
 */
 bool id_Execute(pcas_ast_t *e, pcas_id_t *id, bool recursive) {
-	pcas_ast_t *child;
 	pcas_ast_t *dict[AMOUNT_SYMBOLS] = {0};
 	bool changed = false;
 
@@ -490,7 +478,7 @@ bool id_Execute(pcas_ast_t *e, pcas_id_t *id, bool recursive) {
 	}
 
 	if (recursive && e->type == NODE_OPERATOR) {
-		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+		for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next)
 			changed |= id_Execute(child, id, recursive);
 	}
 

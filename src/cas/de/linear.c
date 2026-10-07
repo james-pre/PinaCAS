@@ -12,14 +12,12 @@ static pcas_ast_t *reduced(pcas_ast_t *e) {
 
 /*Simplifies e, keeping the smallest of its simplified, expanded and identity-reduced forms*/
 static pcas_ast_t *simplest(pcas_ast_t *e) {
-	pcas_ast_t *candidate;
-
 	work_Pause();
 	simplify(e, SIMP_BASIC);
 	expand_if_smaller(e);
 	work_Resume();
 
-	candidate = reduced(ast_Copy(e));
+	pcas_ast_t *candidate = reduced(ast_Copy(e));
 
 	if (node_count(candidate) < node_count(e))
 		replace_node(e, candidate);
@@ -63,18 +61,17 @@ static void condition_rows(
 	unsigned n,
 	pcas_ast_t *matrix[][DE_MAX_ORDER + 1]
 ) {
-	pcas_ast_t *derivatives[DE_MAX_ORDER], *e, *at, *chain, *zero = integer(0);
-	unsigned highest = 0, i, j, k;
-	pcas_condition_t *c;
+	pcas_ast_t *derivatives[DE_MAX_ORDER], *zero = integer(0);
+	unsigned highest = 0;
 
-	for (i = 0; i < de->condition_count; i++) {
+	for (unsigned i = 0; i < de->condition_count; i++) {
 		if (de->conditions[i].order > highest)
 			highest = de->conditions[i].order;
 	}
 
 	derivatives[0] = ast_Copy(general);
 
-	for (k = 1; k <= highest; k++) {
+	for (unsigned k = 1; k <= highest; k++) {
 		derivatives[k] = ast_Copy(derivatives[k - 1]);
 
 		work_Pause();
@@ -82,27 +79,27 @@ static void condition_rows(
 		work_Resume();
 		simplest(derivatives[k]);
 
-		e = de_Derivative(de->y, k);
+		pcas_ast_t *e = de_Derivative(de->y, k);
 		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, e, derivatives[k]);
 		ast_Cleanup(e);
 	}
 
-	for (i = 0; i < de->condition_count; i++) {
-		c = &de->conditions[i];
-		e = ast_Copy(derivatives[c->order]);
+	for (unsigned i = 0; i < de->condition_count; i++) {
+		const pcas_condition_t *c = &de->conditions[i];
+		pcas_ast_t *e = ast_Copy(derivatives[c->order]);
 
 		work_Pause();
 		substitute(e, de->x, c->at);
 		work_Resume();
 		reduced(e);
 
-		at = ast_MakeBinary(OP_AT, de_Derivative(de->y, c->order), ast_Copy(c->at));
-		chain = ast_MakeBinary(OP_EQUALS, ast_Copy(e), ast_Copy(c->value));
+		pcas_ast_t *at = ast_MakeBinary(OP_AT, de_Derivative(de->y, c->order), ast_Copy(c->at));
+		pcas_ast_t *chain = ast_MakeBinary(OP_EQUALS, ast_Copy(e), ast_Copy(c->value));
 		work_Step(STEP_EQUATION, i == 0 ? "Initial conditions" : NULL, at, chain);
 		ast_Cleanup(at);
 		ast_Cleanup(chain);
 
-		for (j = 0; j < n; j++) {
+		for (unsigned j = 0; j < n; j++) {
 			matrix[i][j] = ast_Copy(e);
 
 			work_Pause();
@@ -112,50 +109,50 @@ static void condition_rows(
 		}
 
 		work_Pause();
-		for (j = 0; j < n; j++)
+		for (unsigned j = 0; j < n; j++)
 			substitute(e, constants[j], zero);
 		work_Resume();
 
 		matrix[i][n] = reduced(difference(ast_Copy(c->value), e));
 	}
 
-	for (k = 0; k <= highest; k++)
+	for (unsigned k = 0; k <= highest; k++)
 		ast_Cleanup(derivatives[k]);
 	ast_Cleanup(zero);
 }
 
 /*Reduces the augmented matrix with Gauss-Jordan elimination, setting pivots to the column of each pivot row, and returns the number of pivot rows*/
 static unsigned eliminate(pcas_ast_t *matrix[][DE_MAX_ORDER + 1], unsigned rows, unsigned n, unsigned *pivots) {
-	pcas_ast_t *swap, *pivot, *factor;
-	unsigned rank = 0, i, j, k;
+	unsigned rank = 0;
 
-	for (j = 0; j < n && rank < rows; j++) {
-		for (i = rank; i < rows && is_zero(matrix[i][j]); i++)
-			;
+	for (unsigned j = 0; j < n && rank < rows; j++) {
+		unsigned row = rank;
+		while (row < rows && is_zero(matrix[row][j]))
+			row++;
 
-		if (i == rows)
+		if (row == rows)
 			continue;
 
-		for (k = 0; k <= n; k++) {
-			swap = matrix[i][k];
-			matrix[i][k] = matrix[rank][k];
+		for (unsigned k = 0; k <= n; k++) {
+			pcas_ast_t *swap = matrix[row][k];
+			matrix[row][k] = matrix[rank][k];
 			matrix[rank][k] = swap;
 		}
 
-		pivot = matrix[rank][j];
-		for (k = 0; k <= n; k++) {
+		pcas_ast_t *pivot = matrix[rank][j];
+		for (unsigned k = 0; k <= n; k++) {
 			if (k != j)
 				matrix[rank][k] = reduced(ast_MakeBinary(OP_DIV, matrix[rank][k], ast_Copy(pivot)));
 		}
 		ast_Cleanup(pivot);
 		matrix[rank][j] = integer(1);
 
-		for (i = 0; i < rows; i++) {
+		for (unsigned i = 0; i < rows; i++) {
 			if (i == rank || is_zero(matrix[i][j]))
 				continue;
 
-			factor = matrix[i][j];
-			for (k = 0; k <= n; k++) {
+			pcas_ast_t *factor = matrix[i][j];
+			for (unsigned k = 0; k <= n; k++) {
 				if (k != j) {
 					matrix[i][k] = reduced(
 						difference(matrix[i][k], ast_MakeBinary(OP_MULT, ast_Copy(factor), ast_Copy(matrix[rank][k])))
@@ -180,25 +177,25 @@ static pcas_error_t apply_conditions(
 	unsigned n,
 	pcas_ast_t **solution
 ) {
-	pcas_ast_t *matrix[DE_MAX_CONDITIONS][DE_MAX_ORDER + 1], *value;
-	unsigned pivots[DE_MAX_CONDITIONS], rows = de->condition_count, rank, i, k, r;
+	pcas_ast_t *matrix[DE_MAX_CONDITIONS][DE_MAX_ORDER + 1];
+	unsigned pivots[DE_MAX_CONDITIONS];
+	const unsigned rows = de->condition_count;
 	pcas_error_t err = E_SUCCESS;
-	bool pivot;
 
 	condition_rows(de, general, constants, n, matrix);
-	rank = eliminate(matrix, rows, n, pivots);
+	const unsigned rank = eliminate(matrix, rows, n, pivots);
 
-	for (i = rank; i < rows; i++) {
+	for (unsigned i = rank; i < rows; i++) {
 		if (!is_zero(matrix[i][n]))
 			err = E_DE_NO_SOLUTION;
 	}
 
-	for (i = 0; i < rank && err == E_SUCCESS; i++) {
-		value = ast_Copy(matrix[i][n]);
+	for (unsigned i = 0; i < rank && err == E_SUCCESS; i++) {
+		pcas_ast_t *value = ast_Copy(matrix[i][n]);
 
-		for (k = 0; k < n; k++) {
-			pivot = false;
-			for (r = 0; r < rank; r++)
+		for (unsigned k = 0; k < n; k++) {
+			bool pivot = false;
+			for (unsigned r = 0; r < rank; r++)
 				pivot |= pivots[r] == k;
 
 			if (!pivot && !is_zero(matrix[i][k]))
@@ -216,8 +213,8 @@ static pcas_error_t apply_conditions(
 		ast_Cleanup(value);
 	}
 
-	for (i = 0; i < rows; i++) {
-		for (k = 0; k <= n; k++)
+	for (unsigned i = 0; i < rows; i++) {
+		for (unsigned k = 0; k <= n; k++)
 			ast_Cleanup(matrix[i][k]);
 	}
 
@@ -255,15 +252,15 @@ static pcas_ast_t *quotient(const pcas_ast_t *a, const pcas_ast_t *b) {
 
 /*Returns a times b, expanded term by term when that leaves fewer nodes*/
 static pcas_ast_t *distribute(const pcas_ast_t *a, const pcas_ast_t *b) {
-	pcas_ast_t *product = ast_MakeBinary(OP_MULT, ast_Copy(a), ast_Copy(b)), *sum, *term;
+	pcas_ast_t *product = ast_MakeBinary(OP_MULT, ast_Copy(a), ast_Copy(b));
 
 	work_Pause();
 	simplify(product, SIMP_BASIC);
 
 	if (isoptype(b, OP_ADD)) {
-		sum = ast_MakeOperator(OP_ADD);
+		pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
 
-		for (term = opbase(b); term != NULL; term = term->next) {
+		for (const pcas_ast_t *term = opbase(b); term != NULL; term = term->next) {
 			ast_ChildAppend(sum, ast_MakeBinary(OP_MULT, ast_Copy(a), ast_Copy(term)));
 			simplify(ast_ChildGetLast(sum), SIMP_BASIC);
 		}
@@ -287,9 +284,8 @@ static pcas_ast_t *distribute(const pcas_ast_t *a, const pcas_ast_t *b) {
 /*Returns the sum of each constant times its basis function*/
 static pcas_ast_t *combination(pcas_ast_t **constants, pcas_ast_t **basis, unsigned size) {
 	pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
-	unsigned i;
 
-	for (i = 0; i < size; i++)
+	for (unsigned i = 0; i < size; i++)
 		ast_ChildAppend(sum, ast_MakeBinary(OP_MULT, ast_Copy(constants[i]), ast_Copy(basis[i])));
 
 	return tidy(sum);
@@ -323,12 +319,11 @@ static pcas_error_t solve_with_basis(
 /*Returns preferred, or a symbol that does not appear in the equation or taken if preferred does*/
 static pcas_ast_t *pick_symbol(const pcas_de_t *de, Symbol preferred, const pcas_ast_t *taken) {
 	pcas_ast_t *scope = ast_MakeOperator(OP_ADD);
-	Symbol symbol;
 
 	ast_ChildAppend(scope, ast_Copy(de->equation));
 	ast_ChildAppend(scope, ast_Copy(de->x));
 	ast_ChildAppend(scope, ast_Copy(taken));
-	symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
+	const Symbol symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
 	ast_Cleanup(scope);
 
 	return ast_MakeSymbol(symbol);
@@ -336,12 +331,12 @@ static pcas_ast_t *pick_symbol(const pcas_de_t *de, Symbol preferred, const pcas
 
 /*Returns the constant slope of e in x if e is linear in x, otherwise NULL*/
 static pcas_ast_t *linear_slope(const pcas_de_t *de, const pcas_ast_t *e) {
-	pcas_ast_t *slope = ast_Copy(e), *second;
+	pcas_ast_t *slope = ast_Copy(e);
 
 	work_Pause();
 	derivative(slope, de->x, de->x);
 	simplify(slope, SIMP_BASIC);
-	second = ast_Copy(slope);
+	pcas_ast_t *second = ast_Copy(slope);
 	derivative(second, de->x, de->x);
 	simplify(second, SIMP_BASIC);
 	work_Resume();
@@ -364,26 +359,24 @@ static bool forcing_form(
 	pcas_ast_t **rate,
 	pcas_ast_t **frequency
 ) {
-	const pcas_ast_t *factor;
-	pcas_ast_t *slope;
-	unsigned i, count;
-	mp_small n;
 	bool form = true;
 
 	if (isoptype(term, OP_DIV) && !involves(opbase(term)->next, de->x))
 		term = opbase(term);
 
-	count = isoptype(term, OP_MULT) ? ast_ChildLength(term) : 1;
+	const unsigned count = isoptype(term, OP_MULT) ? ast_ChildLength(term) : 1;
 	*degree = 0;
 	*rate = integer(0);
 	*frequency = NULL;
 
-	for (i = 0; i < count && form; i++) {
-		factor = isoptype(term, OP_MULT) ? ast_ChildGet(term, i) : term;
+	for (unsigned i = 0; i < count && form; i++) {
+		const pcas_ast_t *factor = isoptype(term, OP_MULT) ? ast_ChildGet(term, i) : term;
 
 		if (!involves(factor, de->x))
 			continue;
 
+		pcas_ast_t *slope;
+		mp_small n;
 		if (ast_Compare(factor, de->x)) {
 			(*degree)++;
 		} else if (
@@ -433,16 +426,15 @@ static unsigned root_multiplicity(
 	const pcas_ast_t *rate,
 	const pcas_ast_t *frequency
 ) {
-	pcas_ast_t *re, *im;
-	unsigned i, multiplicity = 0;
-	bool real = is_ast_int(frequency, 0);
+	unsigned multiplicity = 0;
+	const bool real = is_ast_int(frequency, 0);
 
-	for (i = 0; i < count && multiplicity == 0; i++) {
+	for (unsigned i = 0; i < count && multiplicity == 0; i++) {
 		if ((roots[i].im == NULL) != real)
 			continue;
 
-		re = difference(ast_Copy(roots[i].re), ast_Copy(rate));
-		im = real ? integer(0) : difference(ast_Copy(roots[i].im), ast_Copy(frequency));
+		pcas_ast_t *re = difference(ast_Copy(roots[i].re), ast_Copy(rate));
+		pcas_ast_t *im = real ? integer(0) : difference(ast_Copy(roots[i].im), ast_Copy(frequency));
 
 		if (is_zero(re) && is_zero(im))
 			multiplicity = roots[i].multiplicity;
@@ -456,14 +448,13 @@ static unsigned root_multiplicity(
 
 /*Returns the factors of term that involve x, or 1*/
 static pcas_ast_t *function_part(const pcas_de_t *de, const pcas_ast_t *term) {
-	pcas_ast_t *part, *child;
-
 	if (!involves(term, de->x))
 		return integer(1);
 
+	pcas_ast_t *part;
 	if (isoptype(term, OP_MULT)) {
 		part = ast_MakeOperator(OP_MULT);
-		for (child = opbase(term); child != NULL; child = child->next) {
+		for (const pcas_ast_t *child = opbase(term); child != NULL; child = child->next) {
 			if (involves(child, de->x))
 				ast_ChildAppend(part, ast_Copy(child));
 		}
@@ -492,14 +483,12 @@ static pcas_error_t match_coefficients(
 ) {
 	pcas_ast_t *derivatives[DE_MAX_ORDER + 1], *functions[MAX_ROWS], *sums[MAX_ROWS],
 		*matrix[MAX_ROWS][DE_MAX_ORDER + 1];
-	pcas_ast_t *left, *right, *residual, *term, *function, *zero = integer(0);
-	unsigned pivots[MAX_ROWS], groups = 0, rows = 0, rank, i, j, k;
+	unsigned pivots[MAX_ROWS], groups = 0, rows = 0;
 	pcas_error_t err = E_SUCCESS;
-	bool nonzero;
 
 	derivatives[0] = ast_Copy(trial);
 
-	for (k = 1; k <= de->order; k++) {
+	for (unsigned k = 1; k <= de->order; k++) {
 		derivatives[k] = ast_Copy(derivatives[k - 1]);
 
 		work_Pause();
@@ -508,18 +497,18 @@ static pcas_error_t match_coefficients(
 		expand_if_smaller(derivatives[k]);
 		work_Resume();
 
-		left = de_Derivative(de->y, k);
-		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, left, derivatives[k]);
-		ast_Cleanup(left);
+		pcas_ast_t *prime = de_Derivative(de->y, k);
+		work_Step(STEP_EQUATION, k == 1 ? "Differentiate" : NULL, prime, derivatives[k]);
+		ast_Cleanup(prime);
 	}
 
-	left = ast_MakeOperator(OP_ADD);
-	for (k = de->order + 1; k-- > 0;) {
+	pcas_ast_t *left = ast_MakeOperator(OP_ADD);
+	for (unsigned k = de->order + 1; k-- > 0;) {
 		if (!is_ast_int(de->a[k], 0))
 			ast_ChildAppend(left, ast_MakeBinary(OP_MULT, ast_Copy(de->a[k]), ast_Copy(derivatives[k])));
 	}
 	work_Step(STEP_EQUATION, "Substitute", tidy(left), de->g);
-	right = ast_Copy(left);
+	pcas_ast_t *before = ast_Copy(left);
 
 	work_Pause();
 	simplify(left, SIMP_BASIC);
@@ -527,23 +516,24 @@ static pcas_error_t match_coefficients(
 	simplify(left, SIMP_BASIC);
 	work_Resume();
 
-	if (!ast_Compare(left, right))
+	if (!ast_Compare(left, before))
 		work_Step(STEP_EQUATION, NULL, left, de->g);
-	ast_Cleanup(right);
+	ast_Cleanup(before);
 
-	residual = difference(left, ast_Copy(de->g));
+	pcas_ast_t *residual = difference(left, ast_Copy(de->g));
 
 	work_Pause();
 	expand(residual, EXP_ALL);
 	simplify(residual, SIMP_BASIC);
 	work_Resume();
 
-	for (i = 0; i < (isoptype(residual, OP_ADD) ? ast_ChildLength(residual) : 1) && err == E_SUCCESS; i++) {
-		term = isoptype(residual, OP_ADD) ? ast_ChildGet(residual, i) : residual;
-		function = function_part(de, term);
+	for (unsigned i = 0; i < (isoptype(residual, OP_ADD) ? ast_ChildLength(residual) : 1) && err == E_SUCCESS; i++) {
+		const pcas_ast_t *term = isoptype(residual, OP_ADD) ? ast_ChildGet(residual, i) : residual;
+		pcas_ast_t *function = function_part(de, term);
 
-		for (j = 0; j < groups && !ast_Compare(functions[j], function); j++)
-			;
+		unsigned j = 0;
+		while (j < groups && !ast_Compare(functions[j], function))
+			j++;
 
 		if (j < groups) {
 			ast_ChildAppend(sums[j], ast_Copy(term));
@@ -557,10 +547,12 @@ static pcas_error_t match_coefficients(
 		}
 	}
 
-	for (i = 0; i < groups && err == E_SUCCESS; i++) {
-		nonzero = false;
+	pcas_ast_t *zero = integer(0);
 
-		for (j = 0; j < size; j++) {
+	for (unsigned i = 0; i < groups && err == E_SUCCESS; i++) {
+		bool nonzero = false;
+
+		for (unsigned j = 0; j < size; j++) {
 			matrix[rows][j] = ast_Copy(sums[i]);
 
 			work_Pause();
@@ -571,41 +563,42 @@ static pcas_error_t match_coefficients(
 			nonzero |= !is_zero(matrix[rows][j]);
 		}
 
-		right = ast_Copy(sums[i]);
+		pcas_ast_t *constant = ast_Copy(sums[i]);
 
 		work_Pause();
-		for (j = 0; j < size; j++)
-			substitute(right, unknowns[j], zero);
+		for (unsigned j = 0; j < size; j++)
+			substitute(constant, unknowns[j], zero);
 		work_Resume();
 
-		matrix[rows][size] = reduced(ast_MakeBinary(OP_DIV, negate(right), ast_Copy(functions[i])));
+		matrix[rows][size] = reduced(ast_MakeBinary(OP_DIV, negate(constant), ast_Copy(functions[i])));
 
 		if (!nonzero) {
 			if (!is_zero(matrix[rows][size]))
 				err = E_DE_UNSOLVED;
 
-			for (j = 0; j <= size; j++)
+			for (unsigned j = 0; j <= size; j++)
 				ast_Cleanup(matrix[rows][j]);
 			continue;
 		}
 
-		left = ast_MakeOperator(OP_ADD);
-		for (j = 0; j < size; j++)
-			ast_ChildAppend(left, ast_MakeBinary(OP_MULT, ast_Copy(matrix[rows][j]), ast_Copy(unknowns[j])));
+		pcas_ast_t *sum = ast_MakeOperator(OP_ADD);
+		for (unsigned j = 0; j < size; j++)
+			ast_ChildAppend(sum, ast_MakeBinary(OP_MULT, ast_Copy(matrix[rows][j]), ast_Copy(unknowns[j])));
 
 		work_Pause();
-		simplify(left, SIMP_BASIC);
+		simplify(sum, SIMP_BASIC);
 		work_Resume();
 
-		work_Step(STEP_EQUATION, rows == 0 ? "Equate coefficients" : NULL, left, matrix[rows][size]);
-		ast_Cleanup(left);
+		work_Step(STEP_EQUATION, rows == 0 ? "Equate coefficients" : NULL, sum, matrix[rows][size]);
+		ast_Cleanup(sum);
 		rows++;
 	}
 
+	unsigned rank;
 	if (err == E_SUCCESS) {
 		rank = eliminate(matrix, rows, size, pivots);
 
-		for (i = rank; i < rows; i++) {
+		for (unsigned i = rank; i < rows; i++) {
 			if (!is_zero(matrix[i][size]))
 				err = E_DE_UNSOLVED;
 		}
@@ -614,39 +607,39 @@ static pcas_error_t match_coefficients(
 	if (err == E_SUCCESS) {
 		*particular = ast_Copy(trial);
 
-		for (j = 0; j < size; j++) {
-			right = NULL;
-			for (i = 0; i < rank && right == NULL; i++) {
+		for (unsigned j = 0; j < size; j++) {
+			pcas_ast_t *value = NULL;
+			for (unsigned i = 0; i < rank && value == NULL; i++) {
 				if (pivots[i] == j)
-					right = ast_Copy(matrix[i][size]);
+					value = ast_Copy(matrix[i][size]);
 			}
-			if (right == NULL)
-				right = integer(0);
+			if (value == NULL)
+				value = integer(0);
 
-			single_fraction(right);
-			work_Step(STEP_EQUATION, j == 0 ? "Solve for the coefficients" : NULL, unknowns[j], right);
+			single_fraction(value);
+			work_Step(STEP_EQUATION, j == 0 ? "Solve for the coefficients" : NULL, unknowns[j], value);
 
 			work_Pause();
-			substitute(*particular, unknowns[j], right);
+			substitute(*particular, unknowns[j], value);
 			work_Resume();
-			ast_Cleanup(right);
+			ast_Cleanup(value);
 		}
 
 		simplest(*particular);
 		work_Step(STEP_STATE, "Particular solution", NULL, *particular);
 	}
 
-	for (i = 0; i < rows; i++) {
-		for (j = 0; j <= size; j++)
+	for (unsigned i = 0; i < rows; i++) {
+		for (unsigned j = 0; j <= size; j++)
 			ast_Cleanup(matrix[i][j]);
 	}
 
-	for (i = 0; i < groups; i++) {
+	for (unsigned i = 0; i < groups; i++) {
 		ast_Cleanup(functions[i]);
 		ast_Cleanup(sums[i]);
 	}
 
-	for (k = 0; k <= de->order; k++)
+	for (unsigned k = 0; k <= de->order; k++)
 		ast_Cleanup(derivatives[k]);
 
 	ast_Cleanup(residual);
@@ -681,27 +674,29 @@ static pcas_error_t undetermined_coefficients(
 	pcas_ast_t **particular
 ) {
 	pcas_ast_t *rates[DE_MAX_ORDER], *frequencies[DE_MAX_ORDER], *unknowns[DE_MAX_ORDER];
-	pcas_ast_t *g, *term, *rate, *frequency, *trial;
-	unsigned degrees[DE_MAX_ORDER], groups = 0, size = 0, degree, shift, i, j, k;
+	unsigned degrees[DE_MAX_ORDER], groups = 0, size = 0;
 	pcas_error_t err = E_SUCCESS;
 
-	g = ast_Copy(de->g);
+	pcas_ast_t *g = ast_Copy(de->g);
 
 	work_Pause();
 	expand(g, EXP_ALL);
 	simplify(g, SIMP_BASIC);
 	work_Resume();
 
-	for (i = 0; i < (isoptype(g, OP_ADD) ? ast_ChildLength(g) : 1) && err == E_SUCCESS; i++) {
-		term = isoptype(g, OP_ADD) ? ast_ChildGet(g, i) : g;
+	for (unsigned i = 0; i < (isoptype(g, OP_ADD) ? ast_ChildLength(g) : 1) && err == E_SUCCESS; i++) {
+		const pcas_ast_t *term = isoptype(g, OP_ADD) ? ast_ChildGet(g, i) : g;
+		unsigned degree;
+		pcas_ast_t *rate, *frequency;
 
 		if (!forcing_form(de, term, &degree, &rate, &frequency)) {
 			err = E_DE_UNSOLVED;
 			continue;
 		}
 
-		for (j = 0; j < groups && !(ast_Compare(rates[j], rate) && ast_Compare(frequencies[j], frequency)); j++)
-			;
+		unsigned j = 0;
+		while (j < groups && !(ast_Compare(rates[j], rate) && ast_Compare(frequencies[j], frequency)))
+			j++;
 
 		if (j < groups) {
 			if (degree > degrees[j])
@@ -721,7 +716,7 @@ static pcas_error_t undetermined_coefficients(
 
 	ast_Cleanup(g);
 
-	for (i = 0; i < groups; i++)
+	for (unsigned i = 0; i < groups; i++)
 		size += (degrees[i] + 1) * (is_ast_int(frequencies[i], 0) ? 1 : 2);
 
 	if (err == E_SUCCESS && (size > DE_MAX_ORDER || !choose_constants(de, exclude, unknowns, size)))
@@ -731,13 +726,13 @@ static pcas_error_t undetermined_coefficients(
 		de->method = "Undetermined coefficients";
 		work_Text("Undetermined coefficients");
 
-		trial = ast_MakeOperator(OP_ADD);
-		k = 0;
+		pcas_ast_t *trial = ast_MakeOperator(OP_ADD);
+		unsigned k = 0;
 
-		for (i = 0; i < groups; i++) {
-			shift = root_multiplicity(roots, count, rates[i], frequencies[i]);
+		for (unsigned i = 0; i < groups; i++) {
+			const unsigned shift = root_multiplicity(roots, count, rates[i], frequencies[i]);
 
-			for (j = degrees[i] + 1; j-- > 0;) {
+			for (unsigned j = degrees[i] + 1; j-- > 0;) {
 				if (is_ast_int(frequencies[i], 0)) {
 					add_trial_term(de, trial, unknowns[k++], j + shift, rates[i], NULL);
 				} else {
@@ -757,11 +752,11 @@ static pcas_error_t undetermined_coefficients(
 		err = match_coefficients(de, trial, unknowns, size, particular);
 
 		ast_Cleanup(trial);
-		for (k = 0; k < size; k++)
-			ast_Cleanup(unknowns[k]);
+		for (unsigned i = 0; i < size; i++)
+			ast_Cleanup(unknowns[i]);
 	}
 
-	for (i = 0; i < groups; i++) {
+	for (unsigned i = 0; i < groups; i++) {
 		ast_Cleanup(rates[i]);
 		ast_Cleanup(frequencies[i]);
 	}
@@ -777,19 +772,16 @@ static pcas_error_t variation_of_parameters(
 	const pcas_ast_t *exclude,
 	pcas_ast_t **particular
 ) {
-	pcas_ast_t *f, *derivatives[2], *names[3], *W, *left, *right, *parameters[2], *taken;
-	unsigned i;
-
 	if (de->order != 2 || size != 2)
 		return E_DE_UNSOLVED;
 
 	de->method = "Variation of parameters";
 	work_Text("Variation of parameters");
 
-	f = quotient(de->g, de->a[2]);
+	pcas_ast_t *f = quotient(de->g, de->a[2]);
 
 	if (!is_ast_int(de->a[2], 1)) {
-		left = ast_MakeOperator(OP_ADD);
+		pcas_ast_t *left = ast_MakeOperator(OP_ADD);
 		ast_ChildAppend(left, de_Derivative(de->y, 2));
 		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, quotient(de->a[1], de->a[2]), de_Derivative(de->y, 1)));
 		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, quotient(de->a[0], de->a[2]), ast_Copy(de->y)));
@@ -797,7 +789,8 @@ static pcas_error_t variation_of_parameters(
 		ast_Cleanup(left);
 	}
 
-	for (i = 0; i < 2; i++) {
+	pcas_ast_t *derivatives[2];
+	for (unsigned i = 0; i < 2; i++) {
 		derivatives[i] = ast_Copy(basis[i]);
 
 		work_Pause();
@@ -806,24 +799,26 @@ static pcas_error_t variation_of_parameters(
 		simplest(derivatives[i]);
 	}
 
-	taken = ast_MakeOperator(OP_ADD);
+	pcas_ast_t *names[3];
+	pcas_ast_t *taken = ast_MakeOperator(OP_ADD);
 	ast_ChildAppend(taken, ast_Copy(exclude));
-	for (i = 0; i < 3; i++) {
+	for (unsigned i = 0; i < 3; i++) {
 		names[i] = pick_symbol(de, i == 0 ? SYM_W : i == 1 ? SYM_U : SYM_V, taken);
 		ast_ChildAppend(taken, ast_Copy(names[i]));
 	}
 	ast_Cleanup(taken);
 
-	left = difference(
+	pcas_ast_t *left = difference(
 		ast_MakeBinary(OP_MULT, ast_Copy(basis[0]), ast_Copy(derivatives[1])),
 		ast_MakeBinary(OP_MULT, ast_Copy(derivatives[0]), ast_Copy(basis[1]))
 	);
-	W = simplest(ast_Copy(left));
-	right = ast_MakeBinary(OP_EQUALS, tidy(left), ast_Copy(W));
+	pcas_ast_t *W = simplest(ast_Copy(left));
+	pcas_ast_t *right = ast_MakeBinary(OP_EQUALS, tidy(left), ast_Copy(W));
 	work_Step(STEP_EQUATION, "Wronskian", names[0], right);
 	ast_Cleanup(right);
 
-	for (i = 0; i < 2; i++) {
+	pcas_ast_t *parameters[2];
+	for (unsigned i = 0; i < 2; i++) {
 		left = ast_MakeBinary(OP_MULT, ast_Copy(basis[1 - i]), ast_Copy(f));
 		if (i == 0)
 			left = negate(left);
@@ -838,11 +833,11 @@ static pcas_error_t variation_of_parameters(
 	}
 
 	taken = ast_MakeOperator(OP_ADD);
-	for (i = 0; i < 3; i++)
+	for (unsigned i = 0; i < 3; i++)
 		ast_ChildAppend(taken, ast_Copy(names[i]));
 	fresh_Reserve(taken);
 
-	for (i = 0; i < 2; i++) {
+	for (unsigned i = 0; i < 2; i++) {
 		parameters[i] = ast_MakeBinary(OP_INTEGRAL, parameters[i], ast_Copy(de->x));
 		eval_integrals(parameters[i]);
 	}
@@ -853,7 +848,7 @@ static pcas_error_t variation_of_parameters(
 	if (contains_integral(parameters[0]) || contains_integral(parameters[1])) {
 		*particular = NULL;
 	} else {
-		for (i = 0; i < 2; i++) {
+		for (unsigned i = 0; i < 2; i++) {
 			work_Pause();
 			simplify(parameters[i], SIMP_BASIC);
 			work_Resume();
@@ -871,11 +866,11 @@ static pcas_error_t variation_of_parameters(
 		ast_Cleanup(left);
 	}
 
-	for (i = 0; i < 2; i++) {
+	for (unsigned i = 0; i < 2; i++) {
 		ast_Cleanup(derivatives[i]);
 		ast_Cleanup(parameters[i]);
 	}
-	for (i = 0; i < 3; i++)
+	for (unsigned i = 0; i < 3; i++)
 		ast_Cleanup(names[i]);
 	ast_Cleanup(f);
 	ast_Cleanup(W);
@@ -884,22 +879,22 @@ static pcas_error_t variation_of_parameters(
 }
 
 pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
-	root_t roots[DE_MAX_ORDER];
-	pcas_ast_t *basis[DE_MAX_ORDER], *constants[DE_MAX_ORDER], *m, *exclude, *particular = NULL, *complementary;
-	unsigned count = 0, size = 0, i;
-	pcas_error_t err;
-
 	if (!de->linear)
 		return E_DE_UNSOLVED;
 
-	m = substitution_symbol(de, SYM_M);
+	root_t roots[DE_MAX_ORDER];
+	pcas_ast_t *basis[DE_MAX_ORDER], *constants[DE_MAX_ORDER], *particular = NULL;
+	unsigned count = 0, size = 0;
 
-	if ((err = characteristic_roots(de, m, roots, &count)) == E_SUCCESS) {
+	pcas_ast_t *m = substitution_symbol(de, SYM_M);
+
+	pcas_error_t err = characteristic_roots(de, m, roots, &count);
+	if (err == E_SUCCESS) {
 		de->method = "Constant coefficients";
 		size = fill_basis(de, roots, count, basis);
 
 		if (!choose_constants(de, m, constants, size)) {
-			for (i = 0; i < size; i++)
+			for (unsigned i = 0; i < size; i++)
 				ast_Cleanup(basis[i]);
 			size = 0;
 			err = E_DE_UNSOLVED;
@@ -907,16 +902,17 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 	}
 
 	if (err == E_SUCCESS && !is_ast_int(de->g, 0)) {
-		complementary = combination(constants, basis, size);
+		pcas_ast_t *complementary = combination(constants, basis, size);
 		work_Step(STEP_STATE, "Complementary solution", NULL, complementary);
 		ast_Cleanup(complementary);
 
-		exclude = ast_MakeOperator(OP_ADD);
+		pcas_ast_t *exclude = ast_MakeOperator(OP_ADD);
 		ast_ChildAppend(exclude, ast_Copy(m));
-		for (i = 0; i < size; i++)
+		for (unsigned i = 0; i < size; i++)
 			ast_ChildAppend(exclude, ast_Copy(constants[i]));
 
-		if ((err = undetermined_coefficients(de, roots, count, exclude, &particular)) == E_DE_UNSOLVED)
+		err = undetermined_coefficients(de, roots, count, exclude, &particular);
+		if (err == E_DE_UNSOLVED)
 			err = variation_of_parameters(de, basis, size, exclude, &particular);
 
 		ast_Cleanup(exclude);
@@ -925,7 +921,7 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 	if (err == E_SUCCESS)
 		err = solve_with_basis(de, basis, constants, size, particular, solution);
 
-	for (i = 0; i < size; i++) {
+	for (unsigned i = 0; i < size; i++) {
 		ast_Cleanup(basis[i]);
 		ast_Cleanup(constants[i]);
 	}
@@ -937,29 +933,29 @@ pcas_error_t solve_constant_coefficients(pcas_de_t *de, pcas_ast_t **solution) {
 }
 
 pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution) {
-	pcas_ast_t *y1 = de->known, *P, *Q, *left, *right, *mu, *integrand, *integral, *basis[2], *constants[2];
-	pcas_error_t err;
-	bool satisfied;
+	const pcas_ast_t *y1 = de->known;
 
 	if (de->order != 2 || !de->linear || !is_ast_int(de->g, 0))
 		return E_DE_UNSOLVED;
 
 	de->method = "Reduction of order";
 
-	if ((err = check_solution(de, y1, "Known solution", false, &satisfied)) != E_SUCCESS)
+	bool satisfied;
+	pcas_error_t err = check_solution(de, y1, "Known solution", false, &satisfied);
+	if (err != E_SUCCESS)
 		return err;
 	if (!satisfied)
 		return E_DE_NOT_SOLUTION;
 
-	P = quotient(de->a[1], de->a[2]);
-	Q = quotient(de->a[0], de->a[2]);
+	pcas_ast_t *P = quotient(de->a[1], de->a[2]);
+	pcas_ast_t *Q = quotient(de->a[0], de->a[2]);
 
 	if (!is_ast_int(de->a[2], 1)) {
-		left = ast_MakeOperator(OP_ADD);
+		pcas_ast_t *left = ast_MakeOperator(OP_ADD);
 		ast_ChildAppend(left, de_Derivative(de->y, 2));
 		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, ast_Copy(P), de_Derivative(de->y, 1)));
 		ast_ChildAppend(left, ast_MakeBinary(OP_MULT, Q, ast_Copy(de->y)));
-		right = integer(0);
+		pcas_ast_t *right = integer(0);
 		work_Step(STEP_EQUATION, "Standard form", tidy(left), right);
 		ast_Cleanup(left);
 		ast_Cleanup(right);
@@ -967,7 +963,7 @@ pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution) {
 		ast_Cleanup(Q);
 	}
 
-	left = substitution_symbol(de, SYM_P);
+	pcas_ast_t *left = substitution_symbol(de, SYM_P);
 	work_Step(STEP_EQUATION, NULL, left, P);
 	ast_Cleanup(left);
 
@@ -978,14 +974,15 @@ pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution) {
 	simplify(P, SIMP_BASIC);
 	work_Resume();
 
-	if ((mu = exponential_of_integral(P, de->x)) == NULL)
+	pcas_ast_t *mu = exponential_of_integral(P, de->x);
+	if (mu == NULL)
 		return E_DE_INTEGRAL;
 
-	integrand = ast_MakeBinary(OP_DIV, mu, ast_MakeBinary(OP_POW, ast_Copy(y1), integer(2)));
+	pcas_ast_t *integrand = ast_MakeBinary(OP_DIV, mu, ast_MakeBinary(OP_POW, ast_Copy(y1), integer(2)));
 	left = ast_MakeBinary(OP_MULT, ast_Copy(y1), ast_MakeBinary(OP_INTEGRAL, ast_Copy(integrand), ast_Copy(de->x)));
 	single_fraction(integrand);
-	integral = ast_MakeBinary(OP_INTEGRAL, integrand, ast_Copy(de->x));
-	right = ast_MakeBinary(OP_MULT, ast_Copy(y1), ast_Copy(integral));
+	pcas_ast_t *integral = ast_MakeBinary(OP_INTEGRAL, integrand, ast_Copy(de->x));
+	pcas_ast_t *right = ast_MakeBinary(OP_MULT, ast_Copy(y1), ast_Copy(integral));
 	work_Step(STEP_EQUATION, NULL, left, right);
 	ast_Cleanup(left);
 	ast_Cleanup(right);
@@ -997,6 +994,7 @@ pcas_error_t solve_reduction_of_order(pcas_de_t *de, pcas_ast_t **solution) {
 		return E_DE_INTEGRAL;
 	}
 
+	pcas_ast_t *basis[2], *constants[2];
 	basis[0] = ast_Copy(y1);
 	basis[1] = distribute(y1, integral);
 	left = ast_MakeBinary(OP_MULT, ast_Copy(y1), integral);

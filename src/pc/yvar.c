@@ -25,15 +25,12 @@ int read_header(header_t *header, FILE *file) {
 }
 
 int yvar_Read(yvar_t *yvar, FILE *file) {
-	int error = 0;
-	uint16_t magic;
-	uint8_t var_id;
-
-	error = read_header(&yvar->header, file);
+	const int error = read_header(&yvar->header, file);
 
 	if (error != 0)
 		return error;
 
+	uint16_t magic;
 	fread(&magic, 2, 1, file);
 
 	if (magic != 11 && magic != 13)
@@ -41,6 +38,7 @@ int yvar_Read(yvar_t *yvar, FILE *file) {
 
 	fread(&yvar->len, 2, 1, file);
 
+	uint8_t var_id;
 	fread(&var_id, 1, 1, file);
 
 	if (var_id != 3)

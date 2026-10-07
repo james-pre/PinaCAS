@@ -17,7 +17,6 @@ pcas_error_t calculus_Run(
 ) {
 	pcas_ast_t *e = items[0];
 	pcas_error_t err = E_SUCCESS;
-	pcas_de_t de;
 
 	if (kind != CALCULUS_DE && count > 1)
 		return E_PARSE_BAD_COMMA;
@@ -31,7 +30,8 @@ pcas_error_t calculus_Run(
 			simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
 			integral_Indefinite(e, respect_to);
 			break;
-		case CALCULUS_DE:
+		case CALCULUS_DE: {
+			pcas_de_t de;
 			err = de_LoadList(&de, items, count, respect_to);
 
 			if (err == E_SUCCESS) {
@@ -69,6 +69,7 @@ pcas_error_t calculus_Run(
 
 			de_Cleanup(&de);
 			return err;
+		}
 	}
 
 	simplify(e, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_LIKE_TERMS);
@@ -85,9 +86,7 @@ pcas_error_t calculus_Verify(
 	bool *satisfied
 ) {
 	pcas_de_t de;
-	pcas_error_t err;
-
-	err = de_LoadList(&de, items, count, respect_to);
+	pcas_error_t err = de_LoadList(&de, items, count, respect_to);
 
 	if (err == E_SUCCESS)
 		err = de_Verify(&de, solution, satisfied);

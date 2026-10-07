@@ -47,12 +47,11 @@ static ts_box_t *delimited(ts_box_t *child, char left, char right) {
 }
 
 static ts_box_t *integer_box(mp_int z) {
-	mp_size len = mp_int_string_len(z, 10);
+	const mp_size len = mp_int_string_len(z, 10);
 	char *text = malloc(len);
-	ts_box_t *b;
 
 	mp_int_to_string(z, 10, text, len);
-	b = ts_Text(text);
+	ts_box_t *b = ts_Text(text);
 	free(text);
 
 	return b;
@@ -80,7 +79,7 @@ static ts_box_t *symbol_box(Symbol symbol) {
 }
 
 /*True if e does not need parentheses as a base or before a postfix operator*/
-static bool is_atom(pcas_ast_t *e) {
+static bool is_atom(const pcas_ast_t *e) {
 	switch (e->type) {
 		case NODE_NUMBER: return mp_rat_is_integer(e->op.num) && mp_rat_compare_zero(e->op.num) >= 0;
 		case NODE_SYMBOL: return true;
@@ -93,7 +92,7 @@ static bool is_atom(pcas_ast_t *e) {
 }
 
 /*True if e is drawn starting with a number, so a product needs a dot before it*/
-static bool starts_with_number(pcas_ast_t *e) {
+static bool starts_with_number(const pcas_ast_t *e) {
 	if (e->type == NODE_NUMBER)
 		return true;
 
@@ -114,7 +113,6 @@ static ts_box_t *convert(const pcas_ast_t *e);
 /*Writes a numeric fraction on one line, as in an exponent, or returns NULL if e is not one*/
 static ts_box_t *inline_fraction(const pcas_ast_t *e) {
 	mp_rat value;
-	ts_box_t *row;
 
 	if (e->type == NODE_NUMBER && !mp_rat_is_integer(e->op.num)) {
 		value = num_Copy(e->op.num);
@@ -125,7 +123,7 @@ static ts_box_t *inline_fraction(const pcas_ast_t *e) {
 		return NULL;
 	}
 
-	row = ts_Row();
+	ts_box_t *row = ts_Row();
 	if (mp_rat_compare_zero(value) < 0) {
 		ts_Append(row, ts_Text("-"));
 		mp_rat_abs(value, value);
@@ -175,9 +173,8 @@ static ts_box_t *function_box(const pcas_ast_t *e) {
 
 static ts_box_t *sum_box(const pcas_ast_t *e) {
 	ts_box_t *row = ts_Row();
-	pcas_ast_t *term;
 
-	for (term = opbase(e); term != NULL; term = term->next) {
+	for (const pcas_ast_t *term = opbase(e); term != NULL; term = term->next) {
 		if (term != opbase(e) && is_negative_for_sure(term)) {
 			pcas_ast_t *magnitude = ast_Copy(term);
 			absolute_val(magnitude);
@@ -196,10 +193,9 @@ static ts_box_t *sum_box(const pcas_ast_t *e) {
 
 static ts_box_t *product_box(const pcas_ast_t *e) {
 	ts_box_t *row = ts_Row();
-	pcas_ast_t *factor;
 	bool empty = true;
 
-	for (factor = opbase(e); factor != NULL; factor = factor->next) {
+	for (const pcas_ast_t *factor = opbase(e); factor != NULL; factor = factor->next) {
 		if (is_ast_int(factor, 1))
 			continue;
 
@@ -225,7 +221,7 @@ static ts_box_t *product_box(const pcas_ast_t *e) {
 }
 
 static ts_box_t *log_box(const pcas_ast_t *e) {
-	pcas_ast_t *base = ast_ChildGet(e, 0);
+	const pcas_ast_t *base = ast_ChildGet(e, 0);
 	ts_box_t *name;
 
 	if (base->type == NODE_SYMBOL && base->op.symbol == SYM_EULER)
@@ -239,8 +235,8 @@ static ts_box_t *log_box(const pcas_ast_t *e) {
 }
 
 static ts_box_t *operator_box(const pcas_ast_t *e) {
-	pcas_ast_t *a = opbase(e);
-	pcas_ast_t *b = a != NULL ? a->next : NULL;
+	const pcas_ast_t *a = opbase(e);
+	const pcas_ast_t *b = a != NULL ? a->next : NULL;
 
 	switch (optype(e)) {
 		case OP_ADD: return sum_box(e);
@@ -291,10 +287,9 @@ static ts_box_t *operator_box(const pcas_ast_t *e) {
 static ts_box_t *convert(const pcas_ast_t *e) {
 	if (is_negative_for_sure(e)) {
 		pcas_ast_t *magnitude = ast_Copy(e);
-		ts_box_t *b;
 
 		absolute_val(magnitude);
-		b = row2(ts_Text("-"), convert(magnitude));
+		ts_box_t *b = row2(ts_Text("-"), convert(magnitude));
 		ast_Cleanup(magnitude);
 
 		return b;
@@ -325,12 +320,12 @@ static int script_shift(ts_box_t *base, ts_box_t *script, const ts_metrics_t *m)
 }
 
 void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
-	ts_box_t *child, *first = b->first, *second;
+	ts_box_t *first = b->first;
 
-	for (child = first; child != NULL; child = child->next)
+	for (ts_box_t *child = first; child != NULL; child = child->next)
 		ts_Measure(child, m);
 
-	second = first != NULL ? first->next : NULL;
+	ts_box_t *second = first != NULL ? first->next : NULL;
 
 	switch (b->type) {
 		case BOX_TEXT:
@@ -342,7 +337,7 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
 			b->width = 0;
 			b->ascent = m->ascent;
 			b->descent = m->descent;
-			for (child = first; child != NULL; child = child->next) {
+			for (ts_box_t *child = first; child != NULL; child = child->next) {
 				b->width += child->width;
 				b->ascent = max(b->ascent, child->ascent);
 				b->descent = max(b->descent, child->descent);
@@ -354,7 +349,7 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
 			b->descent = max(m->descent, m->gap + height(second) - m->axis);
 			break;
 		case BOX_SUPERSCRIPT: {
-			int shift = script_shift(first, second, m);
+			const int shift = script_shift(first, second, m);
 			b->width = first->width + second->width;
 			b->ascent = max(first->ascent, shift + second->ascent);
 			b->descent = max(first->descent, second->descent - shift);
@@ -371,7 +366,7 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
 			b->width = m->radical_width(height(b)) + first->width;
 			break;
 		case BOX_DELIMITED: {
-			int delimiter = m->delimiter_width(height(first));
+			const int delimiter = m->delimiter_width(height(first));
 			b->width = first->width + (b->left ? delimiter : 0) + (b->right ? delimiter : 0);
 			b->ascent = first->ascent;
 			b->descent = first->descent;
@@ -391,19 +386,19 @@ void ts_Measure(ts_box_t *b, const ts_metrics_t *m) {
 }
 
 void ts_Draw(ts_box_t *b, int x, int baseline, const ts_metrics_t *m, const ts_renderer_t *r) {
-	ts_box_t *child, *first = b->first, *second = first != NULL ? first->next : NULL;
-	int top = baseline - b->ascent;
+	ts_box_t *first = b->first, *second = first != NULL ? first->next : NULL;
+	const int top = baseline - b->ascent;
 
 	switch (b->type) {
 		case BOX_TEXT: r->text(x, top, b->text); break;
 		case BOX_ROW:
-			for (child = first; child != NULL; child = child->next) {
+			for (ts_box_t *child = first; child != NULL; child = child->next) {
 				ts_Draw(child, x, baseline, m, r);
 				x += child->width;
 			}
 			break;
 		case BOX_FRACTION: {
-			int bar = baseline - m->axis - m->rule;
+			const int bar = baseline - m->axis - m->rule;
 			r->bar(x, bar, b->width);
 			ts_Draw(first, x + (b->width - first->width) / 2, bar - m->gap - first->descent, m, r);
 			ts_Draw(second, x + (b->width - second->width) / 2, baseline - m->axis + m->gap + second->ascent, m, r);
@@ -418,14 +413,14 @@ void ts_Draw(ts_box_t *b, int x, int baseline, const ts_metrics_t *m, const ts_r
 			ts_Draw(second, x + first->width, baseline + m->subscript_drop, m, r);
 			break;
 		case BOX_ROOT: {
-			int radical = m->radical_width(height(b));
+			const int radical = m->radical_width(height(b));
 			r->radical(x, top, height(b));
 			r->overline(x + radical, top, first->width);
 			ts_Draw(first, x + radical, baseline, m, r);
 			break;
 		}
 		case BOX_DELIMITED: {
-			int delimiter = m->delimiter_width(height(b));
+			const int delimiter = m->delimiter_width(height(b));
 			if (b->left) {
 				r->delimiter(x, top, height(b), b->left);
 				x += delimiter;
@@ -440,7 +435,7 @@ void ts_Draw(ts_box_t *b, int x, int baseline, const ts_metrics_t *m, const ts_r
 			ts_Draw(first, x + m->integral_width(height(b)), baseline, m, r);
 			break;
 		case BOX_SUMMATION: {
-			int sign_top = baseline - m->ascent - m->gap, sign_bottom = baseline + m->descent + m->gap;
+			const int sign_top = baseline - m->ascent - m->gap, sign_bottom = baseline + m->descent + m->gap;
 			r->summation(x + (b->width - m->summation_width) / 2, sign_top, sign_bottom - sign_top);
 			ts_Draw(second, x + (b->width - second->width) / 2, sign_top - second->descent, m, r);
 			ts_Draw(first, x + (b->width - first->width) / 2, sign_bottom + first->ascent, m, r);

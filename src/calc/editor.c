@@ -171,24 +171,20 @@ static bool is_function(const pcas_ast_t *e) {
 
 /*Shows an initial condition such as Y(0)=1, which is parsed as Y*0=1, as the function at a point*/
 static void show_condition(pcas_ast_t *e) {
-	pcas_ast_t *left;
-
 	if (!isoptype(e, OP_EQUALS))
 		return;
 
-	left = opbase(e);
+	pcas_ast_t *left = opbase(e);
 	if (isoptype(left, OP_MULT) && ast_ChildLength(left) == 2 && is_function(opbase(left)))
 		optype(left) = OP_AT;
 }
 
 static bool too_deep(const pcas_ast_t *e, unsigned depth) {
-	const pcas_ast_t *child;
-
 	if (depth > MAX_PREVIEW_DEPTH)
 		return true;
 
 	if (e->type == NODE_OPERATOR)
-		for (child = opbase(e); child != NULL; child = child->next)
+		for (const pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 			if (too_deep(child, depth + 1))
 				return true;
 
@@ -201,26 +197,24 @@ static void clear_preview(void) {
 }
 
 static void update_preview(void) {
-	pcas_ast_t *items[MAX_ITEMS];
-	pcas_error_t err;
-	unsigned count, i;
-
 	clear_preview();
 	preview_message = NULL;
 
 	if (length == 0)
 		return;
 
-	count = parse_list(data, length, ti_table, items, MAX_ITEMS, &err);
+	pcas_ast_t *items[MAX_ITEMS];
+	pcas_error_t err;
+	const unsigned count = parse_list(data, length, ti_table, items, MAX_ITEMS, &err);
 
 	if (count == 0 && err != E_SUCCESS)
 		preview_message = error_text[err];
 
-	for (i = 0; i < count; i++)
+	for (unsigned i = 0; i < count; i++)
 		if (items[i] != NULL && too_deep(items[i], 0))
 			preview_message = "Too deeply nested to preview";
 
-	for (i = 0; i < count; i++) {
+	for (unsigned i = 0; i < count; i++) {
 		if (items[i] == NULL)
 			continue;
 
@@ -250,8 +244,7 @@ static int layout_tokens(int first_line, bool draw) {
 	while (true) {
 		const char *text = NULL;
 		unsigned size = 0;
-		int width = 0, y;
-		bool visible;
+		int width = 0;
 
 		if (offset < length) {
 			text = token_text(data + offset, &size);
@@ -263,8 +256,8 @@ static int layout_tokens(int first_line, bool draw) {
 			}
 		}
 
-		y = TOKENS_TOP + (line - first_line) * LINE_HEIGHT;
-		visible = draw && line >= first_line && line < first_line + VISIBLE_LINES;
+		const int y = TOKENS_TOP + (line - first_line) * LINE_HEIGHT;
+		const bool visible = draw && line >= first_line && line < first_line + VISIBLE_LINES;
 
 		if (offset == cursor) {
 			cursor_line = line;
@@ -297,9 +290,6 @@ static void print_right(const char *text, int y) {
 
 static void draw(const char *name) {
 	static const char *const mode_text[] = {"", "2nd", "alpha", "ALPHA"};
-	int first_line, y = PREVIEW_TOP;
-	unsigned i;
-
 	gfx_SetClipRegion(0, 0, LCD_WIDTH, LCD_HEIGHT);
 	gfx_FillScreen(COLOR_BACKGROUND);
 	gfx_SetTextFGColor(COLOR_TEXT);
@@ -309,10 +299,12 @@ static void draw(const char *name) {
 	print_right("[enter] save", 4);
 	draw_rule(BAR_HEIGHT - 1);
 
-	first_line = layout_tokens(0, false) - (VISIBLE_LINES - 1);
+	const int first_line = layout_tokens(0, false) - (VISIBLE_LINES - 1);
 	layout_tokens(first_line > 0 ? first_line : 0, true);
 
 	draw_rule(PREVIEW_TOP - 3);
+
+	int y = PREVIEW_TOP;
 
 	if (preview_message != NULL) {
 		gfx_SetTextFGColor(COLOR_PURPLE);
@@ -323,7 +315,7 @@ static void draw(const char *name) {
 	gfx_SetTextFGColor(COLOR_TEXT);
 	gfx_SetColor(COLOR_TEXT);
 
-	for (i = 0; i < preview_count; i++) {
+	for (unsigned i = 0; i < preview_count; i++) {
 		viewer_Draw(previews[i], MARGIN, y + 2 + previews[i]->ascent);
 		y += previews[i]->ascent + previews[i]->descent + PREVIEW_SPACING;
 	}
@@ -349,7 +341,7 @@ static uint8_t wait_key(void) {
 static uint16_t choose_menu_token(const char *name) {
 	const int height = MENU_ROWS * LINE_HEIGHT + 8;
 	const int left = (LCD_WIDTH - MENU_WIDTH) / 2, top = (LCD_HEIGHT - height) / 2;
-	unsigned selected = 0, first = 0, i;
+	unsigned selected = 0, first = 0;
 
 	while (true) {
 		draw(name);
@@ -359,10 +351,10 @@ static uint16_t choose_menu_token(const char *name) {
 		gfx_SetColor(COLOR_BLUE);
 		gfx_Rectangle(left, top, MENU_WIDTH, height);
 
-		for (i = first; i < first + MENU_ROWS && i < countof(menu_tokens); i++) {
-			uint8_t token[2] = {menu_tokens[i] >> 8, menu_tokens[i] & 0xFF};
+		for (unsigned i = first; i < first + MENU_ROWS && i < countof(menu_tokens); i++) {
+			const uint8_t token[2] = {menu_tokens[i] >> 8, menu_tokens[i] & 0xFF};
 			unsigned size;
-			int y = top + 4 + (int)(i - first) * LINE_HEIGHT + 2;
+			const int y = top + 4 + (int)(i - first) * LINE_HEIGHT + 2;
 
 			gfx_SetTextFGColor(COLOR_PURPLE);
 			if (i == selected)
@@ -391,9 +383,7 @@ static uint16_t choose_menu_token(const char *name) {
 }
 
 static uint16_t key_token(uint8_t key, bool second, bool alpha) {
-	unsigned i;
-
-	for (i = 0; i < countof(key_tokens); i++)
+	for (unsigned i = 0; i < countof(key_tokens); i++)
 		if (key_tokens[i].key == key)
 			return alpha ? key_tokens[i].alpha : second ? key_tokens[i].second : key_tokens[i].normal;
 
@@ -401,7 +391,6 @@ static uint16_t key_token(uint8_t key, bool second, bool alpha) {
 }
 
 bool editor_Run(const char *name, const char *tok) {
-	pcas_error_t err;
 	bool saved = false, done = false, changed = true;
 
 	if (!read_tokens_from_tok(tok, data, sizeof(data), &length))
@@ -416,9 +405,6 @@ bool editor_Run(const char *name, const char *tok) {
 	gfx_SetDrawBuffer();
 
 	while (!done) {
-		uint8_t key;
-		bool second, alpha;
-
 		if (changed) {
 			update_preview();
 			changed = false;
@@ -427,7 +413,7 @@ bool editor_Run(const char *name, const char *tok) {
 		draw(name);
 		gfx_SwapDraw();
 
-		key = wait_key();
+		const uint8_t key = wait_key();
 
 		if (key == sk_2nd) {
 			mode = mode == MODE_SECOND ? MODE_NORMAL : MODE_SECOND;
@@ -439,17 +425,19 @@ bool editor_Run(const char *name, const char *tok) {
 			continue;
 		}
 
-		second = mode == MODE_SECOND;
-		alpha = mode == MODE_ALPHA || mode == MODE_ALPHA_LOCK;
+		const bool second = mode == MODE_SECOND;
+		const bool alpha = mode == MODE_ALPHA || mode == MODE_ALPHA_LOCK;
 		if (mode != MODE_ALPHA_LOCK)
 			mode = MODE_NORMAL;
 
 		switch (key) {
-			case sk_Enter:
+			case sk_Enter: {
+				pcas_error_t err;
 				write_tokens_to_tok(tok, data, length, &err);
 				saved = err == E_SUCCESS;
 				done = true;
 				break;
+			}
 			case sk_Mode: done = true; break;
 			case sk_Clear:
 				done = length == 0;

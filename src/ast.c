@@ -34,23 +34,20 @@ mp_rat num_Copy(mp_rat other) {
 }
 
 char *num_ToString(mp_rat num, mp_size precision) {
-	mp_result res;
-
 	char *str;
-	int len;
 
 	if (mp_rat_is_integer(num)) {
 		mp_rat_reduce(num);
-		len = mp_int_string_len(&num->num, RADIX);
+		const int len = mp_int_string_len(&num->num, RADIX);
 		str = malloc(len * sizeof(char));
-		if ((res = mp_int_to_string(&num->num, RADIX, str, len)) != MP_OK) {
+		if (mp_int_to_string(&num->num, RADIX, str, len) != MP_OK) {
 			free(str);
 			return NULL;
 		}
 	} else {
-		len = mp_rat_decimal_len(num, RADIX, precision);
+		const int len = mp_rat_decimal_len(num, RADIX, precision);
 		str = malloc(len * sizeof(char));
-		if ((res = mp_rat_to_decimal(num, RADIX, precision, MP_ROUND_HALF_UP, str, len)) != MP_OK) {
+		if (mp_rat_to_decimal(num, RADIX, precision, MP_ROUND_HALF_UP, str, len) != MP_OK) {
 			free(str);
 			return NULL;
 		}
@@ -116,12 +113,9 @@ pcas_ast_t *ast_Copy(const pcas_ast_t *e) {
 		case NODE_NUMBER: return ast_MakeNumber(num_Copy(e->op.num));
 		case NODE_SYMBOL: return ast_MakeSymbol(e->op.symbol);
 		case NODE_OPERATOR: {
-			pcas_ast_t *copy, *child;
+			pcas_ast_t *copy = ast_MakeOperator(optype(e));
 
-			copy = ast_MakeOperator(optype(e));
-			child = opbase(e);
-
-			for (child = opbase(e); child != NULL; child = child->next)
+			for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 				ast_ChildAppend(copy, ast_Copy(child));
 
 			return copy;
@@ -132,9 +126,7 @@ pcas_ast_t *ast_Copy(const pcas_ast_t *e) {
 }
 
 static bool has_used(const unsigned *buffer, unsigned top, unsigned index) {
-	unsigned i;
-
-	for (i = 0; i < top; i++) {
+	for (unsigned i = 0; i < top; i++) {
 		if (buffer[i] == index)
 			return true;
 	}
@@ -153,17 +145,15 @@ bool ast_Compare(const pcas_ast_t *a, const pcas_ast_t *b) {
 		case NODE_NUMBER: return mp_rat_compare(a->op.num, b->op.num) == 0;
 		case NODE_SYMBOL: return a->op.symbol == b->op.symbol;
 		case NODE_OPERATOR: {
-			unsigned length;
-
 			if (optype(a) != optype(b))
 				return false;
 
-			if ((length = ast_ChildLength(a)) != ast_ChildLength(b))
+			const unsigned length = ast_ChildLength(a);
+			if (length != ast_ChildLength(b))
 				return false;
 
 			/*Compare children that are not necessarily in order. O(n^2)*/
 			if (optype(a) == OP_MULT || optype(a) == OP_ADD) {
-				unsigned a_index, b_index;
 				unsigned top = 0;
 
 				bool had_match = true;
@@ -171,15 +161,13 @@ bool ast_Compare(const pcas_ast_t *a, const pcas_ast_t *b) {
 				/*Keep track if we have already matched a node to another node in the past*/
 				unsigned *buffer = calloc(length, sizeof(unsigned));
 
-				for (a_index = 0; a_index < length && had_match; a_index++) {
-					pcas_ast_t *a_child = ast_ChildGet(a, a_index);
+				for (unsigned a_index = 0; a_index < length && had_match; a_index++) {
+					const pcas_ast_t *a_child = ast_ChildGet(a, a_index);
 					had_match = false;
 
-					for (b_index = 0; b_index < length; b_index++) {
-						pcas_ast_t *b_child;
-
+					for (unsigned b_index = 0; b_index < length; b_index++) {
 						if (!has_used(buffer, top, b_index)) {
-							b_child = ast_ChildGet(b, b_index);
+							const pcas_ast_t *b_child = ast_ChildGet(b, b_index);
 
 							if (ast_Compare(a_child, b_child)) {
 								had_match = true;
@@ -194,9 +182,7 @@ bool ast_Compare(const pcas_ast_t *a, const pcas_ast_t *b) {
 
 				return had_match;
 			} else {
-				unsigned i;
-
-				for (i = 0; i < length; i++) {
+				for (unsigned i = 0; i < length; i++) {
 					if (!ast_Compare(ast_ChildGet(a, i), ast_ChildGet(b, i)))
 						return false;
 				}
@@ -232,12 +218,10 @@ void ast_Cleanup(pcas_ast_t *e) {
 }
 
 pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child) {
-	pcas_ast_t *last;
-
 	if (parent->type != NODE_OPERATOR)
 		return E_AST_NOT_ALLOWED;
 
-	last = ast_ChildGetLast(parent);
+	pcas_ast_t *last = ast_ChildGetLast(parent);
 
 	if (last == NULL)
 		opbase(parent) = child;
@@ -250,12 +234,10 @@ pcas_error_t ast_ChildAppend(pcas_ast_t *parent, pcas_ast_t *child) {
 }
 
 pcas_ast_t *ast_ChildGet(const pcas_ast_t *parent, size_t index) {
-	pcas_ast_t *current;
-
 	if (parent->type != NODE_OPERATOR)
 		return NULL;
 
-	current = opbase(parent);
+	pcas_ast_t *current = opbase(parent);
 
 	for (size_t i = 0; i <= index && current != NULL; i++) {
 		if (i == index)
@@ -273,9 +255,9 @@ pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent) {
 	if (opbase(parent) == NULL) {
 		return NULL;
 	} else {
-		pcas_ast_t *current;
-		for (current = opbase(parent); current->next != NULL; current = current->next)
-			;
+		pcas_ast_t *current = opbase(parent);
+		while (current->next != NULL)
+			current = current->next;
 		return current;
 	}
 
@@ -283,9 +265,6 @@ pcas_ast_t *ast_ChildGetLast(const pcas_ast_t *parent) {
 }
 
 pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, size_t index) {
-	size_t i;
-	pcas_ast_t *current;
-
 	if (parent->type != NODE_OPERATOR)
 		return E_AST_NOT_ALLOWED;
 
@@ -300,8 +279,8 @@ pcas_error_t ast_ChildInsert(pcas_ast_t *parent, pcas_ast_t *child, size_t index
 		return E_SUCCESS;
 	}
 
-	i = 1;
-	current = opbase(parent);
+	size_t i = 1;
+	pcas_ast_t *current = opbase(parent);
 
 	while (current != NULL) {
 		if (i == index) {
@@ -326,15 +305,12 @@ pcas_ast_t *ast_ChildRemove(pcas_ast_t *parent, pcas_ast_t *child) {
 }
 
 size_t ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
-	size_t i;
-	pcas_ast_t *current;
-
 	if (parent->type != NODE_OPERATOR)
 		return -1;
 
-	i = 0;
+	size_t i = 0;
 
-	for (current = opbase(parent); current != NULL; current = current->next) {
+	for (pcas_ast_t *current = opbase(parent); current != NULL; current = current->next) {
 		if (current == child)
 			return i;
 		i++;
@@ -344,26 +320,21 @@ size_t ast_ChildIndexOf(const pcas_ast_t *parent, const pcas_ast_t *child) {
 }
 
 pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, size_t index) {
-	size_t i;
-	pcas_ast_t *current;
-
 	if (parent->type != NODE_OPERATOR)
 		return NULL;
 
 	if (index == 0) {
-		pcas_ast_t *temp;
-
 		if (opbase(parent) == NULL)
 			return NULL;
 
-		temp = opbase(parent);
+		pcas_ast_t *temp = opbase(parent);
 		opbase(parent) = opbase(parent)->next;
 		temp->next = NULL;
 		return temp;
 	}
 
-	i = 1;
-	current = opbase(parent);
+	size_t i = 1;
+	pcas_ast_t *current = opbase(parent);
 
 	while (current != NULL) {
 		if (i == index) {
@@ -382,14 +353,11 @@ pcas_ast_t *ast_ChildRemoveIndex(pcas_ast_t *parent, size_t index) {
 }
 
 size_t ast_ChildLength(const pcas_ast_t *parent) {
-	size_t i;
-	pcas_ast_t *current;
-
 	if (parent->type != NODE_OPERATOR)
 		return 0;
 
-	i = 0;
-	for (current = opbase(parent); current != NULL; current = current->next)
+	size_t i = 0;
+	for (pcas_ast_t *current = opbase(parent); current != NULL; current = current->next)
 		i++;
 
 	return i;

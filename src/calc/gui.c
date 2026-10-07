@@ -309,12 +309,10 @@ static int value_width(const element_t *e) {
 
 /*Draws the value of a variable or character element in r*/
 static void draw_value(const element_t *e, rect_t r) {
-	char character[2] = {0};
-
 	if (e->type == ELEMENT_VARIABLE) {
 		draw_box(r, variables[*e->variable].name);
 	} else {
-		character[0] = *e->character.value;
+		const char character[2] = {*e->character.value, '\0'};
 		draw_box(r, character);
 	}
 }
@@ -331,10 +329,10 @@ static unsigned wrap_text(const char *text, int x, int y, int width) {
 		line[length] = '\0';
 
 		if (length > 1 && (length == sizeof(line) - 1 || (int)gfx_GetStringWidth(line) > width)) {
-			char *space = strrchr(line, ' ');
-			unsigned keep = space != NULL ? (unsigned)(space - line) : length - 1;
-			unsigned skip = space != NULL ? keep + 1 : keep;
-			char next = line[keep];
+			const char *space = strrchr(line, ' ');
+			const unsigned keep = space != NULL ? (unsigned)(space - line) : length - 1;
+			const unsigned skip = space != NULL ? keep + 1 : keep;
+			const char next = line[keep];
 
 			line[keep] = '\0';
 			gfx_PrintStringXY(line, x, y + LINE_HEIGHT * lines++);
@@ -352,26 +350,25 @@ static unsigned wrap_text(const char *text, int x, int y, int width) {
 
 /* Lays content out top to bottom in area with buttons in a row along the bottom, marking the element at focused */
 static void draw_form(const element_t *content, rect_t area, int focused) {
-	const element_t *e;
-	int column = 0, buttons = -GAP, button_x, y = area.y;
+	int column = 0, buttons = -GAP;
 
-	for (e = content; e->type != ELEMENT_END; e++) {
+	for (const element_t *e = content; e->type != ELEMENT_END; e++) {
 		if (e->type == ELEMENT_BUTTON) {
 			buttons += button_width(e) + GAP;
 		} else if (e->type == ELEMENT_VARIABLE || e->type == ELEMENT_CHARACTER) {
-			int width = gfx_GetStringWidth(e->text);
+			const int width = gfx_GetStringWidth(e->text);
 			if (width > column)
 				column = width;
 		}
 	}
 
 	column += area.x + GAP;
-	button_x = area.x + (area.w - buttons) / 2;
+	int button_x = area.x + (area.w - buttons) / 2, y = area.y;
 
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
 	gfx_SetTextFGColor(COLOR_TEXT);
 
-	for (e = content; e->type != ELEMENT_END; e++) {
+	for (const element_t *e = content; e->type != ELEMENT_END; e++) {
 		rect_t r;
 		int marker_x;
 
@@ -415,15 +412,14 @@ static void draw_form(const element_t *content, rect_t area, int focused) {
 
 /* Lays content out in equal columns across area, each value under its label, marking the element at focused */
 static void draw_columns(const element_t *content, rect_t area, int focused) {
-	const element_t *e;
 	int count = 0;
 
-	for (e = content; e->type != ELEMENT_END; e++)
+	for (const element_t *e = content; e->type != ELEMENT_END; e++)
 		count++;
 
-	for (e = content; e->type != ELEMENT_END; e++) {
-		int center = area.x + area.w * (2 * (e - content) + 1) / (2 * count);
-		rect_t r = {center - value_width(e) / 2, area.y + LINE_HEIGHT + GAP, value_width(e), BUTTON_HEIGHT};
+	for (const element_t *e = content; e->type != ELEMENT_END; e++) {
+		const int center = area.x + area.w * (2 * (e - content) + 1) / (2 * count);
+		const rect_t r = {center - value_width(e) / 2, area.y + LINE_HEIGHT + GAP, value_width(e), BUTTON_HEIGHT};
 
 		draw_string_centered(e->text, center, area.y + GAP / 2);
 		draw_value(e, r);
@@ -439,14 +435,14 @@ static void draw_header(void) {
 }
 
 static void draw_menus(void) {
-	rect_t area = inset(menus_area, 12, 10);
+	const rect_t area = inset(menus_area, 12, 10);
 
 	clear(menus_area);
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
 	gfx_SetTextFGColor(COLOR_TEXT);
 
 	for (unsigned i = 0; i < countof(menus); i++) {
-		int y = area.y + MENU_ROW * (int)i;
+		const int y = area.y + MENU_ROW * (int)i;
 
 		gfx_PrintStringXY(menus[i].label, area.x, y);
 
@@ -531,8 +527,6 @@ static void focus_header(void) {
 }
 
 static void handle_header(uint8_t key) {
-	int next;
-
 	switch (key) {
 		case sk_Down:
 			focus = FOCUS_MENUS;
@@ -540,13 +534,14 @@ static void handle_header(uint8_t key) {
 			draw_menus();
 			break;
 		case sk_Left:
-		case sk_Right:
-			next = next_focusable(header, item, key == sk_Left ? -1 : 1);
+		case sk_Right: {
+			const int next = next_focusable(header, item, key == sk_Left ? -1 : 1);
 			if (next >= 0) {
 				item = next;
 				draw_header();
 			}
 			break;
+		}
 		case sk_Enter:
 		case sk_Up:
 			activate(&header[item], key == sk_Enter ? 1 : -1);
@@ -557,8 +552,6 @@ static void handle_header(uint8_t key) {
 }
 
 static void handle_menus(uint8_t key) {
-	int first;
-
 	switch (key) {
 		case sk_Up:
 			if (menu == 0) {
@@ -577,8 +570,8 @@ static void handle_menus(uint8_t key) {
 			}
 			break;
 		case sk_Right:
-		case sk_Enter:
-			first = next_focusable(menus[menu].content, -1, 1);
+		case sk_Enter: {
+			const int first = next_focusable(menus[menu].content, -1, 1);
 			if (first >= 0) {
 				focus = FOCUS_OPTIONS;
 				item = first;
@@ -586,19 +579,18 @@ static void handle_menus(uint8_t key) {
 				draw_options();
 			}
 			break;
+		}
 		default: break;
 	}
 }
 
 static void handle_options(uint8_t key) {
 	const element_t *e = &menus[menu].content[item];
-	int next;
-	char value;
 
 	switch (key) {
 		case sk_Up:
-		case sk_Down:
-			next = next_focusable(menus[menu].content, item, key == sk_Up ? -1 : 1);
+		case sk_Down: {
+			const int next = next_focusable(menus[menu].content, item, key == sk_Up ? -1 : 1);
 			if (next >= 0) {
 				item = next;
 				draw_options();
@@ -606,6 +598,7 @@ static void handle_options(uint8_t key) {
 				focus_header();
 			}
 			break;
+		}
 		case sk_Left:
 			focus = FOCUS_MENUS;
 			draw_menus();
@@ -617,9 +610,12 @@ static void handle_options(uint8_t key) {
 				draw_options();
 			break;
 		default:
-			if (e->type == ELEMENT_CHARACTER && (value = e->character.from_key(key)) != 0) {
-				*e->character.value = value;
-				draw_options();
+			if (e->type == ELEMENT_CHARACTER) {
+				const char value = e->character.from_key(key);
+				if (value != 0) {
+					*e->character.value = value;
+					draw_options();
+				}
 			}
 			break;
 	}
@@ -660,8 +656,7 @@ void gui_Run(void) {
 	draw_screen();
 
 	while (true) {
-		uint8_t key;
-		key = os_GetCSC();
+		const uint8_t key = os_GetCSC();
 
 		if (key == sk_Clear)
 			break;
@@ -732,9 +727,6 @@ static void write_variable(unsigned variable, pcas_ast_t *expression, pcas_error
 static void execute_simplify(void) {
 	char buffer[50];
 
-	pcas_ast_t *expression;
-	pcas_error_t err;
-
 	simplify_flags flags = SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL | SIMP_DERIV | SIMP_LIKE_TERMS;
 	compile_ids_mask ids = 0;
 
@@ -767,7 +759,8 @@ static void execute_simplify(void) {
 
 	console_write("Parsing input...");
 
-	expression = parse_variable(input, &err);
+	pcas_error_t err;
+	pcas_ast_t *expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
@@ -806,33 +799,29 @@ static void execute_simplify(void) {
 static void execute_evaluate(void) {
 	char buffer[50];
 
-	bool should_sub, should_eval;
-	pcas_ast_t *expression;
-	pcas_error_t err;
-
-	should_eval = evaluate_options.constants;
-	should_sub = evaluate_options.substitute;
+	const bool should_eval = evaluate_options.constants;
+	const bool should_sub = evaluate_options.substitute;
 
 	console_write("Parsing input...");
 
-	expression = parse_variable(input, &err);
+	pcas_error_t err;
+	pcas_ast_t *expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
 			simplify(expression, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
 
 			if (should_sub) {
-				pcas_ast_t *sub_from, *sub_to;
 				pcas_error_t err;
 
 				console_write("Parsing sub from...");
-				sub_from = parse_variable(evaluate_options.from, &err);
+				pcas_ast_t *sub_from = parse_variable(evaluate_options.from, &err);
 				simplify(sub_from, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
 
 				if (err == E_SUCCESS) {
 					if (sub_from != NULL) {
 						console_write("Parsing sub to...");
-						sub_to = parse_variable(evaluate_options.to, &err);
+						pcas_ast_t *sub_to = parse_variable(evaluate_options.to, &err);
 						simplify(sub_to, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL);
 
 						if (err == E_SUCCESS) {
@@ -899,9 +888,6 @@ static void execute_evaluate(void) {
 static void execute_expand(void) {
 	char buffer[50];
 
-	pcas_ast_t *expression;
-	pcas_error_t err;
-
 	expand_flags flags = 0;
 
 	if (expand_options.multiplication) {
@@ -913,7 +899,8 @@ static void execute_expand(void) {
 
 	console_write("Parsing input...");
 
-	expression = parse_variable(input, &err);
+	pcas_error_t err;
+	pcas_ast_t *expression = parse_variable(input, &err);
 
 	if (err == E_SUCCESS) {
 		if (expression != NULL) {
@@ -956,11 +943,11 @@ static void execute_expand(void) {
 }
 
 static pcas_ast_t *parse_respect_to(char character, pcas_error_t *err) {
-	char *theta = "theta";
+	const char *theta = "theta";
 
 	/*We treat the @ character as theta partially out of laziness*/
 	if (character == '@')
-		return parse((uint8_t *)theta, strlen(theta), str_table, err);
+		return parse((const uint8_t *)theta, strlen(theta), str_table, err);
 
 	return parse((uint8_t *)&character, 1, str_table, err);
 }
@@ -969,21 +956,16 @@ static pcas_ast_t *parse_respect_to(char character, pcas_error_t *err) {
 static void execute_calculus(Calculus kind, const calculus_options_t *options, const char *title) {
 	char buffer[50];
 
-	pcas_ast_t *items[MAX_ITEMS], *respect_to, *solution = NULL;
-	pcas_error_t err;
-	pcas_work_t work;
-	unsigned count;
-	bool show_work = options->show_work;
-	bool verify = options->verify;
-	bool series = options->series;
-	unsigned terms = kind == CALCULUS_DE ? (unsigned)(options->terms - '0') : 0;
-	bool satisfied = false;
+	const bool show_work = options->show_work;
+	const bool verify = options->verify;
 
 	compile_ids(CID_DERIVATIVE);
 
 	console_write("Parsing input...");
 
-	count = parse_variable_list(input, items, &err);
+	pcas_ast_t *items[MAX_ITEMS], *solution = NULL;
+	pcas_error_t err;
+	unsigned count = parse_variable_list(input, items, &err);
 
 	if (err == E_SUCCESS && verify) {
 		solution = parse_variable(options->solution, &err);
@@ -999,12 +981,14 @@ static void execute_calculus(Calculus kind, const calculus_options_t *options, c
 		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	} else {
-		respect_to = parse_respect_to(options->respect_to, &err);
+		pcas_ast_t *respect_to = parse_respect_to(options->respect_to, &err);
 
+		pcas_work_t work;
 		if (show_work)
 			work_Start(&work);
 
 		if (verify) {
+			bool satisfied = false;
 			console_write("Verifying...");
 			err = calculus_Verify(items, count, respect_to, solution, &satisfied);
 			if (err == E_SUCCESS)
@@ -1015,7 +999,8 @@ static void execute_calculus(Calculus kind, const calculus_options_t *options, c
 				: kind == CALCULUS_INTEGRAL ? "Integrating..."
 											: "Solving..."
 			);
-			err = calculus_Run(kind, items, count, respect_to, series, terms, buffer);
+			const unsigned terms = kind == CALCULUS_DE ? (unsigned)(options->terms - '0') : 0;
+			err = calculus_Run(kind, items, count, respect_to, options->series, terms, buffer);
 
 			if (err == E_SUCCESS && kind == CALCULUS_DE)
 				console_write(buffer);

@@ -5,17 +5,15 @@
 static bool eval_commutative(pcas_ast_t *e, eval_flags flags) {
 	/*How many numbers were accumulated. If <= 1, nothing changed*/
 	unsigned num_changed = false;
-	unsigned i;
-	mp_rat accumulator;
 
 	if (!(flags & EVAL_COMMUTATIVE))
 		return false;
 
 	{
 		unsigned numbers = 0, fractions = 0;
-		pcas_ast_t *child, *first = opbase(e);
+		const pcas_ast_t *first = opbase(e);
 
-		for (child = first; child != NULL; child = child->next) {
+		for (const pcas_ast_t *child = first; child != NULL; child = child->next) {
 			if (child->type == NODE_NUMBER)
 				numbers++;
 			else if (
@@ -35,10 +33,10 @@ static bool eval_commutative(pcas_ast_t *e, eval_flags flags) {
 			return false;
 	}
 
-	accumulator = num_FromInt(optype(e) == OP_MULT ? 1 : 0);
+	mp_rat accumulator = num_FromInt(optype(e) == OP_MULT ? 1 : 0);
 
-	for (i = 0; i < ast_ChildLength(e); i++) {
-		pcas_ast_t *child = ast_ChildGet(e, i);
+	for (unsigned i = 0; i < ast_ChildLength(e); i++) {
+		const pcas_ast_t *child = ast_ChildGet(e, i);
 
 		if (child->type == NODE_NUMBER) {
 			if (optype(e) == OP_MULT)
@@ -50,36 +48,31 @@ static bool eval_commutative(pcas_ast_t *e, eval_flags flags) {
 			i--;
 			num_changed++;
 		} else if (isoptype(e, OP_ADD) && isoptype(child, OP_DIV)) {
-			pcas_ast_t *c_num, *c_den;
-
-			c_num = ast_ChildGet(child, 0);
-			c_den = ast_ChildGet(child, 1);
+			const pcas_ast_t *c_num = ast_ChildGet(child, 0);
+			const pcas_ast_t *c_den = ast_ChildGet(child, 1);
 
 			if (c_num->type == NODE_NUMBER && c_den->type == NODE_NUMBER) {
-				mp_int a, b, c, d;
-				mp_int first, second, num, den;
-
 				/*a/b + c/d = (ad + bc)/(bd)*/
 
-				a = &accumulator->num;
-				b = &accumulator->den;
-				c = &c_num->op.num->num;
-				d = &c_den->op.num->num;
+				mp_int a = &accumulator->num;
+				mp_int b = &accumulator->den;
+				mp_int c = &c_num->op.num->num;
+				mp_int d = &c_den->op.num->num;
 
-				first = mp_int_alloc();
+				mp_int first = mp_int_alloc();
 				mp_int_init(first);
 
 				mp_int_mul(a, d, first);
 
-				second = mp_int_alloc();
+				mp_int second = mp_int_alloc();
 				mp_int_init(second);
 
 				mp_int_mul(b, c, second);
 
-				num = mp_int_alloc();
+				mp_int num = mp_int_alloc();
 				mp_int_add(first, second, num);
 
-				den = mp_int_alloc();
+				mp_int den = mp_int_alloc();
 				mp_int_init(den);
 
 				mp_int_mul(b, d, den);
@@ -118,28 +111,19 @@ static bool eval_commutative(pcas_ast_t *e, eval_flags flags) {
 static bool eval_div(pcas_ast_t *e, eval_flags flags);
 
 static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, eval_flags flags) {
-	pcas_ast_t *temp_num, *temp_den, *temp_div;
-
 	bool changed = false;
-	bool div_changed = false;
 
 	if (isoptype(num, OP_MULT)) {
-		unsigned i = 0;
-
-		for (i = 0; i < ast_ChildLength(num); i++) {
-			temp_num = ast_ChildGet(num, i);
+		for (unsigned i = 0; i < ast_ChildLength(num); i++) {
+			const pcas_ast_t *temp_num = ast_ChildGet(num, i);
 
 			if (isoptype(den, OP_MULT)) {
-				unsigned j;
+				for (unsigned j = 0; j < ast_ChildLength(den); j++) {
+					const pcas_ast_t *temp_den = ast_ChildGet(den, j);
 
-				for (j = 0; j < ast_ChildLength(den); j++) {
-					temp_den = ast_ChildGet(den, j);
+					pcas_ast_t *temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
 
-					temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
-
-					div_changed = eval_div(temp_div, flags);
-
-					if (div_changed) {
+					if (eval_div(temp_div, flags)) {
 						ast_Cleanup(ast_ChildRemoveIndex(num, i));
 						ast_Cleanup(ast_ChildRemoveIndex(den, j));
 
@@ -154,13 +138,9 @@ static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, eval_flags flags) {
 					}
 				}
 			} else {
-				temp_den = den;
+				pcas_ast_t *temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(den));
 
-				temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
-
-				div_changed = eval_div(temp_div, flags);
-
-				if (div_changed) {
+				if (eval_div(temp_div, flags)) {
 					ast_Cleanup(ast_ChildRemoveIndex(num, i));
 					replace_node(den, ast_MakeNumber(num_FromInt(1)));
 
@@ -174,18 +154,12 @@ static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, eval_flags flags) {
 		}
 
 	} else if (isoptype(den, OP_MULT)) {
-		unsigned j;
+		for (unsigned j = 0; j < ast_ChildLength(den); j++) {
+			const pcas_ast_t *temp_den = ast_ChildGet(den, j);
 
-		temp_num = num;
+			pcas_ast_t *temp_div = ast_MakeBinary(OP_DIV, ast_Copy(num), ast_Copy(temp_den));
 
-		for (j = 0; j < ast_ChildLength(den); j++) {
-			temp_den = ast_ChildGet(den, j);
-
-			temp_div = ast_MakeBinary(OP_DIV, ast_Copy(temp_num), ast_Copy(temp_den));
-
-			div_changed = eval_div(temp_div, flags);
-
-			if (div_changed) {
+			if (eval_div(temp_div, flags)) {
 				replace_node(num, temp_div);
 				ast_Cleanup(ast_ChildRemoveIndex(den, j));
 
@@ -203,21 +177,17 @@ static bool eval_div_mult(pcas_ast_t *num, pcas_ast_t *den, eval_flags flags) {
 }
 
 static bool eval_div(pcas_ast_t *e, eval_flags flags) {
-	pcas_ast_t *num, *den;
-
 	bool changed = false;
 
-	num = ast_ChildGet(e, 0);
-	den = ast_ChildGet(e, 1);
+	pcas_ast_t *num = ast_ChildGet(e, 0);
+	pcas_ast_t *den = ast_ChildGet(e, 1);
 
 	if (flags & EVAL_BASIC_IDENTITIES) {
 		if (is_negative_for_sure(num) && is_negative_for_sure(den)) {
-			pcas_ast_t *new_div;
-
 			absolute_val(num);
 			absolute_val(den);
 
-			new_div = ast_MakeBinary(OP_DIV, ast_Copy(num), ast_Copy(den));
+			pcas_ast_t *new_div = ast_MakeBinary(OP_DIV, ast_Copy(num), ast_Copy(den));
 
 			eval_div(new_div, flags);
 			replace_node(e, new_div);
@@ -253,16 +223,12 @@ static bool eval_div(pcas_ast_t *e, eval_flags flags) {
 		return false;
 
 	if (isoptype(num, OP_POW)) {
-		pcas_ast_t *base1, *power1;
-
-		base1 = ast_ChildGet(num, 0);
-		power1 = ast_ChildGet(num, 1);
+		const pcas_ast_t *base1 = ast_ChildGet(num, 0);
+		pcas_ast_t *power1 = ast_ChildGet(num, 1);
 
 		if (isoptype(den, OP_POW)) {
-			pcas_ast_t *base2, *power2;
-
-			base2 = ast_ChildGet(den, 0);
-			power2 = ast_ChildGet(den, 1);
+			const pcas_ast_t *base2 = ast_ChildGet(den, 0);
+			const pcas_ast_t *power2 = ast_ChildGet(den, 1);
 
 			if (ast_Compare(base1, base2)) {
 				/*Subtract powers*/
@@ -338,11 +304,9 @@ static bool power_in_small_range(pcas_ast_t *a, pcas_ast_t *b) {
 
 static bool eval_pow(pcas_ast_t *e, eval_flags flags) {
 	/*a^b*/
-	pcas_ast_t *a, *b;
+	pcas_ast_t *a = ast_ChildGet(e, 0);
+	pcas_ast_t *b = ast_ChildGet(e, 1);
 	bool changed = false;
-
-	a = ast_ChildGet(e, 0);
-	b = ast_ChildGet(e, 1);
 
 	if (!a || !b) {
 		return false;
@@ -404,9 +368,7 @@ static bool eval_pow(pcas_ast_t *e, eval_flags flags) {
 	if (a->type == NODE_NUMBER && b->type == NODE_NUMBER) {
 		if (mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
 			if (flags & EVAL_POWERS_FULL || (flags & EVAL_POWERS_SMALL && power_in_small_range(a, b))) {
-				mp_rat result;
-
-				result = num_FromInt(1);
+				mp_rat result = num_FromInt(1);
 
 				mp_int_expt_full(&a->op.num->num, &b->op.num->num, &result->num);
 
@@ -450,18 +412,17 @@ static bool eval_pow(pcas_ast_t *e, eval_flags flags) {
 		a = ast_ChildGet(temp, 1);
 
 		if (mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num) && mp_rat_compare_zero(b->op.num) > 0) {
-			mp_int answer, check;
-			mp_small small;
 			/*Set answer = small root of a*/
-			answer = mp_int_alloc();
+			mp_int answer = mp_int_alloc();
 			mp_int_init(answer);
 
+			mp_small small;
 			mp_int_to_int(&a->op.num->num, &small);
 
 			mp_int_root(&b->op.num->num, small, answer);
 
 			/*Check if answer ^ small == b*/
-			check = mp_int_alloc();
+			mp_int check = mp_int_alloc();
 			mp_int_init(check);
 
 			mp_int_expt(answer, small, check);
@@ -486,20 +447,17 @@ static bool eval_pow(pcas_ast_t *e, eval_flags flags) {
 
 static bool eval_int(pcas_ast_t *e, eval_flags flags) {
 	bool changed = false;
-	mp_rat res;
-	pcas_ast_t *a;
-	mp_int remainder;
 
 	if (!(flags & EVAL_INT))
 		return false;
 
-	a = ast_ChildGet(e, 0);
+	const pcas_ast_t *a = ast_ChildGet(e, 0);
 
-	remainder = mp_int_alloc();
+	mp_int remainder = mp_int_alloc();
 	mp_int_init(remainder);
 
 	if (a->type == NODE_NUMBER) {
-		res = num_FromInt(1);
+		mp_rat res = num_FromInt(1);
 
 		mp_int_div(&a->op.num->num, &a->op.num->den, &res->num, remainder);
 
@@ -510,13 +468,11 @@ static bool eval_int(pcas_ast_t *e, eval_flags flags) {
 
 		changed = true;
 	} else if (isoptype(a, OP_DIV)) {
-		pcas_ast_t *num, *den;
-
-		num = ast_ChildGet(a, 0);
-		den = ast_ChildGet(a, 1);
+		const pcas_ast_t *num = ast_ChildGet(a, 0);
+		const pcas_ast_t *den = ast_ChildGet(a, 1);
 
 		if (num->type == NODE_NUMBER && den->type == NODE_NUMBER) {
-			res = num_FromInt(1);
+			mp_rat res = num_FromInt(1);
 
 			/*That is a lot of num lol*/
 			mp_int_div(&num->op.num->num, &den->op.num->num, &res->num, remainder);
@@ -536,13 +492,11 @@ static bool eval_int(pcas_ast_t *e, eval_flags flags) {
 }
 
 static bool eval_abs(pcas_ast_t *e, eval_flags flags) {
-	bool changed = false;
-	pcas_ast_t *a = ast_ChildGet(e, 0);
-
 	if (!(flags & EVAL_ABS))
 		return false;
 
-	changed = absolute_val(a) || a->type == NODE_NUMBER;
+	pcas_ast_t *a = ast_ChildGet(e, 0);
+	const bool changed = absolute_val(a) || a->type == NODE_NUMBER;
 
 	if (changed)
 		replace_node(e, a);
@@ -551,10 +505,8 @@ static bool eval_abs(pcas_ast_t *e, eval_flags flags) {
 }
 
 static bool eval_log(pcas_ast_t *e, eval_flags flags) {
-	pcas_ast_t *base, *val;
-
-	base = ast_ChildGet(e, 0);
-	val = ast_ChildGet(e, 1);
+	const pcas_ast_t *base = ast_ChildGet(e, 0);
+	const pcas_ast_t *val = ast_ChildGet(e, 1);
 
 	if (flags & EVAL_BASIC_IDENTITIES) {
 		/*log(1) = 0*/
@@ -568,10 +520,8 @@ static bool eval_log(pcas_ast_t *e, eval_flags flags) {
 		/*log(A^B)=Blog(A)*/
 
 		if (isoptype(val, OP_POW)) {
-			pcas_ast_t *power_base, *power_exponent;
-
-			power_base = ast_ChildGet(val, 0);
-			power_exponent = ast_ChildGet(val, 1);
+			const pcas_ast_t *power_base = ast_ChildGet(val, 0);
+			const pcas_ast_t *power_exponent = ast_ChildGet(val, 1);
 
 			replace_node(
 				e,
@@ -591,7 +541,7 @@ static bool eval_log(pcas_ast_t *e, eval_flags flags) {
 #define factorial_in_small_range(a) (mp_rat_compare_value((a)->op.num, 10, 1) <= 0)
 
 static bool eval_factorial(pcas_ast_t *e, eval_flags flags) {
-	pcas_ast_t *a = ast_ChildGet(e, 0);
+	const pcas_ast_t *a = ast_ChildGet(e, 0);
 
 	if (a->type == NODE_NUMBER) {
 		if (flags & EVAL_BASIC_IDENTITIES) {
@@ -603,12 +553,9 @@ static bool eval_factorial(pcas_ast_t *e, eval_flags flags) {
 		}
 
 		if (mp_rat_is_integer(a->op.num) && mp_rat_compare_zero(a->op.num) > 0) {
-			mp_rat accumulator;
-			mp_int i;
-
 			if (flags & EVAL_FACTORIAL_FULL || (flags & EVAL_FACTORIAL_SMALL && factorial_in_small_range(a))) {
-				accumulator = num_FromInt(1);
-				i = mp_int_alloc();
+				mp_rat accumulator = num_FromInt(1);
+				mp_int i = mp_int_alloc();
 				mp_int_init_copy(i, &a->op.num->num);
 
 				while (mp_int_compare_zero(i) != 0) {
@@ -631,7 +578,6 @@ static bool eval_factorial(pcas_ast_t *e, eval_flags flags) {
 /*Simplifies expressions like 5 + 5 to 10*/
 static bool _eval(pcas_ast_t *e, eval_flags flags) {
 	bool changed = false;
-	pcas_ast_t *current;
 
 	/*Get a head start to evaluate the identity ln(A^B)=Bln(A)
     before child power node is evaluated*/
@@ -641,7 +587,7 @@ static bool _eval(pcas_ast_t *e, eval_flags flags) {
 	if (e->type != NODE_OPERATOR)
 		return false;
 
-	for (current = e->op.operator.base; current != NULL; current = current->next) {
+	for (pcas_ast_t *current = e->op.operator.base; current != NULL; current = current->next) {
 		changed |= eval(current, flags);
 	}
 
@@ -663,9 +609,8 @@ static bool _eval(pcas_ast_t *e, eval_flags flags) {
 }
 
 bool eval(pcas_ast_t *e, eval_flags flags) {
-	bool changed;
 	work_Enter(e);
-	changed = _eval(e, flags);
+	const bool changed = _eval(e, flags);
 	work_Leave(e);
 	return changed;
 }
@@ -677,10 +622,9 @@ static bool _substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t 
 	}
 
 	if (e->type == NODE_OPERATOR) {
-		pcas_ast_t *child;
 		bool changed = false;
 
-		for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+		for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next)
 			changed |= substitute(child, from, to);
 
 		return changed;
@@ -690,9 +634,8 @@ static bool _substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t 
 }
 
 bool substitute(pcas_ast_t *e, const pcas_ast_t *from, const pcas_ast_t *to) {
-	bool changed;
 	work_Enter(e);
-	changed = _substitute(e, from, to);
+	const bool changed = _substitute(e, from, to);
 	work_Leave(e);
 	return changed;
 }

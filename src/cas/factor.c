@@ -4,18 +4,14 @@
 
 /*Handles gcd for AB, BC gcd = B*/
 static pcas_ast_t *gcd_mult(const pcas_ast_t *mult, const pcas_ast_t *b) {
-	unsigned i;
-	pcas_ast_t *current_gcd, *copy;
+	pcas_ast_t *copy = ast_Copy(b);
 
-	copy = ast_Copy(b);
+	pcas_ast_t *current_gcd = ast_MakeOperator(OP_MULT);
 
-	current_gcd = ast_MakeOperator(OP_MULT);
+	for (unsigned i = 0; i < ast_ChildLength(mult); i++) {
+		const pcas_ast_t *child = ast_ChildGet(mult, i);
 
-	for (i = 0; i < ast_ChildLength(mult); i++) {
-		pcas_ast_t *inner_gcd;
-		pcas_ast_t *child = ast_ChildGet(mult, i);
-
-		inner_gcd = gcd(child, copy);
+		pcas_ast_t *inner_gcd = gcd(child, copy);
 
 		ast_ChildAppend(current_gcd, inner_gcd);
 
@@ -31,16 +27,11 @@ static pcas_ast_t *gcd_mult(const pcas_ast_t *mult, const pcas_ast_t *b) {
 
 /*Handles gcd for A + AB, A gcd = A*/
 static pcas_ast_t *gcd_add(const pcas_ast_t *add, const pcas_ast_t *b) {
-	unsigned i;
-	pcas_ast_t *current_gcd;
+	pcas_ast_t *current_gcd = gcd(ast_ChildGet(add, 0), b);
 
-	current_gcd = gcd(ast_ChildGet(add, 0), b);
-
-	for (i = 1; i < ast_ChildLength(add); i++) {
-		pcas_ast_t *temp_gcd, *child;
-
-		child = ast_ChildGet(add, i);
-		temp_gcd = gcd(current_gcd, child);
+	for (unsigned i = 1; i < ast_ChildLength(add); i++) {
+		const pcas_ast_t *child = ast_ChildGet(add, i);
+		pcas_ast_t *temp_gcd = gcd(current_gcd, child);
 
 		ast_Cleanup(current_gcd);
 		current_gcd = temp_gcd;
@@ -50,11 +41,10 @@ static pcas_ast_t *gcd_add(const pcas_ast_t *add, const pcas_ast_t *b) {
 }
 
 static pcas_ast_t *gcd_div(const pcas_ast_t *div, const pcas_ast_t *b) {
-	const pcas_ast_t *num1, *num2, *den1, *den2;
-	pcas_ast_t *num_g, *den_g, *one = NULL;
-
-	num1 = ast_ChildGet(div, 0);
-	den1 = ast_ChildGet(div, 1);
+	const pcas_ast_t *num1 = ast_ChildGet(div, 0);
+	const pcas_ast_t *den1 = ast_ChildGet(div, 1);
+	const pcas_ast_t *num2, *den2;
+	pcas_ast_t *one = NULL;
 
 	if (isoptype(b, OP_DIV)) {
 		num2 = ast_ChildGet(b, 0);
@@ -64,8 +54,8 @@ static pcas_ast_t *gcd_div(const pcas_ast_t *div, const pcas_ast_t *b) {
 		den2 = one = ast_MakeNumber(num_FromInt(1));
 	}
 
-	num_g = gcd(num1, num2);
-	den_g = gcd(den1, den2);
+	pcas_ast_t *num_g = gcd(num1, num2);
+	pcas_ast_t *den_g = gcd(den1, den2);
 
 	ast_Cleanup(one);
 
@@ -74,28 +64,20 @@ static pcas_ast_t *gcd_div(const pcas_ast_t *div, const pcas_ast_t *b) {
 
 /*gcd of both bases, raised to smallest power*/
 static pcas_ast_t *gcd_pow(const pcas_ast_t *pow, const pcas_ast_t *b) {
-	pcas_ast_t *base1, *power1;
-
-	base1 = ast_ChildGet(pow, 0);
-	power1 = ast_ChildGet(pow, 1);
+	const pcas_ast_t *base1 = ast_ChildGet(pow, 0);
+	const pcas_ast_t *power1 = ast_ChildGet(pow, 1);
 
 	/*We purposefully ignore A^X, A^Y and only yield when
     we can determine the numerical powers*/
 
 	if (isoptype(b, OP_POW)) {
-		pcas_ast_t *power2, *base2;
-
-		power1 = ast_ChildGet(pow, 1);
-		base2 = ast_ChildGet(b, 0);
-		power2 = ast_ChildGet(b, 1);
+		const pcas_ast_t *base2 = ast_ChildGet(b, 0);
+		const pcas_ast_t *power2 = ast_ChildGet(b, 1);
 
 		if (power1->type == NODE_NUMBER && power2->type == NODE_NUMBER) {
-			bool use_first;
-			pcas_ast_t *current_gcd;
+			const bool use_first = mp_rat_compare(power1->op.num, power2->op.num) < 0;
 
-			use_first = mp_rat_compare(power1->op.num, power2->op.num) < 0;
-
-			current_gcd = gcd(base1, base2);
+			pcas_ast_t *current_gcd = gcd(base1, base2);
 
 			return ast_MakeBinary(OP_POW, current_gcd, use_first ? ast_Copy(power1) : ast_Copy(power2));
 		}
@@ -117,8 +99,7 @@ pcas_ast_t *gcd(const pcas_ast_t *a, const pcas_ast_t *b) {
 
 	if (a->type == NODE_NUMBER && b->type == NODE_NUMBER) {
 		if (mp_rat_is_integer(a->op.num) && mp_rat_is_integer(b->op.num)) {
-			mp_rat gcd;
-			gcd = num_FromInt(1);
+			mp_rat gcd = num_FromInt(1);
 
 			mp_int_gcd(&a->op.num->num, &b->op.num->num, &gcd->num);
 
@@ -154,10 +135,8 @@ pcas_ast_t *gcd(const pcas_ast_t *a, const pcas_ast_t *b) {
 
 /*Collects the non-numeric factors of e, with divisors in den*/
 static void collect_symbolic_factors(pcas_ast_t *e, pcas_ast_t *num, pcas_ast_t *den) {
-	pcas_ast_t *child;
-
 	if (isoptype(e, OP_MULT)) {
-		for (child = opbase(e); child != NULL; child = child->next)
+		for (pcas_ast_t *child = opbase(e); child != NULL; child = child->next)
 			collect_symbolic_factors(child, num, den);
 	} else if (isoptype(e, OP_DIV)) {
 		collect_symbolic_factors(opbase(e), num, den);
@@ -170,14 +149,11 @@ static void collect_symbolic_factors(pcas_ast_t *e, pcas_ast_t *num, pcas_ast_t 
 /*Takes ownership of neither. True if a and b have the same children in any order.*/
 static bool same_children(pcas_ast_t *a, pcas_ast_t *b) {
 	pcas_ast_t *remaining = ast_Copy(b);
-	pcas_ast_t *child;
 	bool same = ast_ChildLength(a) == ast_ChildLength(b);
 
-	for (child = opbase(a); child != NULL && same; child = child->next) {
-		unsigned j;
-
+	for (const pcas_ast_t *child = opbase(a); child != NULL && same; child = child->next) {
 		same = false;
-		for (j = 0; j < ast_ChildLength(remaining); j++) {
+		for (unsigned j = 0; j < ast_ChildLength(remaining); j++) {
 			if (ast_Compare(child, ast_ChildGet(remaining, j))) {
 				ast_Cleanup(ast_ChildRemoveIndex(remaining, j));
 				same = true;
@@ -194,12 +170,11 @@ static bool same_children(pcas_ast_t *a, pcas_ast_t *b) {
 static bool same_symbolic_part(pcas_ast_t *a, pcas_ast_t *b) {
 	pcas_ast_t *a_num = ast_MakeOperator(OP_MULT), *a_den = ast_MakeOperator(OP_MULT);
 	pcas_ast_t *b_num = ast_MakeOperator(OP_MULT), *b_den = ast_MakeOperator(OP_MULT);
-	bool same;
 
 	collect_symbolic_factors(a, a_num, a_den);
 	collect_symbolic_factors(b, b_num, b_den);
 
-	same = same_children(a_num, b_num) && same_children(a_den, b_den);
+	const bool same = same_children(a_num, b_num) && same_children(a_den, b_den);
 
 	ast_Cleanup(a_num);
 	ast_Cleanup(a_den);
@@ -210,42 +185,36 @@ static bool same_symbolic_part(pcas_ast_t *a, pcas_ast_t *b) {
 }
 
 bool factor_addition(pcas_ast_t *e, factor_flags flags) {
-	pcas_ast_t *child;
 	bool changed = false;
 
 	if (e->type != NODE_OPERATOR)
 		return false;
 
-	for (child = ast_ChildGet(e, 0); child != NULL; child = child->next)
+	for (pcas_ast_t *child = ast_ChildGet(e, 0); child != NULL; child = child->next)
 		changed |= factor_addition(child, flags);
 
 	if (isoptype(e, OP_ADD)) {
-		unsigned i, j;
-		pcas_ast_t *g;
-
-		for (i = 0; i < ast_ChildLength(e); i++) {
+		for (unsigned i = 0; i < ast_ChildLength(e); i++) {
 			pcas_ast_t *a = ast_ChildGet(e, i);
 
-			for (j = i + 1; j < ast_ChildLength(e); j++) {
+			for (unsigned j = i + 1; j < ast_ChildLength(e); j++) {
 				pcas_ast_t *b = ast_ChildGet(e, j);
 
 				if (!(flags & FAC_SIMPLE_ADDITION_NONEVALUATEABLE) && !same_symbolic_part(a, b))
 					continue;
 
-				g = gcd(a, b);
+				pcas_ast_t *g = gcd(a, b);
 
 				if (!is_ast_int(g, 1)) {
-					bool can_factor;
-					pcas_ast_t *append, *first, *second;
+					pcas_ast_t *first = ast_MakeBinary(OP_DIV, ast_Copy(a), ast_Copy(g));
+					pcas_ast_t *second = ast_MakeBinary(OP_DIV, ast_Copy(b), ast_Copy(g));
 
-					first = ast_MakeBinary(OP_DIV, ast_Copy(a), ast_Copy(g));
-					second = ast_MakeBinary(OP_DIV, ast_Copy(b), ast_Copy(g));
-
-					append = ast_MakeBinary(OP_MULT, ast_Copy(g), ast_MakeBinary(OP_ADD, first, second));
+					pcas_ast_t *append = ast_MakeBinary(OP_MULT, ast_Copy(g), ast_MakeBinary(OP_ADD, first, second));
 
 					simplify(first, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
 					simplify(second, SIMP_NORMALIZE | SIMP_COMMUTATIVE | SIMP_RATIONAL | SIMP_EVAL);
 
+					bool can_factor;
 					if (first->type == NODE_NUMBER && second->type == NODE_NUMBER)
 						can_factor = flags & FAC_SIMPLE_ADDITION_EVALUATEABLE;
 					else
@@ -290,9 +259,8 @@ static bool _factor(pcas_ast_t *e, factor_flags flags) {
 }
 
 bool factor(pcas_ast_t *e, factor_flags flags) {
-	bool changed;
 	work_Enter(e);
-	changed = _factor(e, flags);
+	const bool changed = _factor(e, flags);
 	work_Leave(e);
 	return changed;
 }

@@ -22,12 +22,10 @@ const char *operators[AMOUNT_OPS] = {"+",   "*",    "/",    "^",     "root", "lo
 const char *symbols[SYM_THETA - SYM_IMAG + 1] = {"i", "pi", "e", "theta"};
 
 void _print_tree(const pcas_ast_t *e, unsigned indent, unsigned index) {
-	unsigned i;
-
 	if (e == NULL)
 		return;
 
-	for (i = 0; i < indent * index; i++)
+	for (unsigned i = 0; i < indent * index; i++)
 		DBG((" "));
 
 	switch (e->type) {
@@ -44,9 +42,8 @@ void _print_tree(const pcas_ast_t *e, unsigned indent, unsigned index) {
 				DBG(("SYMBOL: %c\n", e->op.symbol));
 			break;
 		case NODE_OPERATOR: {
-			pcas_ast_t *current;
 			DBG(("OPERATOR: %s\n", operators[optype(e)]));
-			for (current = opbase(e); current != NULL; current = current->next) {
+			for (const pcas_ast_t *current = opbase(e); current != NULL; current = current->next) {
 				_print_tree(current, indent, index + 1);
 			}
 			break;
@@ -62,8 +59,7 @@ unsigned dbg_count_nodes(const pcas_ast_t *e) {
 	unsigned amount = 1;
 
 	if (e->type == NODE_OPERATOR) {
-		pcas_ast_t *current;
-		for (current = opbase(e); current != NULL; current = current->next)
+		for (const pcas_ast_t *current = opbase(e); current != NULL; current = current->next)
 			amount += dbg_count_nodes(current);
 	}
 
