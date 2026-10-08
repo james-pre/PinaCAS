@@ -97,7 +97,7 @@ void deflate(num **p, unsigned n, const num &r);
 bool find_roots(num **p, unsigned *n, Root *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
-ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor);
+ast *polynomial(num *const *p, unsigned n, const ast &m, const num &divisor);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
 ast *factored_form(num **p, unsigned n, const Root *roots, unsigned count, const ast &m);

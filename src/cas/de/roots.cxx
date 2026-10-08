@@ -311,7 +311,7 @@ bool find_roots(num **p, unsigned *n, Root *roots, unsigned *count) {
 	return found;
 }
 
-ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor) {
+ast *polynomial(num *const *p, unsigned n, const ast &m, const num &divisor) {
 	ast *sum = ast::make(Op::Add);
 
 	for (unsigned k = n + 1; k-- > 0;) {
