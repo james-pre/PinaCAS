@@ -147,9 +147,7 @@ static CalculusOptions de_options =
 static void execute_simplify(void);
 static void execute_evaluate(void);
 static void execute_expand(void);
-static void execute_derivative(void);
-static void execute_integral(void);
-static void execute_de(void);
+static void execute_calculus(calculus::Kind kind, const CalculusOptions *options, const char *title);
 static void close_console(void);
 
 static constexpr Element header[] = {variable("Input", &input), variable("Output", &output), end};
@@ -184,14 +182,14 @@ static constexpr Element expand_content[] = {
 static constexpr Element derivative_content[] = {
 	letter("Respect to:", &derivative_options.respect_to),
 	checkbox("Show work", &derivative_options.show_work),
-	button("Differentiate", execute_derivative),
+	button("Differentiate", [] { execute_calculus(calculus::Kind::Derivative, &derivative_options, "Derivative"); }),
 	end
 };
 
 static constexpr Element integral_content[] = {
 	letter("Respect to:", &integral_options.respect_to),
 	checkbox("Show work", &integral_options.show_work),
-	button("Integrate", execute_integral),
+	button("Integrate", [] { execute_calculus(calculus::Kind::Integral, &integral_options, "Integral"); }),
 	end
 };
 
@@ -202,7 +200,7 @@ static constexpr Element de_content[] = {
 	variable("Solution in:", &de_options.solution),
 	checkbox("Power series", &de_options.series),
 	digit("Series terms:", &de_options.terms),
-	button("Solve", execute_de),
+	button("Solve", [] { execute_calculus(calculus::Kind::DiffEq, &de_options, "Differential equation"); }),
 	end
 };
 
@@ -976,7 +974,7 @@ static ast *parse_respect_to(char character, Error *err) {
 	return parse(reinterpret_cast<uint8_t *>(&character), 1, str_table, err);
 }
 
-/*Runs a calculus function on the input with the options in context, then shows the work or the result*/
+/* Runs a calculus function on the input with the options in context, then shows the work or the result */
 static void execute_calculus(calculus::Kind kind, const CalculusOptions *options, const char *title) {
 	char buffer[50];
 
@@ -1067,18 +1065,6 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 	ast::dispose(solution);
 
 	console_finish();
-}
-
-static void execute_derivative(void) {
-	execute_calculus(calculus::Kind::Derivative, &derivative_options, "Derivative");
-}
-
-static void execute_integral(void) {
-	execute_calculus(calculus::Kind::Integral, &integral_options, "Integral");
-}
-
-static void execute_de(void) {
-	execute_calculus(calculus::Kind::DiffEq, &de_options, "Differential equation");
 }
 
 #endif
