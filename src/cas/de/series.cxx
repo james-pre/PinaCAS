@@ -3,23 +3,23 @@
 #include "../../work.hxx"
 
 /*Highest degree of a coefficient or right side*/
-#define MAX_SERIES_DEGREE 12
+constexpr int MAX_SERIES_DEGREE = 12;
 /*Highest index of a coefficient that is found*/
-#define MAX_SERIES_INDEX 30
+constexpr int MAX_SERIES_INDEX = 30;
 
 /*The term p (x - x0)^j y^(k) of the equation*/
-typedef struct {
+struct SeriesTerm {
 	unsigned k, j;
 	num *p;
-} series_term_t;
+};
 
-typedef struct {
+struct Series {
 	DiffEq *de;
 	/*x, or x - x0 when the center x0 is not zero*/
 	ast *base;
 	/*Name of the coefficients and the summation index*/
 	ast *name, *index;
-	series_term_t *terms;
+	SeriesTerm *terms;
 	unsigned count;
 	/*The right side in powers of the base, up to g_degree, which is -1 when it is zero*/
 	num *g[MAX_SERIES_DEGREE + 1];
@@ -30,7 +30,7 @@ typedef struct {
 	unsigned start;
 	/*Coefficient of y^(order) at the center*/
 	num *lead;
-} series_t;
+};
 
 /*Fills p with the coefficients of e in powers of x - center and returns its degree, -1 if e is zero, or -2 if e is not a polynomial with rational coefficients*/
 static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center, num **p) {
@@ -81,11 +81,10 @@ static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center
 }
 
 /*Reads the terms of the equation and its right side in powers of x - center. Returns false if they are not polynomials with rational coefficients.*/
-static bool load_terms(series_t *s, const ast &center) {
+static bool load_terms(Series *s, const ast &center) {
 	num *p[MAX_SERIES_DEGREE + 1];
 
-	s->terms =
-		static_cast<series_term_t *>(malloc(sizeof(series_term_t) * (s->de->order + 1) * (MAX_SERIES_DEGREE + 1)));
+	s->terms = static_cast<SeriesTerm *>(malloc(sizeof(SeriesTerm) * (s->de->order + 1) * (MAX_SERIES_DEGREE + 1)));
 	s->count = 0;
 	s->g_degree = -1;
 
@@ -111,7 +110,7 @@ static bool load_terms(series_t *s, const ast &center) {
 	return s->g_degree != -2;
 }
 
-static void free_series(series_t *s) {
+static void free_series(Series *s) {
 	for (unsigned i = 0; i < s->count; i++)
 		num::dispose(s->terms[i].p);
 	for (int j = 0; j <= s->g_degree; j++)
@@ -124,7 +123,7 @@ static void free_series(series_t *s) {
 }
 
 /*Returns the index plus offset*/
-static ast *index_plus(const series_t *s, int offset) {
+static ast *index_plus(const Series *s, int offset) {
 	if (offset == 0)
 		return s->index->copy();
 
@@ -132,7 +131,7 @@ static ast *index_plus(const series_t *s, int offset) {
 }
 
 /*Returns (n + top)(n + top - 1)...(n + top - k + 1) for the index n*/
-static ast *falling(const series_t *s, int top, unsigned k) {
+static ast *falling(const Series *s, int top, unsigned k) {
 	ast *product = ast::make(Op::Mult);
 
 	product->appendChild(integer(1));
@@ -154,16 +153,16 @@ static void falling_value(num &r, int m, int top, unsigned k) {
 }
 
 /*Returns the coefficient with the subscript. Takes ownership of subscript.*/
-static ast *coefficient(const series_t *s, ast *subscript) {
+static ast *coefficient(const Series *s, ast *subscript) {
 	return ast::make(Op::Subscript, s->name->copy(), subscript);
 }
 
-static ast *base_power(const series_t *s, ast *exponent) {
+static ast *base_power(const Series *s, ast *exponent) {
 	return ast::make(Op::Pow, s->base->copy(), exponent);
 }
 
 /*Returns the sum of term from the index equal to lower to infinity, written with a minus sign in front when p is negative. Takes ownership of term.*/
-static ast *series_sum(const series_t *s, const num &p, ast *term, unsigned lower) {
+static ast *series_sum(const Series *s, const num &p, ast *term, unsigned lower) {
 	ast *sum = ast::make(Op::Sum);
 	num *magnitude = p.copy();
 
@@ -178,7 +177,7 @@ static ast *series_sum(const series_t *s, const num &p, ast *term, unsigned lowe
 }
 
 /*Returns the right side as a polynomial in the base*/
-static ast *right_side(const series_t *s) {
+static ast *right_side(const Series *s) {
 	if (s->g_degree < 0)
 		return integer(0);
 
@@ -188,11 +187,11 @@ static ast *right_side(const series_t *s) {
 	return g;
 }
 
-static void record_sums(const series_t *s, const char *text, bool shifted) {
+static void record_sums(const Series *s, const char *text, bool shifted) {
 	ast *left = ast::make(Op::Add);
 
 	for (unsigned i = 0; i < s->count; i++) {
-		const series_term_t *t = &s->terms[i];
+		const SeriesTerm *t = &s->terms[i];
 		const int shift = (int)t->k - (int)t->j;
 
 		ast *term;
@@ -214,7 +213,7 @@ static void record_sums(const series_t *s, const char *text, bool shifted) {
 }
 
 /*Records y = sum of c_n (x - x0)^n, its derivatives, and the equation they make*/
-static void record_substitution(const series_t *s) {
+static void record_substitution(const Series *s) {
 	if (!s->base->compare(*s->de->x)) {
 		ast *left = ast::make(Op::Add);
 
@@ -293,9 +292,9 @@ static int degree_of(num **p) {
 }
 
 /*Returns the polynomial p of degree n in the index with its rational roots factored out*/
-static ast *factored_polynomial(const series_t *s, num **p, unsigned n) {
+static ast *factored_polynomial(const Series *s, num **p, unsigned n) {
 	num *copy[DiffEq::max_order + 1];
-	root_t roots[DiffEq::max_order];
+	Root roots[DiffEq::max_order];
 	unsigned count = 0;
 
 	for (unsigned d = 0; d <= n; d++)
@@ -312,7 +311,7 @@ static ast *factored_polynomial(const series_t *s, num **p, unsigned n) {
 }
 
 /*Records the first equations, the sum from the start of the recurrence, and the recurrence relation*/
-static void record_recurrence(series_t *s) {
+static void record_recurrence(Series *s) {
 	num *P[DiffEq::max_order + 1], *r = num::from(0), *value = num::from(0);
 	ast *left = ast::make(Op::Add), *right = ast::make(Op::Add), *zero = integer(0);
 	const unsigned order = s->de->order;
@@ -420,7 +419,7 @@ static ast *combination_of(num **c, ast **constants, unsigned free_count) {
 }
 
 /*Returns c times the base to the power i, keeping a factor of 1 on a sum so that it stays one term*/
-static ast *series_term(const series_t *s, const num &c, unsigned i) {
+static ast *series_term(const Series *s, const num &c, unsigned i) {
 	ast *power = i == 0 ? nullptr : i == 1 ? s->base->copy() : base_power(s, integer((int)i));
 
 	if (power == nullptr)
@@ -461,7 +460,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		conditions[de->conditions[i].order] = &de->conditions[i];
 	}
 
-	series_t s;
+	Series s;
 	s.de = de;
 	s.base = nullptr;
 	s.name = nullptr;

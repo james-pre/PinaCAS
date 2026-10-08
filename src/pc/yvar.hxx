@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
-typedef struct {
+struct Header {
 	char comment[42];
 	uint16_t var_len;
 	uint16_t checksum;
-} header_t;
+};
 
-typedef struct {
-	header_t header;
+struct YVar {
+	Header header;
 
 	uint16_t len;
 
@@ -22,12 +22,12 @@ typedef struct {
 
 	uint16_t yvar_data_len;
 	uint8_t *data;
-} yvar_t;
+};
 
 /*Only works on little endian systems right now.*/
 
-int yvar_Read(yvar_t *yvar, FILE *file);
+int yvar_Read(YVar *yvar, FILE *file);
 
-void yvar_Cleanup(yvar_t *yvar);
+void yvar_Cleanup(YVar *yvar);
 
 #endif

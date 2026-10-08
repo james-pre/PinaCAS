@@ -409,7 +409,7 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 }
 
 /*Returns the multiplicity of rate + frequency*i as a characteristic root*/
-static unsigned root_multiplicity(const root_t *roots, unsigned count, const ast &rate, const ast &frequency) {
+static unsigned root_multiplicity(const Root *roots, unsigned count, const ast &rate, const ast &frequency) {
 	unsigned multiplicity = 0;
 	const bool real = frequency.isInt(0);
 
@@ -455,7 +455,7 @@ static ast *function_part(const DiffEq *de, const ast &term) {
 	return part;
 }
 
-#define MAX_ROWS (2 * DiffEq::max_order)
+constexpr unsigned MAX_ROWS = 2 * DiffEq::max_order;
 
 /*Substitutes the trial solution into the equation and solves for its unknowns by equating the coefficients of each function of x, recording the work*/
 static Error match_coefficients(DiffEq *de, const ast &trial, ast **unknowns, unsigned size, ast **particular) {
@@ -639,7 +639,7 @@ static void add_trial_term(const DiffEq *de, ast &trial, const ast &unknown, uns
 /*Finds a particular solution with undetermined coefficients when each term of g is a polynomial times e^(ax) times cos(bx) or sin(bx), recording the work*/
 static Error undetermined_coefficients(
 	DiffEq *de,
-	const root_t *roots,
+	const Root *roots,
 	unsigned count,
 	const ast &exclude,
 	ast **particular
@@ -847,7 +847,7 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 	if (!de->linear)
 		return Error::DeUnsolved;
 
-	root_t roots[DiffEq::max_order];
+	Root roots[DiffEq::max_order];
 	ast *basis[DiffEq::max_order], *constants[DiffEq::max_order], *particular = nullptr;
 	unsigned count = 0, size = 0;
 

@@ -19,19 +19,19 @@
 #include "vars.hxx"
 #include "viewer.hxx"
 
-#define MAX_LENGTH 512
-#define BAR_HEIGHT 16
-#define MARGIN 6
-#define LINE_HEIGHT 12
-#define VISIBLE_LINES 6
-#define TOKENS_TOP (BAR_HEIGHT + 4)
-#define PREVIEW_TOP (TOKENS_TOP + LINE_HEIGHT * VISIBLE_LINES + 4)
-#define PREVIEW_BOTTOM (LCD_HEIGHT - BAR_HEIGHT - 2)
-#define PREVIEW_SPACING 6
-#define MENU_ROWS 8
-#define MENU_WIDTH 120
+constexpr int MAX_LENGTH = 512;
+constexpr int BAR_HEIGHT = 16;
+constexpr int MARGIN = 6;
+constexpr int LINE_HEIGHT = 12;
+constexpr int VISIBLE_LINES = 6;
+constexpr int TOKENS_TOP = BAR_HEIGHT + 4;
+constexpr int PREVIEW_TOP = TOKENS_TOP + LINE_HEIGHT * VISIBLE_LINES + 4;
+constexpr int PREVIEW_BOTTOM = LCD_HEIGHT - BAR_HEIGHT - 2;
+constexpr int PREVIEW_SPACING = 6;
+constexpr int MENU_ROWS = 8;
+constexpr int MENU_WIDTH = 120;
 /*Deeper expressions are not previewed, since simplifying and laying them out can overflow the stack*/
-#define MAX_PREVIEW_DEPTH 24
+constexpr int MAX_PREVIEW_DEPTH = 24;
 
 enum class KeyMode : unsigned char { Normal, Second, Alpha, AlphaLock };
 
@@ -73,7 +73,7 @@ static const char *token_text(const uint8_t *token, unsigned *size) {
 	return text;
 }
 
-static const glyph_t *os_glyph(uint8_t c) {
+static const Glyph *os_glyph(uint8_t c) {
 	switch (c) {
 		case 0x0E: return &glyph_cube;
 		case 0x10: return &glyph_root;
@@ -107,7 +107,7 @@ static int print_os_text(const char *text, int x, int y, bool draw) {
 		gfx_SetColor(COLOR_TEXT);
 
 	for (; *text != '\0'; text++) {
-		const glyph_t *g = os_glyph(*text);
+		const Glyph *g = os_glyph(*text);
 
 		if (g != nullptr) {
 			if (draw)

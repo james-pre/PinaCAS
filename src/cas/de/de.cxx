@@ -3,7 +3,7 @@
 #include "../../work.hxx"
 
 /*Limits the size of the expansions that check whether an expression is zero*/
-#define MAX_EXPANDED_TERMS 4096
+constexpr int MAX_EXPANDED_TERMS = 4096;
 
 ast *integer(mp_small n) {
 	return ast::make(num::from(n));

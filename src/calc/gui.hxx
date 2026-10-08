@@ -2,14 +2,16 @@
 
 #ifndef COMPILE_PC
 
-#define COLOR_TRANSPARENT 10
+#include <cstdint>
 
-#define COLOR_BACKGROUND 0x00
-#define COLOR_BLUE 0x9F
-#define COLOR_PURPLE 0xBC
-#define COLOR_TEXT 0xFF
+constexpr uint8_t COLOR_TRANSPARENT = 10;
 
-#define TEXT_HEIGHT 8
+constexpr uint8_t COLOR_BACKGROUND = 0x00;
+constexpr uint8_t COLOR_BLUE = 0x9F;
+constexpr uint8_t COLOR_PURPLE = 0xBC;
+constexpr uint8_t COLOR_TEXT = 0xFF;
+
+constexpr int TEXT_HEIGHT = 8;
 
 namespace gui {
 

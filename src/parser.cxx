@@ -462,17 +462,6 @@ bool collapse_all(Stack<const Token *> &operators, Stack<ast *> &expressions) {
 	return collapse_precedence(operators, expressions, Tok::Number);
 }
 
-#define parse_assert(expression, err)                                                                                  \
-	if (!(expression)) {                                                                                               \
-		while (!expressions.empty())                                                                                   \
-			ast::dispose(expressions.pop());                                                                           \
-                                                                                                                       \
-		free(tokenizer.tokens);                                                                                        \
-                                                                                                                       \
-		*e = err;                                                                                                      \
-		return nullptr;                                                                                                \
-	}
-
 unsigned parse_list(
 	const uint8_t *equation,
 	unsigned length,
@@ -539,6 +528,15 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 	Stack<const Token *> operators;
 	Stack<ast *> expressions;
 
+	/* Frees what has been parsed so far and reports err */
+	auto fail = [&](Error err) -> ast * {
+		while (!expressions.empty())
+			ast::dispose(expressions.pop());
+		free(tokenizer.tokens);
+		*e = err;
+		return nullptr;
+	};
+
 	/*Create instances to push on the stacks as pointers*/
 	Token mult = {Tok::Multiply};
 	Token open_par = {Tok::OpenPar};
@@ -556,18 +554,21 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 			}
 
 			if (should_multiply_by_next_token(&tokenizer, i)) {
-				parse_assert(collapse_precedence(operators, expressions, Tok::Multiply), Error::ParseBadOperator);
+				if (!collapse_precedence(operators, expressions, Tok::Multiply))
+					return fail(Error::ParseBadOperator);
 				operators.push(&mult);
 			}
 
 		} else if (is_tok_unary_operator(tok->type)) {
 			/*Or other left unary operators*/
 			if (tok->type != Tok::Negate) {
-				parse_assert(collapse_precedence(operators, expressions, tok->type), Error::ParseBadOperator);
+				if (!collapse_precedence(operators, expressions, tok->type))
+					return fail(Error::ParseBadOperator);
 				operators.push(tok);
 
 				if (should_multiply_by_next_token(&tokenizer, i)) {
-					parse_assert(collapse_precedence(operators, expressions, Tok::Multiply), Error::ParseBadOperator);
+					if (!collapse_precedence(operators, expressions, Tok::Multiply))
+						return fail(Error::ParseBadOperator);
 					operators.push(&mult);
 				}
 			} else {
@@ -575,34 +576,41 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 			}
 
 		} else if (is_tok_binary_operator(tok->type)) {
-			parse_assert(collapse_precedence(operators, expressions, tok->type), Error::ParseBadOperator);
+			if (!collapse_precedence(operators, expressions, tok->type))
+				return fail(Error::ParseBadOperator);
 			operators.push(tok);
 		} else if (is_tok_function(tok->type)) {
 			/*Insert a ( to correspond with the other closing ) following the parameters*/
 			operators.push(&open_par);
 			operators.push(tok);
 		} else if (tok->type == Tok::ClosePar) {
-			parse_assert(collapse_precedence(operators, expressions, Tok::ClosePar), Error::ParseBadOperator);
-			parse_assert(!operators.empty() && operators.peek()->type == Tok::OpenPar, Error::ParseUnmatchedClosePar);
+			if (!collapse_precedence(operators, expressions, Tok::ClosePar))
+				return fail(Error::ParseBadOperator);
+			if (operators.empty() || operators.peek()->type != Tok::OpenPar)
+				return fail(Error::ParseUnmatchedClosePar);
 
 			operators.pop();
 
 			if (should_multiply_by_next_token(&tokenizer, i)) {
-				parse_assert(collapse_precedence(operators, expressions, Tok::Multiply), Error::ParseBadOperator);
+				if (!collapse_precedence(operators, expressions, Tok::Multiply))
+					return fail(Error::ParseBadOperator);
 				operators.push(&mult);
 			}
 		} else if (tok->type == Tok::Comma) {
-			parse_assert(collapse_precedence(operators, expressions, Tok::Comma), Error::ParseBadOperator);
-			parse_assert(!operators.empty() && is_tok_function(operators.peek()->type), Error::ParseBadComma);
+			if (!collapse_precedence(operators, expressions, Tok::Comma))
+				return fail(Error::ParseBadOperator);
+			if (operators.empty() || !is_tok_function(operators.peek()->type))
+				return fail(Error::ParseBadComma);
 		}
 	}
 
-	parse_assert(collapse_all(operators, expressions), Error::ParseBadOperator);
+	if (!collapse_all(operators, expressions))
+		return fail(Error::ParseBadOperator);
+
+	if (!operators.empty() || expressions.size() > 1)
+		return fail(Error::Generic);
 
 	ast *root = expressions.pop();
-
-	parse_assert(operators.empty(), Error::Generic);
-	parse_assert(expressions.empty(), Error::Generic);
 
 	free(tokenizer.tokens);
 

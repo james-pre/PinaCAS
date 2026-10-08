@@ -94,7 +94,7 @@ constexpr bool is_tok_function(Tok tok) {
 	return is_tok_unary_function(tok) || is_tok_nary_function(tok);
 }
 
-#define MAX_IDENTIFIER_LEN 7
+constexpr unsigned MAX_IDENTIFIER_LEN = 7;
 
 struct Identifier {
 	uint8_t length;

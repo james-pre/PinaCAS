@@ -166,9 +166,12 @@ Identity complex[] = {
 	{nullptr}
 };
 
-typedef ast **Dictionary;
+using Dictionary = ast **;
 
-#define dict_Get(dict, ast_symbol) dict[static_cast<unsigned>((ast_symbol)->symbol()) - 'A']
+/*The entry for a symbol from A to Z*/
+static ast *&dict_Get(Dictionary dict, const ast *symbol) {
+	return dict[static_cast<unsigned>(symbol->symbol()) - 'A'];
+}
 
 static void dict_Copy(Dictionary dest, Dictionary source) {
 	for (unsigned i = 0; i < sym_count; i++) {

@@ -23,28 +23,28 @@
 #include "viewer.hxx"
 #include "../work.hxx"
 
-#define LINE_HEIGHT 10
-#define MENU_ROW 16
-#define CHECKBOX_SIZE 8
-#define CHECKBOX_ROW 12
-#define SELECT_ROW 18
-#define BOX_HEIGHT 16
-#define BUTTON_HEIGHT 20
-#define VARIABLE_WIDTH 50
-#define GAP 6
-#define MARKER_OFFSET 10
+constexpr int LINE_HEIGHT = 10;
+constexpr int MENU_ROW = 16;
+constexpr int CHECKBOX_SIZE = 8;
+constexpr int CHECKBOX_ROW = 12;
+constexpr int SELECT_ROW = 18;
+constexpr int BOX_HEIGHT = 16;
+constexpr int BUTTON_HEIGHT = 20;
+constexpr int VARIABLE_WIDTH = 50;
+constexpr int GAP = 6;
+constexpr int MARKER_OFFSET = 10;
 
-typedef struct {
+struct Rect {
 	int x, y, w, h;
-} rect_t;
+};
 
-static const rect_t header_area = {40, 10, 240, 40};
-static const rect_t menus_area = {14, 70, 96, 136};
-static const rect_t options_area = {112, 70, 195, 138};
-static const rect_t console_area = {LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH * 2 / 3, LCD_HEIGHT * 2 / 3};
+static const Rect header_area = {40, 10, 240, 40};
+static const Rect menus_area = {14, 70, 96, 136};
+static const Rect options_area = {112, 70, 195, 138};
+static const Rect console_area = {LCD_WIDTH / 6, LCD_HEIGHT / 6, LCD_WIDTH * 2 / 3, LCD_HEIGHT * 2 / 3};
 
-static rect_t inset(rect_t r, int x, int y) {
-	return (rect_t){r.x + x, r.y + y, r.w - 2 * x, r.h - 2 * y};
+static Rect inset(Rect r, int x, int y) {
+	return (Rect){r.x + x, r.y + y, r.w - 2 * x, r.h - 2 * y};
 }
 
 static const struct variable {
@@ -80,37 +80,49 @@ struct Element {
 	};
 };
 
-typedef struct {
+struct Menu {
 	const char *label;
 	/*Ends with an Element::Type::End*/
 	const Element *content;
-} menu_t;
+};
 
 static char letter_key(uint8_t key);
 static char digit_key(uint8_t key);
 
-#define END {.type = Element::Type::End, .text = nullptr}
-#define TEXT(label) {.type = Element::Type::Text, .text = (label)}
-#define CHECKBOX(label, state) {.type = Element::Type::Checkbox, .text = (label), .checked = (state)}
-#define VARIABLE(label, state) {.type = Element::Type::Variable, .text = (label), .variable = (state)}
-#define LETTER(label, state)                                                                                           \
-	{                                                                                                                  \
-		.type = Element::Type::Character, .text = (label), .character = {(state), letter_key }                         \
-	}
-#define DIGIT(label, state)                                                                                            \
-	{                                                                                                                  \
-		.type = Element::Type::Character, .text = (label), .character = {(state), digit_key }                          \
-	}
-#define BUTTON(label, function) {.type = Element::Type::Button, .text = (label), .action = (function)}
+static constexpr Element end{.type = Element::Type::End, .text = nullptr};
 
-typedef struct {
+static constexpr Element text(const char *label) {
+	return {.type = Element::Type::Text, .text = label};
+}
+
+static constexpr Element checkbox(const char *label, bool *state) {
+	return {.type = Element::Type::Checkbox, .text = label, .checked = state};
+}
+
+static constexpr Element variable(const char *label, unsigned *state) {
+	return {.type = Element::Type::Variable, .text = label, .variable = state};
+}
+
+static constexpr Element letter(const char *label, char *state) {
+	return {.type = Element::Type::Character, .text = label, .character = {state, letter_key}};
+}
+
+static constexpr Element digit(const char *label, char *state) {
+	return {.type = Element::Type::Character, .text = label, .character = {state, digit_key}};
+}
+
+static constexpr Element button(const char *label, void (*action)()) {
+	return {.type = Element::Type::Button, .text = label, .action = action};
+}
+
+struct CalculusOptions {
 	char respect_to;
 	bool show_work;
 	bool verify;
 	unsigned solution;
 	bool series;
 	char terms;
-} calculus_options_t;
+};
 
 static unsigned input = 0, output = 1;
 
@@ -127,9 +139,9 @@ static struct {
 	bool multiplication, powers;
 } expand_options = {true, true};
 
-static calculus_options_t derivative_options = {.respect_to = 'X', .show_work = true};
-static calculus_options_t integral_options = {.respect_to = 'X', .show_work = true};
-static calculus_options_t de_options =
+static CalculusOptions derivative_options = {.respect_to = 'X', .show_work = true};
+static CalculusOptions integral_options = {.respect_to = 'X', .show_work = true};
+static CalculusOptions de_options =
 	{.respect_to = 'X', .show_work = true, .solution = 2, .terms = '0' + DiffEq::default_terms};
 
 static void execute_simplify(void);
@@ -140,72 +152,72 @@ static void execute_integral(void);
 static void execute_de(void);
 static void close_console(void);
 
-static const Element header[] = {VARIABLE("Input", &input), VARIABLE("Output", &output), END};
+static constexpr Element header[] = {variable("Input", &input), variable("Output", &output), end};
 
-static const Element simplify_content[] = {
-	CHECKBOX("Basic identities", &simplify_options.general),
-	CHECKBOX("Trig identities", &simplify_options.trig),
-	CHECKBOX("Hyperbolic identities", &simplify_options.hyperbolic),
-	CHECKBOX("Complex identities", &simplify_options.complex),
-	CHECKBOX("Evaluate trig", &simplify_options.trig_constants),
-	CHECKBOX("Evaluate inverse trig", &simplify_options.trig_inv_constants),
-	BUTTON("Simplify", execute_simplify),
-	END
+static constexpr Element simplify_content[] = {
+	checkbox("Basic identities", &simplify_options.general),
+	checkbox("Trig identities", &simplify_options.trig),
+	checkbox("Hyperbolic identities", &simplify_options.hyperbolic),
+	checkbox("Complex identities", &simplify_options.complex),
+	checkbox("Evaluate trig", &simplify_options.trig_constants),
+	checkbox("Evaluate inverse trig", &simplify_options.trig_inv_constants),
+	button("Simplify", execute_simplify),
+	end
 };
 
-static const Element evaluate_content[] = {
-	CHECKBOX("Evaluate constants", &evaluate_options.constants),
-	CHECKBOX("Substitute expression:", &evaluate_options.substitute),
-	VARIABLE("From:", &evaluate_options.from),
-	VARIABLE("To:", &evaluate_options.to),
-	BUTTON("Evaluate", execute_evaluate),
-	END
+static constexpr Element evaluate_content[] = {
+	checkbox("Evaluate constants", &evaluate_options.constants),
+	checkbox("Substitute expression:", &evaluate_options.substitute),
+	variable("From:", &evaluate_options.from),
+	variable("To:", &evaluate_options.to),
+	button("Evaluate", execute_evaluate),
+	end
 };
 
-static const Element expand_content[] = {
-	CHECKBOX("Expand multiplication", &expand_options.multiplication),
-	CHECKBOX("Expand powers", &expand_options.powers),
-	BUTTON("Expand", execute_expand),
-	END
+static constexpr Element expand_content[] = {
+	checkbox("Expand multiplication", &expand_options.multiplication),
+	checkbox("Expand powers", &expand_options.powers),
+	button("Expand", execute_expand),
+	end
 };
 
-static const Element derivative_content[] = {
-	LETTER("Respect to:", &derivative_options.respect_to),
-	CHECKBOX("Show work", &derivative_options.show_work),
-	BUTTON("Differentiate", execute_derivative),
-	END
+static constexpr Element derivative_content[] = {
+	letter("Respect to:", &derivative_options.respect_to),
+	checkbox("Show work", &derivative_options.show_work),
+	button("Differentiate", execute_derivative),
+	end
 };
 
-static const Element integral_content[] = {
-	LETTER("Respect to:", &integral_options.respect_to),
-	CHECKBOX("Show work", &integral_options.show_work),
-	BUTTON("Integrate", execute_integral),
-	END
+static constexpr Element integral_content[] = {
+	letter("Respect to:", &integral_options.respect_to),
+	checkbox("Show work", &integral_options.show_work),
+	button("Integrate", execute_integral),
+	end
 };
 
-static const Element de_content[] = {
-	LETTER("Respect to:", &de_options.respect_to),
-	CHECKBOX("Show work", &de_options.show_work),
-	CHECKBOX("Verify solution", &de_options.verify),
-	VARIABLE("Solution in:", &de_options.solution),
-	CHECKBOX("Power series", &de_options.series),
-	DIGIT("Series terms:", &de_options.terms),
-	BUTTON("Solve", execute_de),
-	END
+static constexpr Element de_content[] = {
+	letter("Respect to:", &de_options.respect_to),
+	checkbox("Show work", &de_options.show_work),
+	checkbox("Verify solution", &de_options.verify),
+	variable("Solution in:", &de_options.solution),
+	checkbox("Power series", &de_options.series),
+	digit("Series terms:", &de_options.terms),
+	button("Solve", execute_de),
+	end
 };
 
-static const Element about_content[] = {
-	TEXT("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE),
-	TEXT("github.com/james-pre/PinaCAS"),
-	TEXT(""),
-	TEXT("Credits:"),
-	TEXT("James Prevett"),
-	TEXT("Nathan Farlow (PineappleCAS)"),
-	TEXT("Michael Fromberger (imath)"),
-	END
+static constexpr Element about_content[] = {
+	text("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE),
+	text("github.com/james-pre/PinaCAS"),
+	text(""),
+	text("Credits:"),
+	text("James Prevett"),
+	text("Nathan Farlow (PineappleCAS)"),
+	text("Michael Fromberger (imath)"),
+	end
 };
 
-static const menu_t menus[] = {
+static const Menu menus[] = {
 	{"Simplify", simplify_content},
 	{"Evaluate", evaluate_content},
 	{"Expand", expand_content},
@@ -215,7 +227,7 @@ static const menu_t menus[] = {
 	{"About", about_content}
 };
 
-static const Element console_content[] = {BUTTON("Close", close_console), END};
+static constexpr Element console_content[] = {button("Close", close_console), end};
 
 enum class Focus : unsigned char { Header, Menus, Options };
 
@@ -288,7 +300,7 @@ static void draw_background(void) {
 	draw_string_centered("Options", options_area.x + options_area.w / 2, 50 + 10);
 }
 
-static void clear(rect_t r) {
+static void clear(Rect r) {
 	gfx_SetColor(COLOR_BACKGROUND);
 	gfx_FillRectangle(r.x, r.y, r.w, r.h);
 }
@@ -299,7 +311,7 @@ static void draw_marker(int x, int y, uint8_t color) {
 	gfx_SetTextFGColor(COLOR_TEXT);
 }
 
-static void draw_box(rect_t r, const char *text) {
+static void draw_box(Rect r, const char *text) {
 	gfx_SetColor(COLOR_PURPLE);
 	gfx_Rectangle(r.x, r.y, r.w, r.h);
 	draw_string_centered(text, r.x + r.w / 2, r.y + r.h / 2 - TEXT_HEIGHT / 2);
@@ -314,7 +326,7 @@ static int value_width(const Element *e) {
 }
 
 /*Draws the value of a variable or character element in r*/
-static void draw_value(const Element *e, rect_t r) {
+static void draw_value(const Element *e, Rect r) {
 	if (e->type == Element::Type::Variable) {
 		draw_box(r, variables[*e->variable].name);
 	} else {
@@ -355,7 +367,7 @@ static unsigned wrap_text(const char *text, int x, int y, int width) {
 }
 
 /* Lays content out top to bottom in area with buttons in a row along the bottom, marking the element at focused */
-static void draw_form(const Element *content, rect_t area, int focused) {
+static void draw_form(const Element *content, Rect area, int focused) {
 	int column = 0, buttons = -GAP;
 
 	for (const Element *e = content; e->type != Element::Type::End; e++) {
@@ -375,14 +387,14 @@ static void draw_form(const Element *content, rect_t area, int focused) {
 	gfx_SetTextFGColor(COLOR_TEXT);
 
 	for (const Element *e = content; e->type != Element::Type::End; e++) {
-		rect_t r;
+		Rect r;
 		int marker_x;
 
 		switch (e->type) {
 			case Element::Type::Text: y += LINE_HEIGHT * wrap_text(e->text, area.x, y, area.w); continue;
 
 			case Element::Type::Checkbox:
-				r = (rect_t){area.x, y + (CHECKBOX_ROW - CHECKBOX_SIZE) / 2, CHECKBOX_SIZE, CHECKBOX_SIZE};
+				r = (Rect){area.x, y + (CHECKBOX_ROW - CHECKBOX_SIZE) / 2, CHECKBOX_SIZE, CHECKBOX_SIZE};
 				gfx_SetColor(COLOR_PURPLE);
 				gfx_Rectangle(r.x, r.y, r.w, r.h);
 				if (*e->checked)
@@ -394,7 +406,7 @@ static void draw_form(const Element *content, rect_t area, int focused) {
 
 			case Element::Type::Variable:
 			case Element::Type::Character:
-				r = (rect_t){column, y + (SELECT_ROW - BOX_HEIGHT) / 2, value_width(e), BOX_HEIGHT};
+				r = (Rect){column, y + (SELECT_ROW - BOX_HEIGHT) / 2, value_width(e), BOX_HEIGHT};
 				gfx_PrintStringXY(e->text, area.x, r.y + r.h / 2 - TEXT_HEIGHT / 2);
 				draw_value(e, r);
 				marker_x = area.x;
@@ -402,7 +414,7 @@ static void draw_form(const Element *content, rect_t area, int focused) {
 				break;
 
 			case Element::Type::Button:
-				r = (rect_t){button_x, area.y + area.h - BUTTON_HEIGHT, button_width(e), BUTTON_HEIGHT};
+				r = (Rect){button_x, area.y + area.h - BUTTON_HEIGHT, button_width(e), BUTTON_HEIGHT};
 				draw_box(r, e->text);
 				marker_x = r.x;
 				button_x += r.w + GAP;
@@ -417,7 +429,7 @@ static void draw_form(const Element *content, rect_t area, int focused) {
 }
 
 /* Lays content out in equal columns across area, each value under its label, marking the element at focused */
-static void draw_columns(const Element *content, rect_t area, int focused) {
+static void draw_columns(const Element *content, Rect area, int focused) {
 	int count = 0;
 
 	for (const Element *e = content; e->type != Element::Type::End; e++)
@@ -425,7 +437,7 @@ static void draw_columns(const Element *content, rect_t area, int focused) {
 
 	for (const Element *e = content; e->type != Element::Type::End; e++) {
 		const int center = area.x + area.w * (2 * (e - content) + 1) / (2 * count);
-		const rect_t r = {center - value_width(e) / 2, area.y + LINE_HEIGHT + GAP, value_width(e), BUTTON_HEIGHT};
+		const Rect r = {center - value_width(e) / 2, area.y + LINE_HEIGHT + GAP, value_width(e), BUTTON_HEIGHT};
 
 		draw_string_centered(e->text, center, area.y + GAP / 2);
 		draw_value(e, r);
@@ -441,7 +453,7 @@ static void draw_header(void) {
 }
 
 static void draw_menus(void) {
-	const rect_t area = inset(menus_area, 12, 10);
+	const Rect area = inset(menus_area, 12, 10);
 
 	clear(menus_area);
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
@@ -690,11 +702,13 @@ enum class CompileIds : unsigned char {
 template <> inline constexpr bool is_flags<CompileIds> = true;
 
 /* Entry i is the table for bit i of CompileIds */
-static struct compile_info {
+struct CompileInfo {
 	const char *label;
 	id::Identity *const table;
 	bool compiled;
-} compile_info[] = {
+};
+
+static CompileInfo compile_info[] = {
 	{"basic", id::general, false},
 	{"trig", id::trig_identities, false},
 	{"constant trig", id::trig_constants, false},
@@ -704,13 +718,11 @@ static struct compile_info {
 	{"derivative", id::derivative, false}
 };
 
-#define NUM_COMPILE_INFO countof(compile_info)
-
 /* Loads the identity tables in mask that are not loaded yet */
 static void compile_ids(CompileIds mask) {
 	char buffer[50];
 
-	for (unsigned i = 0; i < NUM_COMPILE_INFO; i++) {
+	for (unsigned i = 0; i < countof(compile_info); i++) {
 		if (!has(mask, static_cast<CompileIds>(1 << i)) || compile_info[i].compiled)
 			continue;
 
@@ -962,7 +974,7 @@ static ast *parse_respect_to(char character, Error *err) {
 }
 
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/
-static void execute_calculus(calculus::Kind kind, const calculus_options_t *options, const char *title) {
+static void execute_calculus(calculus::Kind kind, const CalculusOptions *options, const char *title) {
 	char buffer[50];
 
 	const bool show_work = options->show_work;

@@ -61,8 +61,8 @@ TestType resolve_type(char *type) {
 	return TestType::Invalid;
 }
 
-test_t *test_Parse(char *line) {
-	test_t *t = static_cast<test_t *>(malloc(sizeof(test_t)));
+Test *test_Parse(char *line) {
+	Test *t = static_cast<Test *>(malloc(sizeof(Test)));
 
 	char *pt = strtok(line, ";");
 	for (unsigned i = 0; i < 3; i++) {
@@ -96,8 +96,8 @@ test_t *test_Parse(char *line) {
 	return t;
 }
 
-test_t **test_Load(char *file, unsigned *len) {
-	test_t **arr = static_cast<test_t **>(malloc(sizeof(test_t **) * MAX_TESTS));
+Test **test_Load(char *file, unsigned *len) {
+	Test **arr = static_cast<Test **>(malloc(sizeof(Test **) * MAX_TESTS));
 
 	FILE *f = fopen(file, "r");
 
@@ -113,7 +113,7 @@ test_t **test_Load(char *file, unsigned *len) {
 		if (i >= MAX_TESTS)
 			break;
 
-		test_t *t = test_Parse(line);
+		Test *t = test_Parse(line);
 
 		if (t != nullptr && t->type != TestType::Invalid) {
 			arr[i] = t;
@@ -135,7 +135,7 @@ test_t **test_Load(char *file, unsigned *len) {
 	return arr;
 }
 
-bool check(test_t *t, ast &actual, ast &expected) {
+bool check(Test *t, ast &actual, ast &expected) {
 	if (!expected.compare(actual)) {
 		unsigned expected_len, actual_len;
 		Error expted_err, actual_err;
@@ -169,10 +169,10 @@ bool check(test_t *t, ast &actual, ast &expected) {
 	return true;
 }
 
-#define MAX_ITEMS (DiffEq::max_conditions + 1)
+constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
 /*arg1 is an equation with initial conditions, arg2 a solution, and arg3 the independent variable*/
-static bool run_verify(test_t *t) {
+static bool run_verify(Test *t) {
 	ast *items[MAX_ITEMS];
 	Error err;
 	DiffEq de;
@@ -210,13 +210,13 @@ static void simplify_solution(ast &e) {
 	simplify_canonical_form(e, Canonical::All);
 }
 
-static Error solve_test(DiffEq *de, const test_t *t, ast **solution) {
+static Error solve_test(DiffEq *de, const Test *t, ast **solution) {
 	de->series = t->type == TestType::DeSeries;
 	return de->solve(solution);
 }
 
 /*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable. An explicit solution must also pass verification.*/
-static bool run_solve(test_t *t) {
+static bool run_solve(Test *t) {
 	ast *items[MAX_ITEMS], *solution = nullptr;
 	Error err;
 	DiffEq de;
@@ -258,7 +258,7 @@ static bool run_solve(test_t *t) {
 	return passed;
 }
 
-bool test_Run(test_t *t) {
+bool test_Run(Test *t) {
 	if (t->type == TestType::DeSolves || t->type == TestType::DeNotSolves)
 		return run_verify(t);
 	if (t->type == TestType::DeSolve || t->type == TestType::DeSeries)
@@ -447,11 +447,11 @@ bool test_Run(test_t *t) {
 	return passed;
 }
 
-void test_Cleanup(test_t *t) {
+void test_Cleanup(Test *t) {
 	free(t);
 }
 
-void test_CleanupArr(test_t **arr, unsigned len) {
+void test_CleanupArr(Test **arr, unsigned len) {
 	for (unsigned i = 0; i < len; i++) {
 		test_Cleanup(arr[i]);
 	}

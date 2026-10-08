@@ -8,7 +8,7 @@
 #include "../cas/de.hxx"
 
 /*Most expressions in one input: an equation and its initial conditions*/
-#define MAX_ITEMS (DiffEq::max_conditions + 1)
+constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
 /*Replaces items[0] with the result of kind with respect to respect_to, ready to export. The other items are initial conditions for Kind::DiffEq, which uses a power series with terms nonzero terms per solution when series is true. Writes a one line summary to summary if it is not nullptr.*/
 namespace calculus {

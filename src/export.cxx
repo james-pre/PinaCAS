@@ -6,18 +6,6 @@ which could be easily copied here. */
 
 #include <string.h>
 
-#define add_byte(byte)                                                                                                 \
-	do {                                                                                                               \
-		if (data != nullptr)                                                                                           \
-			data[index] = (byte);                                                                                      \
-		index++;                                                                                                       \
-	} while (0)
-#define add_token(token)                                                                                               \
-	do {                                                                                                               \
-		for (uint8_t _tmp_i = 0; _tmp_i < lookup[(token)].length; _tmp_i++)                                            \
-			add_byte(lookup[token].bytes[_tmp_i]);                                                                     \
-	} while (0)
-
 static uint8_t precedence_type(Op type) {
 	switch (type) {
 		case Op::Equals: return 1;
@@ -36,13 +24,19 @@ static uint8_t precedence(const ast *e) {
 	return 255;
 }
 
-#define is_right_operator_type(type) ((type) == Op::Factorial || (type) == Op::Prime)
+static bool is_right_operator(Op type) {
+	return type == Op::Factorial || type == Op::Prime;
+}
 
-#define need_paren(parent, child)                                                                                      \
-	((((parent)->isOperator() && is_op_operator(parent->op()) && !is_op_commutative(parent->op()) &&                   \
-	   precedence(child) <= precedence(parent)) ||                                                                     \
-	  precedence(child) < precedence(parent)) ||                                                                       \
-	 (is_right_operator_type(parent->op()) && (child)->isNumber() && *(&(child)->num()) < 0))
+/*True if child needs parentheses as an operand of parent*/
+static bool need_paren(const ast *parent, const ast *child) {
+	if (parent->isOperator() && is_op_operator(parent->op()) && !is_op_commutative(parent->op()) &&
+		precedence(child) <= precedence(parent))
+		return true;
+
+	return precedence(child) < precedence(parent) ||
+		   (is_right_operator(parent->op()) && child->isNumber() && child->num() < 0);
+}
 
 static const ast *rightmost(const ast &e) {
 	if (e.isOperator()) {
@@ -85,6 +79,17 @@ static bool only_units(const ast &e) {
 
 /*Returns length of buffer. Writes to buffer is buffer != nullptr*/
 static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const TokenTable &lookup, Error *err) {
+	auto add_byte = [&](uint8_t byte) {
+		if (data != nullptr)
+			data[index] = byte;
+		index++;
+	};
+
+	auto add_token = [&](Tok token) {
+		for (uint8_t i = 0; i < lookup[token].length; i++)
+			add_byte(lookup[token].bytes[i]);
+	};
+
 	switch (e->type()) {
 		case ast::Type::Number: {
 			char *buffer = e->num().toString(6);

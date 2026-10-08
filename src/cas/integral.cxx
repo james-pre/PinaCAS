@@ -3,9 +3,9 @@
 #include "../work.hxx"
 
 /*Limits how deeply integration rules are chained for one integral*/
-#define MAX_METHOD_DEPTH 12
+constexpr int MAX_METHOD_DEPTH = 12;
 /*Highest degree of a polynomial that is divided*/
-#define MAX_DEGREE 8
+constexpr int MAX_DEGREE = 8;
 
 static ast *integer(mp_small n) {
 	return ast::make(num::from(n));

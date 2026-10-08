@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-int read_header(header_t *header, FILE *file) {
+int read_header(Header *header, FILE *file) {
 	char buffer[9] = {0};
 	fread(buffer, 1, 8, file);
 
@@ -24,7 +24,7 @@ int read_header(header_t *header, FILE *file) {
 	return 0;
 }
 
-int yvar_Read(yvar_t *yvar, FILE *file) {
+int yvar_Read(YVar *yvar, FILE *file) {
 	const int error = read_header(&yvar->header, file);
 
 	if (error != 0)
@@ -62,7 +62,7 @@ int yvar_Read(yvar_t *yvar, FILE *file) {
 	return error;
 }
 
-void yvar_Cleanup(yvar_t *yvar) {
+void yvar_Cleanup(YVar *yvar) {
 	free(yvar->data);
 }
 

@@ -169,7 +169,7 @@ static ast *square_root(const num &q) {
 }
 
 /*Records a root, merging it with an equal real root. Takes ownership of re and im.*/
-static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, const num *value, unsigned multiplicity) {
+static void add_root(Root *roots, unsigned *count, ast *re, ast *im, const num *value, unsigned multiplicity) {
 	work::pause();
 	simplify(*re, Simp::Basic);
 	if (im != nullptr)
@@ -192,7 +192,7 @@ static void add_root(root_t *roots, unsigned *count, ast *re, ast *im, const num
 }
 
 /*Records the rational root r of p and divides it out*/
-static void divide_root(num **p, unsigned *n, const num &r, root_t *roots, unsigned *count) {
+static void divide_root(num **p, unsigned *n, const num &r, Root *roots, unsigned *count) {
 	deflate(p, (*n)--, r);
 	add_root(roots, count, ast::make(r.copy()), nullptr, &r, 1);
 }
@@ -217,7 +217,7 @@ static void add_irrational_roots(
 	const num &d,
 	const num &a,
 	unsigned multiplicity,
-	root_t *roots,
+	Root *roots,
 	unsigned *count
 ) {
 	num magnitude = d;
@@ -238,7 +238,7 @@ static void add_irrational_roots(
 }
 
 /*Finds the roots of the quadratic p with the quadratic formula, dividing out the rational ones*/
-static void quadratic(num **p, unsigned *n, root_t *roots, unsigned *count) {
+static void quadratic(num **p, unsigned *n, Root *roots, unsigned *count) {
 	num d, v, s, r;
 
 	discriminant(*p[2], *p[1], *p[0], d, v);
@@ -256,7 +256,7 @@ static void quadratic(num **p, unsigned *n, root_t *roots, unsigned *count) {
 }
 
 /*Finds the roots of am^4 + bm^2 + c as the square roots of the roots of au^2 + bu + c. Returns false unless those are rational.*/
-static bool biquadratic(num **p, root_t *roots, unsigned *count) {
+static bool biquadratic(num **p, Root *roots, unsigned *count) {
 	num d, v, s, zero, one(1);
 	num *u[2] = {num::from(0), num::from(0)};
 	bool rational = *p[1] == 0 && *p[3] == 0;
@@ -286,7 +286,7 @@ static bool biquadratic(num **p, root_t *roots, unsigned *count) {
 	return rational;
 }
 
-bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count) {
+bool find_roots(num **p, unsigned *n, Root *roots, unsigned *count) {
 	num r;
 	bool found = true;
 
@@ -339,7 +339,7 @@ ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor) {
 	return tidy(sum);
 }
 
-ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast &m) {
+ast *factored_form(num **p, unsigned n, const Root *roots, unsigned count, const ast &m) {
 	ast *product = ast::make(Op::Mult);
 	num scale(1), t;
 
@@ -378,7 +378,7 @@ ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, con
 	return tidy(product);
 }
 
-static void record_roots(const root_t *roots, unsigned count, const ast &m) {
+static void record_roots(const Root *roots, unsigned count, const ast &m) {
 	for (unsigned i = 0; i < count; i++) {
 		const char *text = roots[i].multiplicity < 4 ? multiplicity_names[roots[i].multiplicity] : "Repeated root";
 
@@ -421,11 +421,11 @@ ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f) {
 	return product;
 }
 
-unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast **basis) {
+unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis) {
 	unsigned n = 0;
 
 	for (unsigned i = 0; i < count; i++) {
-		const root_t *root = &roots[i];
+		const Root *root = &roots[i];
 
 		for (unsigned j = 0; j < root->multiplicity; j++) {
 			if (root->im == nullptr) {
@@ -445,7 +445,7 @@ unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast *
 }
 
 /*Finds the roots of a2m^2 + a0 = 0 as ±i*sqrt(a0/a2), assuming that a0/a2 is positive, when the coefficients are constants that are not all rational*/
-static Error oscillator_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count) {
+static Error oscillator_roots(DiffEq *de, const ast &m, Root *roots, unsigned *count) {
 	if (de->order != 2 || !de->a[1]->isInt(0) || involves(*de->a[0], *de->x) || involves(*de->a[2], *de->x))
 		return Error::DeUnsolved;
 
@@ -470,7 +470,7 @@ static Error oscillator_roots(DiffEq *de, const ast &m, root_t *roots, unsigned 
 	return Error::Success;
 }
 
-Error characteristic_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count) {
+Error characteristic_roots(DiffEq *de, const ast &m, Root *roots, unsigned *count) {
 	num *p[DiffEq::max_order + 1];
 	unsigned n = de->order;
 
@@ -518,7 +518,7 @@ Error characteristic_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *co
 	return err;
 }
 
-void free_roots(root_t *roots, unsigned count) {
+void free_roots(Root *roots, unsigned count) {
 	for (unsigned i = 0; i < count; i++) {
 		ast::dispose(roots[i].re);
 		ast::dispose(roots[i].im);

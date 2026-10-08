@@ -9,17 +9,17 @@
 #include "glyph.hxx"
 #include "gui.hxx"
 
-#define TITLE_HEIGHT 16
-#define VIEW_LEFT 4
-#define VIEW_TOP (TITLE_HEIGHT + 4)
-#define VIEW_RIGHT (LCD_WIDTH - 4)
-#define VIEW_BOTTOM (LCD_HEIGHT - 2)
-#define LABEL_HEIGHT 10
-#define ENTRY_SPACING 8
-#define SCROLL_Y 16
-#define SCROLL_X 48
+constexpr int TITLE_HEIGHT = 16;
+constexpr int VIEW_LEFT = 4;
+constexpr int VIEW_TOP = TITLE_HEIGHT + 4;
+constexpr int VIEW_RIGHT = LCD_WIDTH - 4;
+constexpr int VIEW_BOTTOM = LCD_HEIGHT - 2;
+constexpr int LABEL_HEIGHT = 10;
+constexpr int ENTRY_SPACING = 8;
+constexpr int SCROLL_Y = 16;
+constexpr int SCROLL_X = 48;
 
-static const glyph_t *special_glyph(char c) {
+static const Glyph *special_glyph(char c) {
 	switch (c) {
 		case ts::Pi: return &glyph_pi;
 		case ts::Theta: return &glyph_theta;
@@ -33,7 +33,7 @@ static int text_width(const char *text) {
 	int width = 0;
 
 	for (; *text != '\0'; text++) {
-		const glyph_t *g = special_glyph(*text);
+		const Glyph *g = special_glyph(*text);
 		width += g != nullptr ? g->width : (int)gfx_GetCharWidth(*text);
 	}
 
@@ -60,7 +60,7 @@ static const ts::Metrics metrics =
 
 static void draw_text(int x, int y, const char *text) {
 	for (; *text != '\0'; text++) {
-		const glyph_t *g = special_glyph(*text);
+		const Glyph *g = special_glyph(*text);
 
 		if (g != nullptr) {
 			glyph_draw(x, y, g, VIEW_LEFT, VIEW_TOP, VIEW_RIGHT, VIEW_BOTTOM);
@@ -122,13 +122,13 @@ void viewer::draw(ts::Box *b, int x, int baseline) {
 	ts::draw(b, x, baseline, metrics, renderer);
 }
 
-typedef struct {
+struct Entry {
 	const char *label;
 	ts::Box *box;
 	/*Top of the entry in content coordinates*/
 	int y;
 	int height;
-} entry_t;
+};
 
 static void draw_title(const char *title) {
 	gfx_SetClipRegion(0, 0, LCD_WIDTH, LCD_HEIGHT);
@@ -143,14 +143,14 @@ static void draw_title(const char *title) {
 	gfx_HorizLine(0, TITLE_HEIGHT - 1, LCD_WIDTH);
 }
 
-static void draw_entries(entry_t *entries, unsigned count, int scroll_x, int scroll_y) {
+static void draw_entries(Entry *entries, unsigned count, int scroll_x, int scroll_y) {
 	gfx_SetClipRegion(0, 0, LCD_WIDTH, LCD_HEIGHT);
 	gfx_SetColor(COLOR_BACKGROUND);
 	gfx_FillRectangle(0, TITLE_HEIGHT, LCD_WIDTH, LCD_HEIGHT - TITLE_HEIGHT);
 	gfx_SetClipRegion(VIEW_LEFT, VIEW_TOP, VIEW_RIGHT, VIEW_BOTTOM);
 
 	for (unsigned i = 0; i < count; i++) {
-		const entry_t *entry = &entries[i];
+		const Entry *entry = &entries[i];
 		int top = VIEW_TOP + entry->y - scroll_y;
 
 		if (top + entry->height < VIEW_TOP || top >= VIEW_BOTTOM)
@@ -176,8 +176,8 @@ void viewer::show(work::Record *w, const char *title) {
 	for (const work::Step *step = w->first; step != nullptr; step = step->next)
 		count++;
 
-	entry_t *entries = static_cast<entry_t *>(malloc(sizeof(entry_t) * (count > 0 ? count : 1)));
-	entry_t *entry = entries;
+	Entry *entries = static_cast<Entry *>(malloc(sizeof(Entry) * (count > 0 ? count : 1)));
+	Entry *entry = entries;
 	const work::Step *previous = nullptr;
 	int content_width = 0, content_height = 0;
 

@@ -4,7 +4,7 @@
 #include "../../work.hxx"
 
 /*Limits how many operations are undone to solve for the function*/
-#define MAX_ISOLATE_STEPS 12
+constexpr int MAX_ISOLATE_STEPS = 12;
 
 /*Returns the logarithm of e to base. Takes ownership of e.*/
 static ast *logarithm(const ast &base, ast *e) {

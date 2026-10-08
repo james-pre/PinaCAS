@@ -466,8 +466,6 @@ static bool eval_log(ast &e, Eval flags) {
 	return false;
 }
 
-#define factorial_in_small_range(a) (*(&(a)->num()) <= 10)
-
 static bool eval_factorial(ast &e, Eval flags) {
 	const ast *a = e.childAt(0);
 
@@ -481,7 +479,7 @@ static bool eval_factorial(ast &e, Eval flags) {
 		}
 
 		if (a->num().isInteger() && a->num() > 0) {
-			if (has(flags, Eval::FactorialFull) || (has(flags, Eval::FactorialSmall) && factorial_in_small_range(a))) {
+			if (has(flags, Eval::FactorialFull) || (has(flags, Eval::FactorialSmall) && a->num() <= 10)) {
 				num *accumulator = num::from(1);
 				mp_int i = mp_int_alloc();
 				mp_int_init_copy(i, MP_NUMER_P(&a->num()));

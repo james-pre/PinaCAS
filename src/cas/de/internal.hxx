@@ -3,11 +3,11 @@
 #include "../cas.hxx"
 
 /*A root re, or the pair re ± im*i when im is not nullptr. value is the root when it is rational, otherwise nullptr.*/
-typedef struct {
+struct Root {
 	ast *re, *im;
 	num *value;
 	unsigned multiplicity;
-} root_t;
+};
 
 ast *integer(mp_small n);
 
@@ -66,15 +66,15 @@ void finish(DiffEq *de, ast *lhs, ast *antiderivative, ast **solution);
 Error solve_first_order(DiffEq *de, ast **solution);
 
 /*Finds the roots of the characteristic polynomial in m with their multiplicities, recording the work*/
-Error characteristic_roots(DiffEq *de, const ast &m, root_t *roots, unsigned *count);
+Error characteristic_roots(DiffEq *de, const ast &m, Root *roots, unsigned *count);
 
-void free_roots(root_t *roots, unsigned count);
+void free_roots(Root *roots, unsigned count);
 
 /*Returns x^j e^(rx) f, leaving out f when it is nullptr. Takes ownership of f.*/
 ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f);
 
 /*Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are*/
-unsigned fill_basis(const DiffEq *de, const root_t *roots, unsigned count, ast **basis);
+unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis);
 
 /*Solves a linear equation with constant coefficients from the roots of its characteristic polynomial, finding a particular solution by undetermined coefficients or variation of parameters when it is not homogeneous*/
 Error solve_constant_coefficients(DiffEq *de, ast **solution);
@@ -94,13 +94,13 @@ bool is_root(num **p, unsigned n, const num &r);
 void deflate(num **p, unsigned n, const num &r);
 
 /*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
-bool find_roots(num **p, unsigned *n, root_t *roots, unsigned *count);
+bool find_roots(num **p, unsigned *n, Root *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
 ast *polynomial(num **p, unsigned n, const ast &m, const num &divisor);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
-ast *factored_form(num **p, unsigned n, const root_t *roots, unsigned count, const ast &m);
+ast *factored_form(num **p, unsigned n, const Root *roots, unsigned count, const ast &m);
 
 /*Fills constants with n letters that do not appear in the equation or in exclude unless it is nullptr. Returns false if there are not enough.*/
 bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, unsigned n);

@@ -303,7 +303,7 @@ int run_test(int argc, char **argv) {
 	}
 
 	unsigned len, failed = 0, passed = 0;
-	test_t **arr = test_Load(argv[2], &len);
+	Test **arr = test_Load(argv[2], &len);
 
 	if (arr == nullptr) {
 		printf("Could not load test file.\n");
@@ -314,7 +314,7 @@ int run_test(int argc, char **argv) {
 
 	clock_t delta = clock();
 	for (unsigned i = 0; i < len; i++) {
-		test_t *t = arr[i];
+		Test *t = arr[i];
 		printf("Running test %d/%d on line %d... ", i + 1, len, t->line);
 		if (!test_Run(t)) {
 			puts("[FAIL]");
@@ -489,7 +489,7 @@ int run_integral(int argc, char **argv) {
 	return 0;
 }
 
-#define MAX_ITEMS (DiffEq::max_conditions + 1)
+constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
 int run_de(int argc, char **argv) {
 	if (argc <= 2) {

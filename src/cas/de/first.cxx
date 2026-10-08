@@ -234,10 +234,10 @@ static Error solve_linear_first(DiffEq *de, ast **solution) {
 	return Error::Success;
 }
 
-typedef Error (*solver_t)(DiffEq *de, ast **solution);
+using Solver = Error (*)(DiffEq *de, ast **solution);
 
 /*Solves equation, a first order equation in u = back, with solver, then substitutes back and solves for y. Takes ownership of back and equation.*/
-static Error solve_substituted(DiffEq *de, ast *back, ast *equation, solver_t solver, ast **solution) {
+static Error solve_substituted(DiffEq *de, ast *back, ast *equation, Solver solver, ast **solution) {
 	DiffEq::Condition *c = de->condition_count > 0 ? &de->conditions[0] : nullptr;
 	ast *inner = nullptr, *u = nullptr, *constant = nullptr;
 	DiffEq sub;

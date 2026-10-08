@@ -8,21 +8,21 @@
 #include <ti/vars.h>
 
 /*Free RAM left to the OS for the variables the program creates*/
-#define RAM_MARGIN 16384
+constexpr size_t RAM_MARGIN = 16384;
 /*Blocks up to this size, including the header, are kept in bins by exact size*/
-#define SMALL_LIMIT 128
-#define GRANULARITY 4
-#define BINS (SMALL_LIMIT / GRANULARITY + 1)
-#define HEADER sizeof(size_t)
+constexpr size_t SMALL_LIMIT = 128;
+constexpr size_t GRANULARITY = 4;
+constexpr size_t BINS = SMALL_LIMIT / GRANULARITY + 1;
+constexpr size_t HEADER = sizeof(size_t);
 
-typedef struct free_block {
+struct FreeBlock {
 	size_t size;
-	struct free_block *next;
-} free_block_t;
+	FreeBlock *next;
+};
 
-typedef struct {
+struct Region {
 	uint8_t *next, *end;
-} region_t;
+};
 
 extern "C" {
 extern uint8_t __heap_low[], __heap_high[];
@@ -30,10 +30,10 @@ extern uint8_t __heap_low[], __heap_high[];
 void *ram_Reserve(size_t size);
 }
 
-static region_t regions[2] = {{__heap_low, __heap_high}};
+static Region regions[2] = {{__heap_low, __heap_high}};
 static unsigned region_count = 1;
-static free_block_t *bins[BINS];
-static free_block_t *large;
+static FreeBlock *bins[BINS];
+static FreeBlock *large;
 static void (*on_failure)(void);
 
 void heap::init() {
@@ -55,31 +55,31 @@ void heap::setFailure(void (*failure)()) {
 static size_t block_size(size_t size) {
 	size_t total = size + HEADER;
 
-	if (total < sizeof(free_block_t))
-		total = sizeof(free_block_t);
+	if (total < sizeof(FreeBlock))
+		total = sizeof(FreeBlock);
 
 	return (total + GRANULARITY - 1) & ~(size_t)(GRANULARITY - 1);
 }
 
-static void release(free_block_t *block) {
-	free_block_t **list = block->size <= SMALL_LIMIT ? &bins[block->size / GRANULARITY] : &large;
+static void release(FreeBlock *block) {
+	FreeBlock **list = block->size <= SMALL_LIMIT ? &bins[block->size / GRANULARITY] : &large;
 
 	block->next = *list;
 	*list = block;
 }
 
 /*Takes a block of at least total bytes from the large list, splitting off the rest*/
-static free_block_t *take_large(size_t total) {
-	for (free_block_t **link = &large; *link != nullptr; link = &(*link)->next) {
-		free_block_t *block = *link;
+static FreeBlock *take_large(size_t total) {
+	for (FreeBlock **link = &large; *link != nullptr; link = &(*link)->next) {
+		FreeBlock *block = *link;
 
 		if (block->size < total)
 			continue;
 
 		*link = block->next;
 
-		if (block->size - total >= sizeof(free_block_t)) {
-			free_block_t *rest = (free_block_t *)((uint8_t *)block + total);
+		if (block->size - total >= sizeof(FreeBlock)) {
+			FreeBlock *rest = (FreeBlock *)((uint8_t *)block + total);
 			rest->size = block->size - total;
 			block->size = total;
 			release(rest);
@@ -91,10 +91,10 @@ static free_block_t *take_large(size_t total) {
 	return nullptr;
 }
 
-static free_block_t *bump(size_t total) {
+static FreeBlock *bump(size_t total) {
 	for (unsigned i = 0; i < region_count; i++) {
 		if ((size_t)(regions[i].end - regions[i].next) >= total) {
-			free_block_t *block = (free_block_t *)regions[i].next;
+			FreeBlock *block = (FreeBlock *)regions[i].next;
 			regions[i].next += total;
 			block->size = total;
 			return block;
@@ -105,8 +105,8 @@ static free_block_t *bump(size_t total) {
 }
 
 /*Merges two lists sorted by address*/
-static free_block_t *merge(free_block_t *a, free_block_t *b) {
-	free_block_t head, *tail = &head;
+static FreeBlock *merge(FreeBlock *a, FreeBlock *b) {
+	FreeBlock head, *tail = &head;
 
 	while (a != nullptr && b != nullptr) {
 		if (a < b) {
@@ -123,18 +123,18 @@ static free_block_t *merge(free_block_t *a, free_block_t *b) {
 	return head.next;
 }
 
-static free_block_t *sort(free_block_t *list) {
+static FreeBlock *sort(FreeBlock *list) {
 	if (list == nullptr || list->next == nullptr)
 		return list;
 
-	free_block_t *slow = list;
-	free_block_t *fast = list->next;
+	FreeBlock *slow = list;
+	FreeBlock *fast = list->next;
 	while (fast != nullptr && fast->next != nullptr) {
 		slow = slow->next;
 		fast = fast->next->next;
 	}
 
-	free_block_t *second = slow->next;
+	FreeBlock *second = slow->next;
 	slow->next = nullptr;
 
 	return merge(sort(list), sort(second));
@@ -142,10 +142,10 @@ static free_block_t *sort(free_block_t *list) {
 
 /*Joins adjacent free blocks, returns those at the end of a region to it, and refills the lists*/
 static void coalesce(void) {
-	free_block_t *all = large;
+	FreeBlock *all = large;
 
 	for (unsigned i = 0; i < BINS; i++) {
-		free_block_t *block;
+		FreeBlock *block;
 		while ((block = bins[i]) != nullptr) {
 			bins[i] = block->next;
 			block->next = all;
@@ -156,7 +156,7 @@ static void coalesce(void) {
 	large = nullptr;
 	all = sort(all);
 
-	for (free_block_t *block = all, *next; block != nullptr; block = next) {
+	for (FreeBlock *block = all, *next; block != nullptr; block = next) {
 		while (block->next != nullptr && (uint8_t *)block + block->size == (uint8_t *)block->next) {
 			block->size += block->next->size;
 			block->next = block->next->next;
@@ -177,8 +177,8 @@ static void coalesce(void) {
 	}
 }
 
-static free_block_t *allocate(size_t total) {
-	free_block_t *block = nullptr;
+static FreeBlock *allocate(size_t total) {
+	FreeBlock *block = nullptr;
 
 	if (total <= SMALL_LIMIT && (block = bins[total / GRANULARITY]) != nullptr) {
 		bins[total / GRANULARITY] = block->next;
@@ -196,7 +196,7 @@ static free_block_t *allocate(size_t total) {
 
 void *malloc(size_t size) {
 	const size_t total = block_size(size);
-	free_block_t *block = allocate(total);
+	FreeBlock *block = allocate(total);
 
 	if (block == nullptr) {
 		coalesce();
@@ -214,14 +214,14 @@ void *malloc(size_t size) {
 
 void free(void *pointer) {
 	if (pointer != nullptr)
-		release((free_block_t *)((uint8_t *)pointer - HEADER));
+		release((FreeBlock *)((uint8_t *)pointer - HEADER));
 }
 
 void *realloc(void *pointer, size_t size) {
 	if (pointer == nullptr)
 		return malloc(size);
 
-	free_block_t *block = (free_block_t *)((uint8_t *)pointer - HEADER);
+	FreeBlock *block = (FreeBlock *)((uint8_t *)pointer - HEADER);
 
 	if (block->size >= block_size(size))
 		return pointer;
@@ -242,11 +242,11 @@ size_t heap::available() {
 		available += regions[i].end - regions[i].next;
 
 	for (unsigned i = 0; i < BINS; i++) {
-		for (const free_block_t *block = bins[i]; block != nullptr; block = block->next)
+		for (const FreeBlock *block = bins[i]; block != nullptr; block = block->next)
 			available += block->size;
 	}
 
-	for (const free_block_t *block = large; block != nullptr; block = block->next)
+	for (const FreeBlock *block = large; block != nullptr; block = block->next)
 		available += block->size;
 
 	return available;
