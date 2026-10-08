@@ -26,7 +26,7 @@ unsigned parse_list_from_tok(const char *tok, ast **items, unsigned max, Error *
 	}
 
 	unsigned count =
-		parse_list(static_cast<const char *>(ti_GetDataPtr(var)), ti_GetSize(var), ti_table, items, max, err);
+		parse_list(static_cast<const uint8_t *>(ti_GetDataPtr(var)), ti_GetSize(var), ti_table, items, max, err);
 
 	ti_Close(var);
 
@@ -38,7 +38,7 @@ ast *parse_from_tok(const char *tok, Error *err) {
 	return parse_list_from_tok(tok, &result, 1, err) == 1 ? result : nullptr;
 }
 
-bool read_tokens_from_tok(const char *tok, char *data, unsigned max, unsigned *length) {
+bool read_tokens_from_tok(const char *tok, uint8_t *data, unsigned max, unsigned *length) {
 	ti_var_t var = ti_OpenVar(tok, "r", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
 	bool fits = true;
 

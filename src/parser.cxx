@@ -105,11 +105,11 @@ struct Tokenizer {
 };
 
 /*'0' through '9' and including '.'*/
-static bool is_num(char byte, const TokenTable &lookup) {
+static bool is_num(uint8_t byte, const TokenTable &lookup) {
 	return (byte >= '0' && byte <= '9') || byte == lookup[Tok::Period].bytes[0];
 }
 
-num *read_num(const char *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
+num *read_num(const uint8_t *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
 	unsigned size = 0;
 
 	for (unsigned i = index; i < length; i++) {
@@ -123,7 +123,7 @@ num *read_num(const char *equation, unsigned index, unsigned length, const Token
 
 	/*Copy digits, but replace Ti's '.' with ascii '.'*/
 	for (unsigned i = 0; i < size; i++) {
-		const char digit = equation[i + index];
+		const char digit = static_cast<char>(equation[i + index]);
 
 		if (digit == lookup[Tok::Period].bytes[0])
 			buffer[i] = '.';
@@ -142,7 +142,7 @@ num *read_num(const char *equation, unsigned index, unsigned length, const Token
 	return num;
 }
 
-Tok read_type(const char *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
+Tok read_type(const uint8_t *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
 	for (unsigned i = static_cast<unsigned>(Tok::Plus); i < static_cast<unsigned>(Tok::Amount); i++) {
 		const Tok tok = static_cast<Tok>(i);
 		const Identifier &current = lookup[tok];
@@ -168,7 +168,13 @@ Tok read_type(const char *equation, unsigned index, unsigned length, const Token
 	return Tok::Invalid;
 }
 
-Sym read_symbol(const char *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
+Sym read_symbol(
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const TokenTable &lookup,
+	unsigned *consumed
+) {
 	/*Sym letter enum values are mapped to their ascii code (Sym::B == 'B')*/
 	if (equation[index] >= 'A' && equation[index] <= 'Z') {
 		*consumed = 1;
@@ -184,7 +190,13 @@ Sym read_symbol(const char *equation, unsigned index, unsigned length, const Tok
 	}
 }
 
-Token read_token(const char *equation, unsigned index, unsigned length, const TokenTable &lookup, unsigned *consumed) {
+Token read_token(
+	const uint8_t *equation,
+	unsigned index,
+	unsigned length,
+	const TokenTable &lookup,
+	unsigned *consumed
+) {
 	Token tok;
 
 	if (is_num(equation[index], lookup)) {
@@ -206,7 +218,13 @@ Token read_token(const char *equation, unsigned index, unsigned length, const To
 	return tok;
 }
 
-Error _tokenize(Token *tokens, const char *equation, unsigned length, unsigned *tok_amount, const TokenTable &lookup) {
+Error _tokenize(
+	Token *tokens,
+	const uint8_t *equation,
+	unsigned length,
+	unsigned *tok_amount,
+	const TokenTable &lookup
+) {
 	unsigned token_index = 0;
 	unsigned i = 0;
 
@@ -233,7 +251,7 @@ Error _tokenize(Token *tokens, const char *equation, unsigned length, unsigned *
 	return Error::Success;
 }
 
-Error tokenize(Tokenizer *t, const char *equation, unsigned length, const TokenTable &lookup) {
+Error tokenize(Tokenizer *t, const uint8_t *equation, unsigned length, const TokenTable &lookup) {
 	/*Determine the amount of tokens to malloc()*/
 	Error err = _tokenize(nullptr, equation, length, &t->amount, lookup);
 
@@ -445,7 +463,7 @@ bool collapse_all(Stack<const Token *> &operators, Stack<ast *> &expressions) {
 }
 
 unsigned parse_list(
-	const char *equation,
+	const uint8_t *equation,
 	unsigned length,
 	const TokenTable &lookup,
 	ast **items,
@@ -499,7 +517,7 @@ unsigned parse_list(
 	}
 }
 
-ast *parse(const char *equation, unsigned length, const TokenTable &lookup, Error *e) {
+ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, Error *e) {
 	Tokenizer tokenizer = {0};
 
 	*e = tokenize(&tokenizer, equation, length, lookup);

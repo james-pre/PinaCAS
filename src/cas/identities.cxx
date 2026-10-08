@@ -495,12 +495,12 @@ bool execute(ast &e, Identity *id, bool recursive) {
 bool load(Identity *id) {
 	Error err;
 
-	id->from = parse(id->from_text, strlen(id->from_text), str_table, &err);
+	id->from = parse(reinterpret_cast<const uint8_t *>(id->from_text), strlen(id->from_text), str_table, &err);
 
 	if (err != Error::Success)
 		return false;
 
-	id->to = parse(id->to_text, strlen(id->to_text), str_table, &err);
+	id->to = parse(reinterpret_cast<const uint8_t *>(id->to_text), strlen(id->to_text), str_table, &err);
 
 	if (err != Error::Success)
 		return false;
