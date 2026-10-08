@@ -968,9 +968,9 @@ static ast *parse_respect_to(char character, Error *err) {
 
 	/*We treat the @ character as theta partially out of laziness*/
 	if (character == '@')
-		return parse((const uint8_t *)theta, strlen(theta), str_table, err);
+		return parse(theta, strlen(theta), str_table, err);
 
-	return parse((uint8_t *)&character, 1, str_table, err);
+	return parse(&character, 1, str_table, err);
 }
 
 /*Runs a calculus function on the input with the options in context, then shows the work or the result*/

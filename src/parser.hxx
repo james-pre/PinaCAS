@@ -113,10 +113,10 @@ struct TokenTable {
 extern const TokenTable ti_table;
 extern const TokenTable str_table;
 
-ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, Error *e);
+ast *parse(const char *equation, unsigned length, const TokenTable &lookup, Error *e);
 /*Parses up to max expressions separated by commas outside of parentheses into items. Returns how many were parsed, or 0 on error.*/
 unsigned parse_list(
-	const uint8_t *equation,
+	const char *equation,
 	unsigned length,
 	const TokenTable &lookup,
 	ast **items,

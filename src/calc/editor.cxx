@@ -54,7 +54,7 @@ static const struct key_tokens {
 static const uint16_t menu_tokens[] =
 	{0x6A, 0xAE, 0xB2, 0x2D, 0xB1, 0x25, 0x24, 0xEF34, 0x0F, 0xBD, 0xF1, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0x5B};
 
-static uint8_t data[MAX_LENGTH];
+static char data[MAX_LENGTH];
 static unsigned length, cursor;
 static KeyMode mode;
 
@@ -64,8 +64,8 @@ static unsigned preview_count;
 static const char *preview_message;
 
 /*Returns the display text of the token at token, and sets size to its length in bytes*/
-static const char *token_text(const uint8_t *token, unsigned *size) {
-	void *read = (void *)token;
+static const char *token_text(const char *token, unsigned *size) {
+	void *read = const_cast<char *>(token);
 	uint8_t token_length;
 	const char *text = ti_GetTokenString(&read, &token_length, nullptr);
 
@@ -73,7 +73,7 @@ static const char *token_text(const uint8_t *token, unsigned *size) {
 	return text;
 }
 
-static const Glyph *os_glyph(uint8_t c) {
+static const Glyph *os_glyph(char c) {
 	switch (c) {
 		case 0x0E: return &glyph_cube;
 		case 0x10: return &glyph_root;
@@ -87,7 +87,7 @@ static const Glyph *os_glyph(uint8_t c) {
 }
 
 /*Returns how to print a character of the OS character set that has no glyph*/
-static const char *os_char(uint8_t c) {
+static const char *os_char(char c) {
 	static char ascii[2];
 
 	switch (c) {
@@ -352,9 +352,7 @@ static uint16_t choose_menu_token(const char *name) {
 		gfx_Rectangle(left, top, MENU_WIDTH, height);
 
 		for (unsigned i = first; i < first + MENU_ROWS && i < countof(menu_tokens); i++) {
-			const uint8_t token[2] = {
-				static_cast<uint8_t>(menu_tokens[i] >> 8), static_cast<uint8_t>(menu_tokens[i] & 0xFF)
-			};
+			const char token[2] = {static_cast<char>(menu_tokens[i] >> 8), static_cast<char>(menu_tokens[i] & 0xFF)};
 			unsigned size;
 			const int y = top + 4 + (int)(i - first) * LINE_HEIGHT + 2;
 

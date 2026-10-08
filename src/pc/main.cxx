@@ -48,7 +48,7 @@ void display_help(void) {
 }
 
 /*Trim null terminated string*/
-uint8_t *trim(char *input, unsigned *len) {
+char *trim(char *input, unsigned *len) {
 	unsigned trimmed_len = 0, trim_index = 0;
 
 	for (unsigned i = 0; i < strlen(input) + 1; i++) {
@@ -56,11 +56,11 @@ uint8_t *trim(char *input, unsigned *len) {
 			trimmed_len++;
 	}
 
-	uint8_t *trimmed = static_cast<uint8_t *>(malloc(trimmed_len * sizeof(uint8_t)));
+	char *trimmed = static_cast<char *>(malloc(trimmed_len * sizeof(char)));
 
 	for (unsigned i = 0; i < strlen(input) + 1; i++) {
 		if (input[i] != ' ' && input[i] != '\t')
-			trimmed[trim_index++] = (uint8_t)input[i];
+			trimmed[trim_index++] = input[i];
 	}
 
 	*len = trimmed_len - 1; /*Don't include null byte*/
@@ -75,7 +75,7 @@ int run_gcd(int argc, char **argv) {
 	}
 
 	unsigned trimmed_a_len;
-	uint8_t *trimmed_a = trim(argv[2], &trimmed_a_len);
+	char *trimmed_a = trim(argv[2], &trimmed_a_len);
 
 	printf("Parsing \"%s\"\n", trimmed_a);
 
@@ -90,7 +90,7 @@ int run_gcd(int argc, char **argv) {
 	simplify(*a, Simp::All);
 
 	unsigned trimmed_b_len;
-	uint8_t *trimmed_b = trim(argv[3], &trimmed_b_len);
+	char *trimmed_b = trim(argv[3], &trimmed_b_len);
 
 	printf("Parsing \"%s\"\n", trimmed_b);
 
@@ -141,7 +141,7 @@ int run_simplify(int argc, char **argv) {
 	}
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
@@ -189,7 +189,7 @@ int run_factor(int argc, char **argv) {
 	}
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
@@ -246,7 +246,7 @@ int run_expand(int argc, char **argv) {
 	}
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 
 	printf("Parsing \"%s\"\n", trimmed);
 
@@ -348,7 +348,7 @@ int run_derivative(int argc, char **argv) {
 	ast *respect_to = nullptr, *at = nullptr;
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 	printf("Parsing \"%s\"\n", trimmed);
 	Error err;
 	ast *e = parse(trimmed, trimmed_len, str_table, &err);
@@ -459,7 +459,7 @@ int run_integral(int argc, char **argv) {
 	ast *respect_to = nullptr;
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 	Error err;
 	ast *e = parse(trimmed, trimmed_len, str_table, &err);
 	free(trimmed);
@@ -500,7 +500,7 @@ int run_de(int argc, char **argv) {
 	ast *items[MAX_ITEMS], *x = nullptr, *solution = nullptr;
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 	Error err;
 	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
 	free(trimmed);
@@ -522,7 +522,7 @@ int run_de(int argc, char **argv) {
 		if (err == Error::Success) {
 			de.series = !strcmp(argv[1], "series");
 			if (argc >= 5 && atoi(argv[4]) > 0)
-				de.terms = (unsigned)atoi(argv[4]);
+				de.terms = static_cast<unsigned>(atoi(argv[4]));
 
 			de.classify();
 
@@ -578,7 +578,7 @@ int run_verify(int argc, char **argv) {
 	bool satisfied = false;
 
 	unsigned trimmed_len;
-	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	char *trimmed = trim(argv[2], &trimmed_len);
 	Error err;
 	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
 	free(trimmed);

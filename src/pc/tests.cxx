@@ -139,8 +139,9 @@ bool check(Test *t, ast &actual, ast &expected) {
 	if (!expected.compare(actual)) {
 		unsigned expected_len, actual_len;
 		Error expted_err, actual_err;
-		char *output_expected = (char *)export_to_binary(expected, &expected_len, str_table, &expted_err);
-		char *output_actual = (char *)export_to_binary(actual, &actual_len, str_table, &actual_err);
+		char *output_expected =
+			reinterpret_cast<char *>(export_to_binary(expected, &expected_len, str_table, &expted_err));
+		char *output_actual = reinterpret_cast<char *>(export_to_binary(actual, &actual_len, str_table, &actual_err));
 
 		if (expted_err != Error::Success || actual_err != Error::Success) {
 			printf("Test failed on line %u. Error when exporting ast to text.\n", t->line);
@@ -178,9 +179,9 @@ static bool run_verify(Test *t) {
 	DiffEq de;
 	bool satisfied = false, passed = false;
 
-	const unsigned count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
-	ast *solution = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
-	ast *x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	const unsigned count = parse_list(t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	ast *solution = parse(t->arg2, strlen(t->arg2), str_table, &err);
+	ast *x = parse(t->arg3, strlen(t->arg3), str_table, &err);
 
 	if (count == 0 || items[0] == nullptr || solution == nullptr || x == nullptr) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
@@ -222,9 +223,9 @@ static bool run_solve(Test *t) {
 	DiffEq de;
 	bool satisfied = true, passed = false;
 
-	const unsigned count = parse_list((uint8_t *)t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
-	ast *expected = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
-	ast *x = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	const unsigned count = parse_list(t->arg1, strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	ast *expected = parse(t->arg2, strlen(t->arg2), str_table, &err);
+	ast *x = parse(t->arg3, strlen(t->arg3), str_table, &err);
 
 	if (count == 0 || items[0] == nullptr || expected == nullptr || x == nullptr) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
@@ -265,20 +266,20 @@ bool test_Run(Test *t) {
 		return run_solve(t);
 
 	Error err;
-	ast *a = parse((uint8_t *)t->arg1, strlen(t->arg1), str_table, &err);
+	ast *a = parse(t->arg1, strlen(t->arg1), str_table, &err);
 	if (err != Error::Success) {
 		printf("Test failed on line %u. Unable to parse first argument %s\n", t->line, t->arg1);
 		return false;
 	}
 
-	ast *b = parse((uint8_t *)t->arg2, strlen(t->arg2), str_table, &err);
+	ast *b = parse(t->arg2, strlen(t->arg2), str_table, &err);
 	if (err != Error::Success) {
 		ast::dispose(a);
 		printf("Test failed on line %u. Unable to parse second argument %s\n", t->line, t->arg2);
 		return false;
 	}
 
-	ast *c = parse((uint8_t *)t->arg3, strlen(t->arg3), str_table, &err);
+	ast *c = parse(t->arg3, strlen(t->arg3), str_table, &err);
 	if (err != Error::Success) {
 		ast::dispose(a);
 		ast::dispose(b);
