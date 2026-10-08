@@ -15,7 +15,7 @@ unsigned parse_list_from_tok(const char *tok, ast **items, unsigned max, Error *
 /*Copies the tokens in the variable tok to data and sets length, which is 0 if tok does not exist. Returns false if tok is longer than max.*/
 bool read_tokens_from_tok(const char *tok, char *data, unsigned max, unsigned *length);
 /*Replaces the contents of the variable tok with length bytes of tokens, enabling it if it is a Y= variable*/
-void write_tokens_to_tok(const char *tok, const char *data, unsigned length, Error *err);
+void write_tokens_to_tok(const char *tok, const void *data, unsigned length, Error *err);
 /*Writes expression to the variable tok, enabling it if it is a Y= variable*/
 void write_to_tok(const char *tok, const ast &expression, Error *err);
 

@@ -10,8 +10,8 @@ DESCRIPTION  = "PinaCAS v$(VERSION)"
 APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
-CFLAGS       = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
-CXXFLAGS     = -std=c++23 -fno-rtti -Wall -Oz -Ilib -DUSE_32BIT_WORDS -Wsign-conversion -Wsign-compare
+CFLAGS       = -std=c23 -Oz -Ilib -DUSE_32BIT_WORDS -Wall
+CXXFLAGS     = -std=c++23 -Oz -Ilib -DUSE_32BIT_WORDS -fno-rtti -Wall -Wsign-conversion -Wsign-compare
 CPP_EXTENSION = cxx
 
 EXTRA_CSOURCES = lib/imath/imath.c lib/imath/imrat.c
@@ -85,12 +85,12 @@ $(PC_TARGET): $(PC_OBJECTS)
 $(PC_OBJDIR)/%.o: %.cxx
 	@mkdir -p $(@D)
 	@$(PC_CXX) $(PC_CXXFLAGS) -c $< -o $@
-	@echo "Compiled $<"
+	@echo "[cc] $<"
 
 $(PC_OBJDIR)/%.o: %.c
 	@mkdir -p $(@D)
 	@$(PC_CC) $(PC_CFLAGS) -c $< -o $@
-	@echo "Compiled $<"
+	@echo "[cc] $<"
 
 -include $(PC_OBJECTS:.o=.d)
 

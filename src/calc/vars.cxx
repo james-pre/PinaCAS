@@ -59,7 +59,7 @@ bool read_tokens_from_tok(const char *tok, char *data, unsigned max, unsigned *l
 	return fits;
 }
 
-void write_tokens_to_tok(const char *tok, const uint8_t *data, unsigned length, Error *err) {
+void write_tokens_to_tok(const char *tok, const void *data, unsigned length, Error *err) {
 	ti_var_t var = ti_OpenVar(tok, "w", tok[0] == 0x5Eu ? OS_TYPE_EQU : OS_TYPE_STR);
 
 	if (var == 0) {
