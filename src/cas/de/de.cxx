@@ -9,6 +9,12 @@ ast *integer(mp_small n) {
 	return ast::make(num::from(n));
 }
 
+template <std::unsigned_integral T>
+	requires(!std::same_as<T, bool>)
+ast *integer(T n) {
+	return ast::make(num::from(static_cast<long>(n)));
+}
+
 ast *negate(ast *a) {
 	return ast::make(Op::Mult, integer(-1), a);
 }

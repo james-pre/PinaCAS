@@ -21,12 +21,12 @@ static uint32_t symbol(char c) {
 		case ts::Theta: return 0x03B8;
 		case ts::Dot: return 0x00B7;
 		case ts::Infinity: return 0x221E;
-		default: return (unsigned char)c;
+		default: return static_cast<unsigned char>(c);
 	}
 }
 
-static int text_width(const char *text) {
-	return (int)strlen(text);
+static unsigned text_width(const char *text) {
+	return strlen(text);
 }
 
 static int one(int height) {
@@ -95,14 +95,14 @@ static const ts::Renderer renderer =
 
 static void print_utf8(uint32_t c) {
 	if (c < 0x80) {
-		putchar((int)c);
+		putchar(static_cast<int>(c));
 	} else if (c < 0x800) {
-		putchar((int)(0xC0 | (c >> 6)));
-		putchar((int)(0x80 | (c & 0x3F)));
+		putchar(static_cast<int>((0xC0 | (c >> 6))));
+		putchar(static_cast<int>((0x80 | (c & 0x3F))));
 	} else {
-		putchar((int)(0xE0 | (c >> 12)));
-		putchar((int)(0x80 | ((c >> 6) & 0x3F)));
-		putchar((int)(0x80 | (c & 0x3F)));
+		putchar(static_cast<int>((0xE0 | (c >> 12))));
+		putchar(static_cast<int>((0x80 | ((c >> 6) & 0x3F))));
+		putchar(static_cast<int>((0x80 | (c & 0x3F))));
 	}
 }
 
@@ -111,7 +111,7 @@ void render::print(ts::Box *b) {
 
 	canvas_width = b->width;
 	canvas_height = b->ascent + b->descent;
-	cells = static_cast<uint32_t *>(malloc(sizeof(uint32_t) * canvas_width * canvas_height));
+	cells = static_cast<uint32_t *>(malloc(sizeof(uint32_t) * static_cast<size_t>(canvas_width * canvas_height)));
 
 	for (int i = 0; i < canvas_width * canvas_height; i++)
 		cells[i] = ' ';

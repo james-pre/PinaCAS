@@ -79,16 +79,16 @@ char *num::toString(mp_size precision) const {
 	char *str;
 
 	if (isInteger()) {
-		const int len = mp_int_string_len(MP_NUMER_P(this), radix);
+		const mp_size len = mp_int_string_len(MP_NUMER_P(this), radix);
 		str = static_cast<char *>(malloc(len * sizeof(char)));
-		if (mp_int_to_string(MP_NUMER_P(this), radix, str, len) != MP_OK) {
+		if (mp_int_to_string(MP_NUMER_P(this), radix, str, static_cast<int>(len)) != MP_OK) {
 			free(str);
 			return nullptr;
 		}
 	} else {
-		const int len = mp_rat_decimal_len(this, radix, precision);
+		const mp_size len = mp_rat_decimal_len(this, radix, precision);
 		str = static_cast<char *>(malloc(len * sizeof(char)));
-		if (mp_rat_to_decimal(this, radix, precision, MP_ROUND_HALF_UP, str, len) != MP_OK) {
+		if (mp_rat_to_decimal(this, radix, precision, MP_ROUND_HALF_UP, str, static_cast<int>(len)) != MP_OK) {
 			free(str);
 			return nullptr;
 		}

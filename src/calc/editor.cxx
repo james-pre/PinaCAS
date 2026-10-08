@@ -95,7 +95,7 @@ static const char *os_char(char c) {
 		case 0x1D: return "10";
 		case 0xD7: return "i";
 		case 0xDB: return "e";
-		default: ascii[0] = c >= 0x20 && c < 0x7F ? (char)c : '?'; return ascii;
+		default: ascii[0] = c >= 0x20 && c < 0x7F ? c : '?'; return ascii;
 	}
 }
 
@@ -285,7 +285,7 @@ static void draw_rule(int y) {
 }
 
 static void print_right(const char *text, int y) {
-	gfx_PrintStringXY(text, LCD_WIDTH - MARGIN - gfx_GetStringWidth(text), y);
+	gfx_PrintStringXY(text, LCD_WIDTH - MARGIN - static_cast<int>(gfx_GetStringWidth(text)), y);
 }
 
 static void draw(const char *name) {
@@ -354,7 +354,7 @@ static uint16_t choose_menu_token(const char *name) {
 		for (unsigned i = first; i < first + MENU_ROWS && i < countof(menu_tokens); i++) {
 			const char token[2] = {static_cast<char>(menu_tokens[i] >> 8), static_cast<char>(menu_tokens[i] & 0xFF)};
 			unsigned size;
-			const int y = top + 4 + (int)(i - first) * LINE_HEIGHT + 2;
+			const int y = top + 4 + static_cast<int>(i - first) * LINE_HEIGHT + 2;
 
 			gfx_SetTextFGColor(COLOR_PURPLE);
 			if (i == selected)

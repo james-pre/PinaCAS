@@ -259,7 +259,7 @@ static bool power_in_small_range(ast &a, ast &b) {
 	if (!b.num().toInt(exponent) || exponent > 64)
 		return false;
 
-	return (mp_small)mp_int_count_bits(MP_NUMER_P(&a.num())) * exponent <= 64;
+	return static_cast<mp_small>(mp_int_count_bits(MP_NUMER_P(&a.num()))) * exponent <= 64;
 }
 
 static bool eval_pow(ast &e, Eval flags) {

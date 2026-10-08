@@ -269,7 +269,7 @@ static char digit_key(uint8_t key) {
 static void draw_string_centered(const char *text, int x, int y) {
 	gfx_SetTextBGColor(COLOR_TRANSPARENT);
 	gfx_SetTextFGColor(COLOR_TEXT);
-	gfx_PrintStringXY(text, x - (int)gfx_GetStringWidth(text) / 2, y);
+	gfx_PrintStringXY(text, x - static_cast<int>(gfx_GetStringWidth(text)) / 2, y);
 }
 
 static void draw_background(void) {
@@ -318,7 +318,7 @@ static void draw_box(Rect r, const char *text) {
 }
 
 static int button_width(const Element *e) {
-	return (int)gfx_GetStringWidth(e->text) + 16;
+	return static_cast<int>(gfx_GetStringWidth(e->text) + 16);
 }
 
 static int value_width(const Element *e) {
@@ -336,9 +336,10 @@ static void draw_value(const Element *e, Rect r) {
 }
 
 /*Prints text wrapped to width, breaking at the last space that fits or else within a word. Returns the number of lines.*/
-static unsigned wrap_text(const char *text, int x, int y, int width) {
+static int wrap_text(const char *text, int x, int y, unsigned width) {
 	char line[48];
-	unsigned lines = 0, length = 0;
+	int lines = 0;
+	unsigned length = 0;
 
 	line[0] = '\0';
 
@@ -346,9 +347,9 @@ static unsigned wrap_text(const char *text, int x, int y, int width) {
 		line[length++] = *text;
 		line[length] = '\0';
 
-		if (length > 1 && (length == sizeof(line) - 1 || (int)gfx_GetStringWidth(line) > width)) {
+		if (length > 1 && (length == sizeof(line) - 1 || gfx_GetStringWidth(line) > width)) {
 			const char *space = strrchr(line, ' ');
-			const unsigned keep = space != nullptr ? (unsigned)(space - line) : length - 1;
+			const unsigned keep = space != nullptr ? static_cast<unsigned>((space - line)) : length - 1;
 			const unsigned skip = space != nullptr ? keep + 1 : keep;
 			const char next = line[keep];
 
@@ -374,7 +375,7 @@ static void draw_form(const Element *content, Rect area, int focused) {
 		if (e->type == Element::Type::Button) {
 			buttons += button_width(e) + GAP;
 		} else if (e->type == Element::Type::Variable || e->type == Element::Type::Character) {
-			const int width = gfx_GetStringWidth(e->text);
+			const int width = static_cast<int>(gfx_GetStringWidth(e->text));
 			if (width > column)
 				column = width;
 		}
@@ -391,7 +392,9 @@ static void draw_form(const Element *content, Rect area, int focused) {
 		int marker_x;
 
 		switch (e->type) {
-			case Element::Type::Text: y += LINE_HEIGHT * wrap_text(e->text, area.x, y, area.w); continue;
+			case Element::Type::Text:
+				y += LINE_HEIGHT * wrap_text(e->text, area.x, y, static_cast<unsigned>(area.w));
+				continue;
 
 			case Element::Type::Checkbox:
 				r = (Rect){area.x, y + (CHECKBOX_ROW - CHECKBOX_SIZE) / 2, CHECKBOX_SIZE, CHECKBOX_SIZE};
@@ -460,7 +463,7 @@ static void draw_menus(void) {
 	gfx_SetTextFGColor(COLOR_TEXT);
 
 	for (unsigned i = 0; i < countof(menus); i++) {
-		const int y = area.y + MENU_ROW * (int)i;
+		const int y = area.y + MENU_ROW * static_cast<int>(i);
 
 		gfx_PrintStringXY(menus[i].label, area.x, y);
 
@@ -531,7 +534,7 @@ static void activate(const Element *e, int step) {
 	switch (e->type) {
 		case Element::Type::Checkbox: *e->checked = !*e->checked; break;
 		case Element::Type::Variable:
-			*e->variable = (*e->variable + countof(variables) + step) % countof(variables);
+			*e->variable = (*e->variable + countof(variables) + static_cast<unsigned>(step)) % countof(variables);
 			break;
 		case Element::Type::Button: e->action(); break;
 		default: break;
@@ -1020,7 +1023,7 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 				: kind == calculus::Kind::Integral ? "Integrating..."
 												   : "Solving..."
 			);
-			const unsigned terms = kind == calculus::Kind::DiffEq ? (unsigned)(options->terms - '0') : 0;
+			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
 			err = calculus::run(kind, items, count, *respect_to, options->series, terms, buffer);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)

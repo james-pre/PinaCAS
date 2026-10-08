@@ -11,7 +11,7 @@ APPLICATION  = YES
 ALLOCATOR    = CUSTOM
 
 CFLAGS       = -std=c23 -Wall -Oz -Ilib -DUSE_32BIT_WORDS
-CXXFLAGS     = -std=c++23 -fno-rtti -Wall -Oz -Ilib -DUSE_32BIT_WORDS
+CXXFLAGS     = -std=c++23 -fno-rtti -Wall -Oz -Ilib -DUSE_32BIT_WORDS -Wsign-conversion -Wsign-compare
 CPP_EXTENSION = cxx
 
 EXTRA_CSOURCES = lib/imath/imath.c lib/imath/imrat.c
@@ -66,7 +66,7 @@ PC_CC      := $(if $(shell command -v clang 2>/dev/null),clang,gcc)
 PC_CXX     := $(if $(shell command -v clang++ 2>/dev/null),clang++,g++)
 PC_FLAGS    = -pedantic -g -DCOMPILE_PC -DDEBUG -DUSE_32BIT_WORDS -Wall -MMD -MP -I. -Ilib
 PC_CFLAGS   = -std=c23 $(PC_FLAGS)
-PC_CXXFLAGS = -std=c++23 -fno-rtti -fno-exceptions $(PC_FLAGS)
+PC_CXXFLAGS = -std=c++23 $(PC_FLAGS) -fno-rtti -fno-exceptions -Wsign-conversion -Wsign-compare
 PC_LFLAGS   = -lm
 PC_OBJDIR   = obj/pc
 PC_SOURCES := $(wildcard src/*.cxx src/*/*.cxx src/*/*/*.cxx)

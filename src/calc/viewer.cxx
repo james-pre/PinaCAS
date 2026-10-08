@@ -29,12 +29,12 @@ static const Glyph *special_glyph(char c) {
 	}
 }
 
-static int text_width(const char *text) {
-	int width = 0;
+static unsigned text_width(const char *text) {
+	unsigned width = 0;
 
 	for (; *text != '\0'; text++) {
 		const Glyph *g = special_glyph(*text);
-		width += g != nullptr ? g->width : (int)gfx_GetCharWidth(*text);
+		width += g != nullptr ? g->width : gfx_GetCharWidth(*text);
 	}
 
 	return width;
@@ -137,7 +137,7 @@ static void draw_title(const char *title) {
 
 	gfx_SetTextFGColor(COLOR_TEXT);
 	gfx_PrintStringXY(title, 6, 4);
-	gfx_PrintStringXY("[clear] back", LCD_WIDTH - 6 - gfx_GetStringWidth("[clear] back"), 4);
+	gfx_PrintStringXY("[clear] back", LCD_WIDTH - 6 - static_cast<int>(gfx_GetStringWidth("[clear] back")), 4);
 
 	gfx_SetColor(COLOR_BLUE);
 	gfx_HorizLine(0, TITLE_HEIGHT - 1, LCD_WIDTH);

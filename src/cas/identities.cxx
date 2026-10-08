@@ -436,7 +436,7 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 			}
 
 			/*Reverse loop to better guess variables for derivative nodes*/
-			for (int i = e.childCount() - 1; i >= 0; i--) {
+			for (unsigned i = e.childCount() - 1; i >= 0; i--) {
 				ast &e_child = *e.childAt(i);
 				ast *id_child = id->childAt(i);
 				if (!matches(id_child, e_child, dict_copy)) {

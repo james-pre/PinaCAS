@@ -49,7 +49,7 @@ struct Box {
 
 /*Sizes are in the renderer's units, with y increasing downward*/
 struct Metrics {
-	int (*text_width)(const char *text);
+	unsigned (*text_width)(const char *text);
 	/*Extent of a line of text above and below its baseline*/
 	int ascent, descent;
 	/*Distance from the baseline up to the bottom of a fraction bar*/

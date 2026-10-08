@@ -20,7 +20,7 @@ void glyph_draw(int x, int y, const Glyph *g, int left, int top, int right, int 
 			const int px = x + column, py = y + row;
 
 			if ((g->rows[row] & (0x80 >> column)) && px >= left && px < right && py >= top && py < bottom)
-				gfx_SetPixel(px, py);
+				gfx_SetPixel(static_cast<uint24_t>(px), static_cast<uint24_t>(py));
 		}
 	}
 }

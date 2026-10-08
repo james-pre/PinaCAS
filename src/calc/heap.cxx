@@ -58,7 +58,7 @@ static size_t block_size(size_t size) {
 	if (total < sizeof(FreeBlock))
 		total = sizeof(FreeBlock);
 
-	return (total + GRANULARITY - 1) & ~(size_t)(GRANULARITY - 1);
+	return (total + GRANULARITY - 1) & ~(GRANULARITY - 1);
 }
 
 static void release(FreeBlock *block) {
@@ -79,7 +79,7 @@ static FreeBlock *take_large(size_t total) {
 		*link = block->next;
 
 		if (block->size - total >= sizeof(FreeBlock)) {
-			FreeBlock *rest = (FreeBlock *)((uint8_t *)block + total);
+			FreeBlock *rest = reinterpret_cast<FreeBlock *>((reinterpret_cast<uint8_t *>(block) + total));
 			rest->size = block->size - total;
 			block->size = total;
 			release(rest);
@@ -93,8 +93,8 @@ static FreeBlock *take_large(size_t total) {
 
 static FreeBlock *bump(size_t total) {
 	for (unsigned i = 0; i < region_count; i++) {
-		if ((size_t)(regions[i].end - regions[i].next) >= total) {
-			FreeBlock *block = (FreeBlock *)regions[i].next;
+		if (static_cast<size_t>((regions[i].end - regions[i].next)) >= total) {
+			FreeBlock *block = reinterpret_cast<FreeBlock *>(regions[i].next);
 			regions[i].next += total;
 			block->size = total;
 			return block;
@@ -157,7 +157,8 @@ static void coalesce(void) {
 	all = sort(all);
 
 	for (FreeBlock *block = all, *next; block != nullptr; block = next) {
-		while (block->next != nullptr && (uint8_t *)block + block->size == (uint8_t *)block->next) {
+		while (block->next != nullptr &&
+			   reinterpret_cast<uint8_t *>(block) + block->size == reinterpret_cast<uint8_t *>(block->next)) {
 			block->size += block->next->size;
 			block->next = block->next->next;
 		}
@@ -166,8 +167,8 @@ static void coalesce(void) {
 
 		unsigned i;
 		for (i = 0; i < region_count; i++) {
-			if ((uint8_t *)block + block->size == regions[i].next) {
-				regions[i].next = (uint8_t *)block;
+			if (reinterpret_cast<uint8_t *>(block) + block->size == regions[i].next) {
+				regions[i].next = reinterpret_cast<uint8_t *>(block);
 				break;
 			}
 		}
@@ -209,19 +210,19 @@ void *malloc(size_t size) {
 		return nullptr;
 	}
 
-	return (uint8_t *)block + HEADER;
+	return reinterpret_cast<uint8_t *>(block) + HEADER;
 }
 
 void free(void *pointer) {
 	if (pointer != nullptr)
-		release((FreeBlock *)((uint8_t *)pointer - HEADER));
+		release(reinterpret_cast<FreeBlock *>((reinterpret_cast<uint8_t *>(pointer) - HEADER)));
 }
 
 void *realloc(void *pointer, size_t size) {
 	if (pointer == nullptr)
 		return malloc(size);
 
-	FreeBlock *block = (FreeBlock *)((uint8_t *)pointer - HEADER);
+	FreeBlock *block = reinterpret_cast<FreeBlock *>((reinterpret_cast<uint8_t *>(pointer) - HEADER));
 
 	if (block->size >= block_size(size))
 		return pointer;
@@ -239,7 +240,7 @@ size_t heap::available() {
 	size_t available = 0;
 
 	for (unsigned i = 0; i < region_count; i++)
-		available += regions[i].end - regions[i].next;
+		available += static_cast<size_t>(regions[i].end - regions[i].next);
 
 	for (unsigned i = 0; i < BINS; i++) {
 		for (const FreeBlock *block = bins[i]; block != nullptr; block = block->next)

@@ -100,7 +100,7 @@ static bool load_terms(Series *s, const ast &center) {
 			}
 
 			s->terms[s->count].k = k;
-			s->terms[s->count].j = (unsigned)j;
+			s->terms[s->count].j = static_cast<unsigned>(j);
 			s->terms[s->count++].p = p[j];
 		}
 	}
@@ -136,18 +136,18 @@ static ast *falling(const Series *s, int top, unsigned k) {
 
 	product->appendChild(integer(1));
 	for (unsigned i = 0; i < k; i++)
-		product->appendChild(index_plus(s, top - (int)i));
+		product->appendChild(index_plus(s, top - static_cast<int>(i)));
 
 	return product;
 }
 
 /*Sets r to (m + top)(m + top - 1)...(m + top - k + 1)*/
-static void falling_value(num &r, int m, int top, unsigned k) {
+static void falling_value(num &r, unsigned m, unsigned top, unsigned k) {
 	num factor;
 
 	mp_rat_set_value(&r, 1, 1);
 	for (unsigned i = 0; i < k; i++) {
-		mp_rat_set_value(&factor, m + top - (int)i, 1);
+		mp_rat_set_value(&factor, m + top - i, 1);
 		r *= factor;
 	}
 }
@@ -182,7 +182,7 @@ static ast *right_side(const Series *s) {
 		return integer(0);
 
 	num one(1);
-	ast *g = polynomial((num **)s->g, (unsigned)s->g_degree, *s->base, one);
+	ast *g = polynomial(s->g, static_cast<unsigned>(s->g_degree), *s->base, one);
 
 	return g;
 }
@@ -192,7 +192,7 @@ static void record_sums(const Series *s, const char *text, bool shifted) {
 
 	for (unsigned i = 0; i < s->count; i++) {
 		const SeriesTerm *t = &s->terms[i];
-		const int shift = (int)t->k - (int)t->j;
+		const int shift = static_cast<int>(t->k) - static_cast<int>(t->j);
 
 		ast *term;
 		if (shifted) {
@@ -243,7 +243,7 @@ static void record_substitution(const Series *s) {
 
 	for (unsigned k = 0; k <= s->de->order; k++) {
 		ast *term = ast::make(Op::Mult, falling(s, 0, k), coefficient(s, s->index->copy()));
-		term = ast::make(Op::Mult, term, base_power(s, tidy(index_plus(s, -(int)k))));
+		term = ast::make(Op::Mult, term, base_power(s, tidy(index_plus(s, -static_cast<int>(k)))));
 		ast *sum = series_sum(s, one, term, k);
 		ast *left = DiffEq::derivative(*s->de->y, k);
 		work::step(work::Step::Type::Equation, k == 0 ? "Power series" : k == 1 ? "Differentiate" : nullptr, left, sum);
@@ -265,11 +265,11 @@ static void add_falling(num **sum, const num &p, int top, unsigned k) {
 
 	for (unsigned i = 0; i < k; i++) {
 		for (unsigned d = i + 1; d > 0; d--) {
-			mp_rat_set_value(factor, top - (int)i, 1);
+			mp_rat_set_value(factor, top - static_cast<int>(i), 1);
 			*product[d] *= *factor;
 			*product[d] += *product[d - 1];
 		}
-		mp_rat_set_value(factor, top - (int)i, 1);
+		mp_rat_set_value(factor, top - static_cast<int>(i), 1);
 		*product[0] *= *factor;
 	}
 
@@ -323,55 +323,61 @@ static void record_recurrence(Series *s) {
 			if (s->terms[i].j > m)
 				continue;
 
-			const int shift = (int)s->terms[i].k - (int)s->terms[i].j;
-			falling_value(*value, (int)m, shift, s->terms[i].k);
+			const unsigned shift = s->terms[i].k - s->terms[i].j;
+			falling_value(*value, m, shift, s->terms[i].k);
 			*value *= *s->terms[i].p;
-			e->appendChild(ast::make(Op::Mult, ast::make(value->copy()), coefficient(s, integer((int)m + shift))));
+			e->appendChild(ast::make(Op::Mult, ast::make(value->copy()), coefficient(s, integer(m + shift))));
 		}
 
 		work::pause();
 		simplify(*e, Simp::Basic);
 		work::resume();
 
-		ast *sum = (int)m <= s->g_degree ? ast::make(s->g[m]->copy()) : integer(0);
+		ast *sum = static_cast<int>(m) <= s->g_degree ? ast::make(s->g[m]->copy()) : integer(0);
 		work::step(work::Step::Type::Equation, m == 0 ? "Separate the first terms" : nullptr, e, sum);
 		ast::dispose(e);
 		ast::dispose(sum);
 	}
 
-	for (int shift = (int)order; shift >= s->lowest_shift; shift--) {
+	for (int shift = static_cast<int>(order); shift >= s->lowest_shift; shift--) {
 		for (unsigned d = 0; d <= DiffEq::max_order; d++)
 			P[d] = num::from(0);
 
 		for (unsigned i = 0; i < s->count; i++) {
-			if ((int)s->terms[i].k - (int)s->terms[i].j == shift)
+			if (static_cast<int>(s->terms[i].k) - static_cast<int>(s->terms[i].j) == shift)
 				add_falling(P, *s->terms[i].p, shift, s->terms[i].k);
 		}
 
 		int n = degree_of(P);
 		if (n >= 0) {
 			left->appendChild(
-				ast::make(Op::Mult, factored_polynomial(s, P, (unsigned)n), coefficient(s, tidy(index_plus(s, shift))))
+				ast::make(
+					Op::Mult,
+					factored_polynomial(s, P, static_cast<unsigned>(n)),
+					coefficient(s, tidy(index_plus(s, shift)))
+				)
 			);
 
-			if (shift < (int)order) {
+			if (shift < static_cast<int>(order)) {
 				bool cancelled[DiffEq::max_order + 1];
 				for (unsigned d = 1; d <= order; d++) {
-					mp_rat_set_value(r, -(int)d, 1);
-					cancelled[d] = n > 0 && is_root(P, (unsigned)n, *r);
+					mp_rat_set_value(r, -static_cast<int>(d), 1);
+					cancelled[d] = n > 0 && is_root(P, static_cast<unsigned>(n), *r);
 					if (cancelled[d])
-						deflate(P, (unsigned)n--, *r);
+						deflate(P, static_cast<unsigned>(n--), *r);
 				}
 
 				ast *denominator = ast::make(Op::Mult);
 				denominator->appendChild(ast::make(s->lead->copy()));
 				for (unsigned d = order; d >= 1; d--) {
 					if (!cancelled[d])
-						denominator->appendChild(index_plus(s, (int)d));
+						denominator->appendChild(index_plus(s, static_cast<int>(d)));
 				}
 
 				ast *e = ast::make(
-					Op::Mult, factored_polynomial(s, P, (unsigned)n), coefficient(s, tidy(index_plus(s, shift)))
+					Op::Mult,
+					factored_polynomial(s, P, static_cast<unsigned>(n)),
+					coefficient(s, tidy(index_plus(s, shift)))
 				);
 				right->appendChild(negate(ast::make(Op::Div, e, denominator)));
 			}
@@ -384,11 +390,11 @@ static void record_recurrence(Series *s) {
 	ast *sum = ast::make(Op::Sum);
 	sum->appendChild(ast::make(Op::Mult, tidy(left), base_power(s, s->index->copy())));
 	sum->appendChild(s->index->copy());
-	sum->appendChild(integer((int)s->start));
+	sum->appendChild(integer(s->start));
 	work::step(work::Step::Type::Equation, nullptr, sum, zero);
 	ast::dispose(sum);
 
-	left = coefficient(s, tidy(index_plus(s, (int)order)));
+	left = coefficient(s, tidy(index_plus(s, static_cast<int>(order))));
 	if (right->childCount() == 0)
 		right->appendChild(integer(0));
 
@@ -420,7 +426,7 @@ static ast *combination_of(num **c, ast **constants, unsigned free_count) {
 
 /*Returns c times the base to the power i, keeping a factor of 1 on a sum so that it stays one term*/
 static ast *series_term(const Series *s, const num &c, unsigned i) {
-	ast *power = i == 0 ? nullptr : i == 1 ? s->base->copy() : base_power(s, integer((int)i));
+	ast *power = i == 0 ? nullptr : i == 1 ? s->base->copy() : base_power(s, integer(i));
 
 	if (power == nullptr)
 		return ast::make(c.copy());
@@ -501,11 +507,11 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 	s.base = is_zero(*offset) ? de->x->copy() : tidy(difference(de->x->copy(), center->copy()));
 	ast::dispose(offset);
 
-	s.lowest_shift = (int)order;
-	s.start = s.g_degree >= 0 ? (unsigned)s.g_degree + 1 : 0;
+	s.lowest_shift = static_cast<int>(order);
+	s.start = s.g_degree >= 0 ? static_cast<unsigned>(s.g_degree) + 1 : 0;
 	for (unsigned i = 0; i < s.count; i++) {
-		if ((int)s.terms[i].k - (int)s.terms[i].j < s.lowest_shift)
-			s.lowest_shift = (int)s.terms[i].k - (int)s.terms[i].j;
+		if (static_cast<int>(s.terms[i].k) - static_cast<int>(s.terms[i].j) < s.lowest_shift)
+			s.lowest_shift = static_cast<int>(s.terms[i].k) - static_cast<int>(s.terms[i].j);
 		if (s.terms[i].j > s.start)
 			s.start = s.terms[i].j;
 	}
@@ -518,7 +524,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 	unsigned free_count = 0;
 	for (unsigned k = 0; k < order; k++) {
 		if (conditions[k] == nullptr)
-			free_index[k] = (int)free_count++;
+			free_index[k] = static_cast<int>(free_count++);
 		else
 			free_index[k] = -1;
 	}
@@ -547,7 +553,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 		if (conditions[k] == nullptr) {
 			mp_rat_set_value(coefficients[k][free_index[k]], 1, 1);
-			ast *e = coefficient(&s, integer((int)k));
+			ast *e = coefficient(&s, integer(k));
 			work::step(
 				work::Step::Type::Equation, labelled_free ? nullptr : "Arbitrary constants", e, constants[free_index[k]]
 			);
@@ -562,21 +568,21 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 			err = Error::DeUnsolved;
 		}
 
-		falling_value(value, (int)k, 0, k);
+		falling_value(value, k, 0, k);
 		*coefficients[k][free_count] /= value;
 
 		ast *e = ast::make(Op::At, DiffEq::derivative(*de->y, k), center->copy());
 		if (k > 1)
 			e = ast::make(Op::Div, e, ast::make(value.copy()));
 		ast *chain = ast::make(Op::Equals, e, ast::make(coefficients[k][free_count]->copy()));
-		e = coefficient(&s, integer((int)k));
+		e = coefficient(&s, integer(k));
 		work::step(work::Step::Type::Equation, labelled_conditions ? nullptr : "Initial conditions", e, chain);
 		ast::dispose(e);
 		ast::dispose(chain);
 		labelled_conditions = true;
 	}
 
-	const unsigned window = (unsigned)((int)order - s.lowest_shift);
+	const unsigned window = static_cast<unsigned>((static_cast<int>(order) - s.lowest_shift));
 	unsigned counts[DiffEq::max_order + 1], last[DiffEq::max_order + 1];
 	bool active[DiffEq::max_order + 1];
 
@@ -599,24 +605,24 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		const unsigned t = m + order;
 		coefficients[t] = static_cast<num **>(malloc(sizeof(num *) * components));
 
-		falling_value(denominator, (int)m, (int)order, order);
+		falling_value(denominator, m, order, order);
 		denominator *= *s.lead;
 
 		for (unsigned b = 0; b < components; b++) {
 			coefficients[t][b] = num::from(0);
 
-			if (b == free_count && (int)m <= s.g_degree)
+			if (b == free_count && static_cast<int>(m) <= s.g_degree)
 				mp_rat_copy(s.g[m], coefficients[t][b]);
 
 			for (unsigned i = 0; i < s.count; i++) {
-				const int shift = (int)s.terms[i].k - (int)s.terms[i].j;
+				const unsigned shift = s.terms[i].k - s.terms[i].j;
 
 				if (s.terms[i].j > m || (s.terms[i].k == order && s.terms[i].j == 0))
 					continue;
 
-				falling_value(value, (int)m, shift, s.terms[i].k);
+				falling_value(value, m, shift, s.terms[i].k);
 				value *= *s.terms[i].p;
-				value *= *coefficients[(int)m + shift][b];
+				value *= *coefficients[m + shift][b];
 				*coefficients[t][b] -= value;
 			}
 
@@ -625,7 +631,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 		computed = t + 1;
 
-		ast *e = coefficient(&s, integer((int)t));
+		ast *e = coefficient(&s, integer(t));
 		ast *chain = combination_of(coefficients[t], constants, free_count);
 		work::step(work::Step::Type::Equation, m == 0 ? "Coefficients" : nullptr, e, chain);
 		ast::dispose(e);
@@ -634,7 +640,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 		done = true;
 
 		for (unsigned b = 0; b < components; b++) {
-			bool zero_window = t + 1 >= window && (int)m > s.g_degree;
+			bool zero_window = t + 1 >= window && static_cast<int>(m) > s.g_degree;
 
 			if (*coefficients[t][b] != 0 && counts[b] < de->terms) {
 				counts[b]++;

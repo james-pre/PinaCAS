@@ -62,7 +62,7 @@ static Box *integer_box(const mpz_t *z) {
 	const mp_size len = mp_int_string_len(z, 10);
 	char *digits = static_cast<char *>(malloc(len));
 
-	mp_int_to_string(z, 10, digits, len);
+	mp_int_to_string(z, 10, digits, static_cast<int>(len));
 	Box *b = text(digits);
 	free(digits);
 
@@ -340,7 +340,7 @@ void measure(Box *b, const Metrics &m) {
 
 	switch (b->type) {
 		case Box::Type::Text:
-			b->width = m.text_width(b->text);
+			b->width = static_cast<int>(m.text_width(b->text));
 			b->ascent = m.ascent;
 			b->descent = m.descent;
 			break;

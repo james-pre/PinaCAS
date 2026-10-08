@@ -38,8 +38,8 @@ bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, uns
 		scope->appendChild(exclude->copy());
 
 	for (; *candidates != '\0' && count < n; candidates++) {
-		if (!contains_symbol(*scope, (Sym)*candidates))
-			constants[count++] = ast::make(static_cast<Sym>((Sym)*candidates));
+		if (!contains_symbol(*scope, static_cast<Sym>(*candidates)))
+			constants[count++] = ast::make(static_cast<Sym>(*candidates));
 	}
 
 	ast::dispose(scope);
@@ -373,7 +373,7 @@ static bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, as
 			factor->firstChild()->next()->isNumber() && factor->firstChild()->next()->num().toInt(n) && n > 0 &&
 			n <= DiffEq::max_order
 		) {
-			*degree += (unsigned)n;
+			*degree += static_cast<unsigned>(n);
 		} else if (
 			factor->isOp(Op::Pow) && is_euler(*factor->firstChild()) &&
 			(slope = linear_slope(de, *factor->firstChild()->next())) != nullptr

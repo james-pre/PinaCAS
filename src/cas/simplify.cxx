@@ -462,7 +462,7 @@ static bool is_constant_of_integration(const ast &e) {
 /*Returns negative if a sorts before b, 0 if they are equal and positive if a sorts after b*/
 static int sort_order(const ast *a, const ast *b, bool add) {
 	int multiplier = 1;
-	const int rank_a = function_rank(*a), rank_b = function_rank(*b);
+	const int rank_a = static_cast<int>(function_rank(*a)), rank_b = static_cast<int>(function_rank(*b));
 
 	/*An added constant of integration goes last*/
 	if (add && is_constant_of_integration(*a) != is_constant_of_integration(*b))

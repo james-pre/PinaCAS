@@ -95,7 +95,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 			char *buffer = e->num().toString(6);
 
 			for (unsigned i = 0; i < strlen(buffer); i++) {
-				uint8_t c = (uint8_t)buffer[i];
+				uint8_t c = static_cast<uint8_t>(buffer[i]);
 				if (c == '.')
 					c = lookup[Tok::Period].bytes[0];
 				else if (c == '-')

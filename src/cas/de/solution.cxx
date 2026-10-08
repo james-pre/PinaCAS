@@ -80,8 +80,9 @@ static void absorb(DiffEq *de, ast &e, const ast &constant) {
 		absorb(de, *kept, constant);
 
 		int i;
-		if (kept->isOp(Op::Add) && (i = only_child_with(*kept, constant)) >= 0 && kept->childAt(i)->compare(constant)) {
-			ast::dispose(kept->removeChildAt(i));
+		if (kept->isOp(Op::Add) && (i = only_child_with(*kept, constant)) >= 0 &&
+			kept->childAt(static_cast<size_t>(i))->compare(constant)) {
+			ast::dispose(kept->removeChildAt(static_cast<size_t>(i)));
 			e.replace(ast::make(Op::Mult, constant.copy(), ast::make(Op::Pow, e.firstChild()->copy(), kept)));
 		} else {
 			ast::dispose(kept);
@@ -92,7 +93,7 @@ static void absorb(DiffEq *de, ast &e, const ast &constant) {
 
 	int i;
 	if ((e.isOp(Op::Add) || e.isOp(Op::Mult)) && (i = only_child_with(e, constant)) >= 0) {
-		const ast &term = *e.childAt(i);
+		const ast &term = *e.childAt(static_cast<size_t>(i));
 
 		if (!involves(term, *de->x) && !involves(term, *de->y)) {
 			ast *kept = ast::make(e.op());
@@ -195,7 +196,7 @@ static bool isolate_step(DiffEq *de, ast **lhs, ast **rhs, const ast &constant, 
 			return false;
 
 		ast *rest = L->copy();
-		left = rest->removeChildAt(i);
+		left = rest->removeChildAt(static_cast<size_t>(i));
 		right = L->isOp(Op::Add) ? difference(R->copy(), rest) : ast::make(Op::Div, R->copy(), rest);
 	} else if (L->isOp(Op::Div)) {
 		const ast &base = *L->firstChild();
