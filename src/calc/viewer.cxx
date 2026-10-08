@@ -254,6 +254,4 @@ void viewer::show(work::Record *w, const char *title) {
 	free(entries);
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

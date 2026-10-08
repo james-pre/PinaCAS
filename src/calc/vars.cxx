@@ -94,6 +94,4 @@ void write_to_tok(const char *tok, const ast &expression, Error *err) {
 	free(data);
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

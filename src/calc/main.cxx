@@ -37,6 +37,4 @@ int main(void) {
 	return 0;
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

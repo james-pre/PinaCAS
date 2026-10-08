@@ -482,6 +482,4 @@ bool editor::run(const char *name, const char *tok) {
 	return saved;
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

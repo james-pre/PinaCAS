@@ -252,6 +252,4 @@ size_t heap::available() {
 	return available;
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

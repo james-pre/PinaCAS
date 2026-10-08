@@ -133,6 +133,4 @@ void render::print(ts::Box *b) {
 	free(cells);
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

@@ -90,6 +90,4 @@ Error calculus::verify(ast **items, unsigned count, ast &respect_to, ast &soluti
 	return err;
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

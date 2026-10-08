@@ -1066,6 +1066,4 @@ static void execute_de(void) {
 	execute_calculus(calculus::Kind::DiffEq, &de_options, "Differential equation");
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

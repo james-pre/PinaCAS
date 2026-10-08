@@ -25,6 +25,4 @@ void glyph_draw(int x, int y, const glyph_t *g, int left, int top, int right, in
 	}
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

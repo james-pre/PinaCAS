@@ -458,6 +458,4 @@ void test_CleanupArr(test_t **arr, unsigned len) {
 	free(arr);
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif

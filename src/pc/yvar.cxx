@@ -66,6 +66,4 @@ void yvar_Cleanup(yvar_t *yvar) {
 	free(yvar->data);
 }
 
-#else
-typedef int make_iso_compilers_happy;
 #endif
