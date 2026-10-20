@@ -374,12 +374,15 @@ static void record_recurrence(Series *s) {
 						denominator->appendChild(index_plus(s, static_cast<int>(d)));
 				}
 
+				for (int d = 0; d <= n; d++)
+					*P[d] = -*P[d];
+
 				ast *e = ast::make(
 					Op::Mult,
 					factored_polynomial(s, P, static_cast<unsigned>(n)),
 					coefficient(s, tidy(index_plus(s, shift)))
 				);
-				right->appendChild(negate(ast::make(Op::Div, e, denominator)));
+				right->appendChild(ast::make(Op::Div, e, denominator));
 			}
 		}
 
