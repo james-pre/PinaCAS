@@ -283,7 +283,11 @@ static ast *combination(ast **constants, ast **basis, unsigned size) {
 	for (unsigned i = 0; i < size; i++)
 		sum->appendChild(ast::make(Op::Mult, constants[i]->copy(), basis[i]->copy()));
 
-	return tidy(sum);
+	work::pause();
+	simplify(*sum, Simp::Normalize | Simp::Commutative | Simp::Eval | Simp::Rational);
+	work::resume();
+
+	return sum;
 }
 
 /*Records y as the combination of the basis with the constants, plus particular unless it is nullptr, and finds the constants from the initial conditions. Takes ownership of particular.*/
@@ -843,27 +847,17 @@ static Error variation_of_parameters(DiffEq *de, ast **basis, unsigned size, con
 	return *particular != nullptr ? Error::Success : Error::DeIntegral;
 }
 
-Error solve_constant_coefficients(DiffEq *de, ast **solution) {
-	if (!de->linear)
-		return Error::DeUnsolved;
-
-	Root roots[DiffEq::max_order];
+/*Solves from the roots of the characteristic or, with euler, the auxiliary equation in m, finding a particular solution when the equation is not homogeneous. Frees the roots.*/
+static Error solve_from_roots(DiffEq *de, const ast &m, Root *roots, unsigned count, bool euler, ast **solution) {
 	ast *basis[DiffEq::max_order], *constants[DiffEq::max_order], *particular = nullptr;
-	unsigned count = 0, size = 0;
+	unsigned size = fill_basis(de, roots, count, basis, euler);
+	Error err = Error::Success;
 
-	ast *m = substitution_symbol(de, Sym::M);
-
-	Error err = characteristic_roots(de, *m, roots, &count);
-	if (err == Error::Success) {
-		de->method = "Constant coefficients";
-		size = fill_basis(de, roots, count, basis);
-
-		if (!choose_constants(de, m, constants, size)) {
-			for (unsigned i = 0; i < size; i++)
-				ast::dispose(basis[i]);
-			size = 0;
-			err = Error::DeUnsolved;
-		}
+	if (!choose_constants(de, &m, constants, size)) {
+		for (unsigned i = 0; i < size; i++)
+			ast::dispose(basis[i]);
+		size = 0;
+		err = Error::DeUnsolved;
 	}
 
 	if (err == Error::Success && !de->g->isInt(0)) {
@@ -872,11 +866,11 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 		ast::dispose(complementary);
 
 		ast *exclude = ast::make(Op::Add);
-		exclude->appendChild(m->copy());
+		exclude->appendChild(m.copy());
 		for (unsigned i = 0; i < size; i++)
 			exclude->appendChild(constants[i]->copy());
 
-		err = undetermined_coefficients(de, roots, count, *exclude, &particular);
+		err = euler ? Error::DeUnsolved : undetermined_coefficients(de, roots, count, *exclude, &particular);
 		if (err == Error::DeUnsolved)
 			err = variation_of_parameters(de, basis, size, *exclude, &particular);
 
@@ -892,12 +886,237 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 	}
 
 	free_roots(roots, count);
+
+	return err;
+}
+
+Error solve_constant_coefficients(DiffEq *de, ast **solution) {
+	if (!de->linear)
+		return Error::DeUnsolved;
+
+	Root roots[DiffEq::max_order];
+	unsigned count = 0;
+
+	ast *m = substitution_symbol(de, Sym::M);
+
+	Error err = characteristic_roots(de, *m, roots, &count);
+	if (err == Error::Success) {
+		de->method = "Constant coefficients";
+		err = solve_from_roots(de, *m, roots, count, false, solution);
+	} else {
+		free_roots(roots, count);
+	}
+
 	ast::dispose(m);
 
 	return err;
 }
 
-Error solve_reduction_of_order(DiffEq *de, ast **solution) {
+/*Returns a[k] x^(order - k) / a[order] if it is a rational number, otherwise nullptr*/
+static num *euler_ratio(const DiffEq *de, unsigned k) {
+	ast *ratio = ast::make(
+		Op::Div,
+		ast::make(Op::Mult, de->a[k]->copy(), ast::make(Op::Pow, de->x->copy(), integer(de->order - k))),
+		de->a[de->order]->copy()
+	);
+
+	work::pause();
+	simplify(*ratio, Simp::Basic);
+	work::resume();
+
+	num *value = rational_value(*ratio);
+	ast::dispose(ratio);
+
+	return value;
+}
+
+/*Returns m(m - 1)...(m - k + 1)*/
+static ast *falling_factorial(const ast &m, unsigned k) {
+	if (k == 0)
+		return integer(1);
+
+	ast *product = ast::make(Op::Mult);
+
+	for (unsigned i = 0; i < k; i++)
+		product->appendChild(i == 0 ? m.copy() : difference(m.copy(), integer(i)));
+
+	return product;
+}
+
+Error solve_cauchy_euler(DiffEq *de, ast **solution) {
+	const unsigned order = de->order;
+	num *c[DiffEq::max_order + 1];
+
+	if (!de->linear || order > DiffEq::max_order || (!de->g->isInt(0) && order != 2))
+		return Error::DeUnsolved;
+
+	for (unsigned k = 0; k <= order; k++) {
+		if ((c[k] = euler_ratio(de, k)) == nullptr) {
+			while (k > 0)
+				num::dispose(c[--k]);
+			return Error::DeUnsolved;
+		}
+	}
+
+	ast *lead = ast::make(Op::Div, de->a[order]->copy(), ast::make(Op::Pow, de->x->copy(), integer(order)));
+	work::pause();
+	simplify(*lead, Simp::Basic);
+	work::resume();
+
+	num *scale = rational_value(*lead);
+	if (scale != nullptr) {
+		for (unsigned k = 0; k <= order; k++)
+			*c[k] *= *scale;
+		lead->replace(integer(1));
+		num::dispose(scale);
+	}
+
+	de->method = "Cauchy-Euler";
+	work::text("Cauchy-Euler");
+
+	ast *m = substitution_symbol(de, Sym::M);
+
+	ast *trial = ast::make(Op::Pow, de->x->copy(), m->copy());
+	work::step(work::Step::Type::Equation, "Try", de->y, trial);
+
+	ast *substituted = ast::make(Op::Add), *auxiliary = ast::make(Op::Add);
+
+	for (unsigned k = 0; k <= order; k++) {
+		ast *power = ast::make(Op::Pow, de->x->copy(), difference(m->copy(), integer(k)));
+		ast *falling = falling_factorial(*m, k);
+
+		if (k > 0) {
+			ast *left = DiffEq::derivative(*de->y, k);
+			ast *right = falling->copy();
+			right->appendChild(power->copy());
+			work::step(work::Step::Type::Equation, k == 1 ? "Differentiate" : nullptr, left, tidy(right));
+			ast::dispose(left);
+			ast::dispose(right);
+		}
+
+		if (!de->a[k]->isInt(0)) {
+			ast *term = ast::make(Op::Mult, de->a[k]->copy(), falling->copy());
+			term->appendChild(power);
+			work::pause();
+			simplify(*term, Simp::Basic);
+			work::resume();
+			substituted->appendChild(term);
+			auxiliary->appendChild(ast::make(Op::Mult, ast::make(c[k]->copy()), falling));
+		} else {
+			ast::dispose(power);
+			ast::dispose(falling);
+		}
+	}
+
+	tidy(auxiliary);
+
+	ast *factored = ast::make(Op::Mult, lead, trial);
+	factored->appendChild(auxiliary->copy());
+	ast *right = ast::make(Op::Equals, tidy(factored), integer(0));
+	work::step(work::Step::Type::Equation, "Substitute", tidy(substituted), right);
+	ast::dispose(substituted);
+	ast::dispose(right);
+
+	canonical_SetFunction(m->symbol());
+
+	ast *zero = integer(0);
+	work::step(work::Step::Type::Equation, "Auxiliary equation", auxiliary, zero);
+	ast::dispose(auxiliary);
+	ast::dispose(zero);
+
+	num *p[DiffEq::max_order + 1], *falling[DiffEq::max_order + 1];
+	for (unsigned d = 0; d <= order; d++) {
+		p[d] = num::from(0);
+		falling[d] = num::from(d == 0 ? 1 : 0);
+	}
+
+	num t;
+	for (unsigned k = 0; k <= order; k++) {
+		for (unsigned d = 0; d <= k; d++) {
+			t = *falling[d];
+			t *= *c[k];
+			*p[d] += t;
+		}
+
+		if (k == order)
+			break;
+
+		for (unsigned d = k + 1; d > 0; d--) {
+			mp_rat_set_value(&t, -static_cast<mp_small>(k), 1);
+			t *= *falling[d];
+			*falling[d] = *falling[d - 1];
+			*falling[d] += t;
+		}
+		mp_rat_set_value(&t, -static_cast<mp_small>(k), 1);
+		*falling[0] *= t;
+	}
+
+	Root roots[DiffEq::max_order];
+	unsigned count = 0;
+
+	Error err = polynomial_roots(p, order, *m, nullptr, roots, &count);
+	canonical_SetFunction(de->y->symbol());
+
+	if (err == Error::Success)
+		err = solve_from_roots(de, *m, roots, count, true, solution);
+	else
+		free_roots(roots, count);
+
+	for (unsigned d = 0; d <= order; d++) {
+		num::dispose(p[d]);
+		num::dispose(falling[d]);
+		num::dispose(c[d]);
+	}
+	ast::dispose(m);
+
+	return err;
+}
+
+/*Returns e without its factors that do not involve x, or nullptr if it has none*/
+static ast *without_constant_factor(const ast &e, const ast &x) {
+	ast *numerator, *denominator;
+	bool changed = false;
+
+	rational_parts(e, &numerator, &denominator);
+
+	ast **parts[] = {&numerator, &denominator};
+	for (ast **part : parts) {
+		work::pause();
+		simplify(**part, Simp::Basic);
+		work::resume();
+
+		if ((*part)->isOp(Op::Mult)) {
+			for (ast *child = (*part)->firstChild(); child != nullptr;) {
+				ast *next = child->next();
+				if (!involves(*child, x)) {
+					ast::dispose((*part)->removeChild(*child));
+					changed = true;
+				}
+				child = next;
+			}
+			if ((*part)->childCount() == 0)
+				(*part)->replace(integer(1));
+		} else if (!involves(**part, x) && !(*part)->isInt(1)) {
+			(*part)->replace(integer(1));
+			changed = true;
+		}
+	}
+
+	ast *result = ast::make(Op::Div, numerator, denominator);
+
+	if (!changed) {
+		ast::dispose(result);
+		return nullptr;
+	}
+
+	work::pause();
+	simplify(*result, Simp::Basic);
+	work::resume();
+
+	return result;
+}
+
+Error solve_reduction_of_order(DiffEq *de, bool checked, ast **solution) {
 	const ast &y1 = *de->known;
 
 	if (de->order != 2 || !de->linear || !de->g->isInt(0))
@@ -905,12 +1124,16 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution) {
 
 	de->method = "Reduction of order";
 
-	bool satisfied;
-	Error err = check_solution(de, y1, "Known solution", false, &satisfied);
-	if (err != Error::Success)
-		return err;
-	if (!satisfied)
-		return Error::DeNotSolution;
+	Error err = Error::Success;
+
+	if (!checked) {
+		bool satisfied;
+		err = check_solution(de, y1, "Known solution", false, &satisfied);
+		if (err != Error::Success)
+			return err;
+		if (!satisfied)
+			return Error::DeNotSolution;
+	}
 
 	ast *P = quotient(*de->a[1], *de->a[2]);
 	ast *Q = quotient(*de->a[0], *de->a[2]);
@@ -961,7 +1184,7 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution) {
 
 	ast *basis[2], *constants[2];
 	basis[0] = y1.copy();
-	basis[1] = distribute(y1, *integral);
+	basis[1] = simplest(distribute(y1, *integral));
 	left = ast::make(Op::Mult, y1.copy(), integral);
 
 	work::pause();
@@ -973,6 +1196,13 @@ Error solve_reduction_of_order(DiffEq *de, ast **solution) {
 	else
 		work::step(work::Step::Type::Equation, "Second solution", left, basis[1]);
 	ast::dispose(left);
+
+	ast *simpler = without_constant_factor(*basis[1], *de->x);
+	if (simpler != nullptr) {
+		work::step(work::Step::Type::State, "Without the constant factor", nullptr, simpler);
+		ast::dispose(basis[1]);
+		basis[1] = simpler;
+	}
 
 	if (choose_constants(de, nullptr, constants, 2))
 		err = solve_with_basis(de, basis, constants, 2, nullptr, solution);

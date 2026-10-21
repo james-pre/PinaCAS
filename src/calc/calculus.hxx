@@ -16,8 +16,9 @@ namespace calculus {
 enum class Kind : unsigned char { Derivative, Integral, DiffEq };
 
 Error run(Kind kind, ast **items, unsigned count, ast &respect_to, bool series, unsigned terms, char *summary);
-/*Checks whether solution satisfies the equation and initial conditions in items*/
-Error verify(ast **items, unsigned count, ast &respect_to, ast &solution, bool *satisfied);
+/*Checks whether solution satisfies the equation and initial conditions in items.
+Replaces items[0] with the general solution and sets extended when reduction of order finds a second solution.*/
+Error verify(ast **items, unsigned count, ast &respect_to, ast &solution, bool *satisfied, bool *extended);
 
 } // namespace calculus
 

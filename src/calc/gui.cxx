@@ -1009,12 +1009,16 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 		if (show_work)
 			work::start(work);
 
+		bool extended = false;
+
 		if (verify) {
 			bool satisfied = false;
 			console_write("Verifying...");
-			err = calculus::verify(items, count, *respect_to, *solution, &satisfied);
+			err = calculus::verify(items, count, *respect_to, *solution, &satisfied, &extended);
 			if (err == Error::Success)
 				console_write(satisfied ? "It is a solution." : "It is not a solution.");
+			if (extended)
+				console_write("Found a second solution by reduction of order.");
 		} else {
 			console_write(
 				kind == calculus::Kind::Derivative ? "Differentiating..."
@@ -1031,7 +1035,7 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 		if (show_work)
 			work::stop();
 
-		if (err == Error::Success && !verify) {
+		if (err == Error::Success && (!verify || extended)) {
 			console_write("Exporting...");
 			write_variable(output, *items[0], &err);
 		}

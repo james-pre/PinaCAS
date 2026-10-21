@@ -74,8 +74,12 @@ class DiffEq {
 	/*Adds a known solution written like Y=e^X, as parsed and before simplification*/
 	Error addKnownSolution(const ast &solution);
 
-	/*Checks whether solution, written as y = f or as f, satisfies the equation and the initial conditions, and records the check*/
-	Error verify(const ast &solution, bool *satisfied);
+	/* 
+	Checks whether solution, written as y = f or as f, satisfies the equation and the initial conditions, and records the check.
+	If it does, the equation is homogeneous, second order and linear without initial conditions, and f has no constants of its own,
+	sets general to the general solution from reduction of order when it is not nullptr, otherwise to nullptr.
+	*/
+	Error verify(const ast &solution, bool *satisfied, ast **general = nullptr);
 
 	/*Solves the equation, using the initial conditions, and records the work. The solution is y = f when explicit and an implicit equation otherwise.*/
 	Error solve(ast **solution);

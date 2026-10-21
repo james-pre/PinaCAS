@@ -777,8 +777,46 @@ Error check_solution(DiffEq *de, const ast &solution, const char *text, bool con
 	return Error::Success;
 }
 
-Error DiffEq::verify(const ast &solution, bool *satisfied) {
-	return check_solution(this, solution, "Solution", true, satisfied);
+/*Returns true if e has a symbol that is not in the equation or x*/
+static bool has_new_symbol(const DiffEq *de, const ast &e) {
+	ast *scope = ast::make(Op::Add, de->equation->copy(), de->x->copy());
+	bool found = false;
+
+	for (char c = 'A'; c <= 'Z' && !found; c++)
+		found = contains_symbol(e, static_cast<Sym>(c)) && !contains_symbol(*scope, static_cast<Sym>(c));
+
+	ast::dispose(scope);
+
+	return found;
+}
+
+Error DiffEq::verify(const ast &solution, bool *satisfied, ast **general) {
+	if (general != nullptr)
+		*general = nullptr;
+
+	Error err = check_solution(this, solution, "Solution", true, satisfied);
+
+	const ast *f = &solution;
+	if (f->isOp(Op::Equals) && f->firstChild()->compare(*y))
+		f = f->firstChild()->next();
+
+	classify();
+
+	if (err != Error::Success || !*satisfied || general == nullptr || order != 2 || !linear || !g->isInt(0) ||
+		condition_count > 0 || known != nullptr || has_new_symbol(this, *f) || is_zero(*f))
+		return err;
+
+	known = f->copy();
+	work::pause();
+	simplify(*known, Simp::Basic);
+	work::resume();
+
+	if (solve_reduction_of_order(this, true, general) != Error::Success) {
+		ast::dispose(*general);
+		*general = nullptr;
+	}
+
+	return Error::Success;
 }
 
 Error DiffEq::solve(ast **solution) {
@@ -799,10 +837,14 @@ Error DiffEq::solve(ast **solution) {
 		return solve_first_order(this, solution);
 
 	if (known != nullptr)
-		return solve_reduction_of_order(this, solution);
+		return solve_reduction_of_order(this, false, solution);
 
 	Error err = solve_constant_coefficients(this, solution);
 	if (err != Error::DeUnsolved || !linear)
+		return err;
+
+	err = solve_cauchy_euler(this, solution);
+	if (err != Error::DeUnsolved)
 		return err;
 
 	err = solve_power_series(this, solution);

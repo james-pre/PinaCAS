@@ -78,12 +78,20 @@ Error calculus::run(
 	return err;
 }
 
-Error calculus::verify(ast **items, unsigned count, ast &respect_to, ast &solution, bool *satisfied) {
+Error calculus::verify(ast **items, unsigned count, ast &respect_to, ast &solution, bool *satisfied, bool *extended) {
 	DiffEq de;
+	ast *general = nullptr;
 	Error err = de.loadList(items, count, respect_to);
 
 	if (err == Error::Success)
-		err = de.verify(solution, satisfied);
+		err = de.verify(solution, satisfied, &general);
+
+	*extended = general != nullptr;
+	if (*extended) {
+		items[0]->replace(general->firstChild()->next()->copy());
+		ast::dispose(general);
+		simplify_canonical_form(*items[0], Canonical::All);
+	}
 
 	de.clear();
 

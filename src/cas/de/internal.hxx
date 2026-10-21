@@ -73,14 +73,22 @@ void free_roots(Root *roots, unsigned count);
 /*Returns x^j e^(rx) f, leaving out f when it is nullptr. Takes ownership of f.*/
 ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f);
 
-/*Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are*/
-unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis);
+/* Fills basis with x^j e^(rx) for each root r, or x^j e^(ax)cos(bx) and x^j e^(ax)sin(bx) for each pair a ± bi, and returns how many there are.
+With euler, the functions are ln(x)^j x^r, ln(x)^j x^a cos(b ln(x)) and ln(x)^j x^a sin(b ln(x)). */
+unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis, bool euler);
+
+/*Records p = 0 under text, a polynomial of degree n in m, and finds its roots with their multiplicities, recording the work. Divides the rational roots out of p.*/
+Error polynomial_roots(num **p, unsigned n, const ast &m, const char *text, Root *roots, unsigned *count);
 
 /*Solves a linear equation with constant coefficients from the roots of its characteristic polynomial, finding a particular solution by undetermined coefficients or variation of parameters when it is not homogeneous*/
 Error solve_constant_coefficients(DiffEq *de, ast **solution);
 
-/*Finds a second solution of a homogeneous second order linear equation from the known solution with the reduction of order formula*/
-Error solve_reduction_of_order(DiffEq *de, ast **solution);
+/* Solves a Cauchy-Euler equation, with each a[k] a constant times x^k, from the roots of its auxiliary equation,
+finding a particular solution by variation of parameters when it is not homogeneous */
+Error solve_cauchy_euler(DiffEq *de, ast **solution);
+
+/*Finds a second solution of a homogeneous second order linear equation from the known solution with the reduction of order formula, first checking the known solution unless checked*/
+Error solve_reduction_of_order(DiffEq *de, bool checked, ast **solution);
 
 /*Returns the value of e if it is a rational number, otherwise nullptr*/
 num *rational_value(const ast &e);

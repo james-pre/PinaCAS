@@ -603,10 +603,19 @@ int run_verify(int argc, char **argv) {
 		DiffEq de;
 		err = de.loadList(items, count, *x);
 
+		ast *general = nullptr;
 		if (err == Error::Success)
-			err = de.verify(*solution, &satisfied);
+			err = de.verify(*solution, &satisfied, &general);
 
 		printf("%s\n", err == Error::Success ? (satisfied ? "Solution" : "Not a solution") : error_text(err));
+
+		if (general != nullptr) {
+			simplify_canonical_form(*general, Canonical::All);
+			printf("General solution: ");
+			print_ast(*general);
+			printf("\n");
+			ast::dispose(general);
+		}
 
 		de.clear();
 	} else {

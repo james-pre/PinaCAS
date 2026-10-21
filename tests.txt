@@ -22,6 +22,13 @@ simplify; 13/3 + 432/23 + 23/4534 _ 24/455; 3283650931/142344930
 simplify; 2308923 ^ 23; 228253448800248422382839314862503628377253091439771292143944853074575569935094601836903968561973397828129853500717494518706509240578306118071046867
 simplify; 10!; 3628800
 
+simplify; sqrt(8); 2sqrt(2)
+simplify; 72^(1/2); 6sqrt(2)
+simplify; 3^(5/2); 9sqrt(3)
+simplify; 16^(3/4); 8
+simplify; 2^(3/2)_2sqrt(2); 0
+simplify; sqrt(2)sqrt(2); 2
+
 simplify; abs(-5); 5
 simplify; abs(-23.2); 23.2
 simplify; abs(324); 324
@@ -489,10 +496,21 @@ solve; Y''_Y=0,Y(0)=1,Y'(1)=0; Y=e^X/(e^2+1)+e^(2_X)/(e^2+1); X
 
 #Differential equations: reduction of order
 solve; 9Y''_12Y'+4Y=0,Y=e^(2X/3); Y=Ae^(2X/3)+BXe^(2X/3); X
-solve; 4X^2Y''+Y=0,Y=sqrt(X)ln(X); Y=Asqrt(X)ln(X)_Bsqrt(X); X
-solve; X^2Y''+XY'_Y=0,Y=X; Y=AX_B/(2X); X
+solve; 4X^2Y''+Y=0,Y=sqrt(X)ln(X); Y=Asqrt(X)ln(X)+Bsqrt(X); X
+solve; X^2Y''+XY'_Y=0,Y=X; Y=AX+B/X; X
+solve; X^2Y''+2XY'_6Y=0,Y=X^2; Y=AX^2+B/X^3; X
 solve; X^2Y''_3XY'+4Y=0,Y=X^2,Y(1)=0,Y'(1)=1; Y=X^2ln(abs(X)); X
 solve; (1_2X_X^2)Y''+2(1+X)Y'_2Y=0,Y=X+1; Y=A(X+1)_B(X^2+X+2); X
+
+#Differential equations: Cauchy-Euler
+solve; X^2Y''+2XY'_6Y=0; Y=AX^2+B/X^3; X
+solve; Y''+2/XY'_6/X^2Y=0; Y=AX^2+B/X^3; X
+solve; X^2Y''_3XY'+4Y=0; Y=AX^2+BX^2ln(X); X
+solve; X^2Y''+XY'+4Y=0; Y=Acos(2ln(X))+Bsin(2ln(X)); X
+solve; X^2Y''+3XY'_4Y=0; Y=AX^(sqrt(5)_1)+BX^(-sqrt(5)_1); X
+solve; X^3Y'''_6Y=0; Y=AX^3+Bcos(sqrt(2)ln(X))+Csin(sqrt(2)ln(X)); X
+solve; X^2Y''_3XY'+3Y=2X^4e^X; Y=AX^3+BX+2X^2e^X_2Xe^X; X
+solve; X^2Y''+5XY'+4Y=0,Y(1)=1,Y'(1)=0; Y=1/X^2+(2ln(X))/X^2; X
 
 #Differential equations: undetermined coefficients and variation of parameters
 solve; 1/4Y''+Y'+Y=X^2_2X; Y=Ae^(-2X)+BXe^(-2X)+X^2_4X+7/2; X

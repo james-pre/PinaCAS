@@ -755,6 +755,15 @@ static ast *exponent_of(const ast &e) {
 	return e.isOp(Op::Pow) ? e.childAt(1)->copy() : ast::make(num::from(1));
 }
 
+/*True for a number n and a power n^(p/q), which eval separates*/
+static bool is_root_and_coefficient(const ast &a, const ast &b) {
+	const ast &power = a.isOp(Op::Pow) ? a : b;
+	const ast &other = a.isOp(Op::Pow) ? b : a;
+
+	return other.isNumber() && power.isOp(Op::Pow) && power.childAt(1)->isOp(Op::Div) &&
+		   power.childAt(1)->childAt(0)->isNumber() && power.childAt(1)->childAt(1)->isNumber();
+}
+
 /*
     Combine things like
     AA to A^(1+1)
@@ -777,7 +786,7 @@ static bool simplify_like_terms_multiplication(ast &e) {
 		bool combined = false;
 
 		for (ast *b = a.next(); b != nullptr; b = b->next()) {
-			if (!base_of(a)->compare(*base_of(*b)))
+			if (!base_of(a)->compare(*base_of(*b)) || is_root_and_coefficient(a, *b))
 				continue;
 
 			e.appendChild(ast::make(Op::Pow, base_of(a)->copy(), ast::make(Op::Add, exponent_of(a), exponent_of(*b))));

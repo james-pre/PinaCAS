@@ -421,7 +421,30 @@ ast *basis_function(const DiffEq *de, unsigned j, const ast &r, ast *f) {
 	return product;
 }
 
-unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis) {
+/*Returns x^r ln(x)^j f, leaving out f when it is nullptr. Takes ownership of f.*/
+static ast *euler_function(const DiffEq *de, unsigned j, const ast &r, ast *f) {
+	ast *product = ast::make(Op::Mult);
+
+	product->appendChild(integer(1));
+
+	if (!r.isInt(0))
+		product->appendChild(ast::make(Op::Pow, de->x->copy(), r.copy()));
+
+	if (j > 0)
+		product->appendChild(ast::make(Op::Pow, ln(de->x->copy()), integer(j)));
+
+	if (f != nullptr)
+		product->appendChild(f);
+
+	work::pause();
+	simplify(*product, Simp::Basic);
+	work::resume();
+
+	return product;
+}
+
+unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis, bool euler) {
+	ast *(*const function)(const DiffEq *, unsigned, const ast &, ast *) = euler ? euler_function : basis_function;
 	unsigned n = 0;
 
 	for (unsigned i = 0; i < count; i++) {
@@ -429,14 +452,14 @@ unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **b
 
 		for (unsigned j = 0; j < root->multiplicity; j++) {
 			if (root->im == nullptr) {
-				basis[n++] = basis_function(de, j, *root->re, nullptr);
-			} else {
-				basis[n++] = basis_function(
-					de, j, *root->re, ast::make(Op::Cos, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
-				);
-				basis[n++] = basis_function(
-					de, j, *root->re, ast::make(Op::Sin, ast::make(Op::Mult, root->im->copy(), de->x->copy()))
-				);
+				basis[n++] = function(de, j, *root->re, nullptr);
+				continue;
+			}
+
+			constexpr Op ops[] = {Op::Cos, Op::Sin};
+			for (const Op op : ops) {
+				ast *t = euler ? ln(de->x->copy()) : de->x->copy();
+				basis[n++] = function(de, j, *root->re, ast::make(op, ast::make(Op::Mult, root->im->copy(), t)));
 			}
 		}
 	}
@@ -472,7 +495,6 @@ static Error oscillator_roots(DiffEq *de, const ast &m, Root *roots, unsigned *c
 
 Error characteristic_roots(DiffEq *de, const ast &m, Root *roots, unsigned *count) {
 	num *p[DiffEq::max_order + 1];
-	unsigned n = de->order;
 
 	*count = 0;
 	canonical_SetFunction(m.symbol());
@@ -488,18 +510,32 @@ Error characteristic_roots(DiffEq *de, const ast &m, Root *roots, unsigned *coun
 		}
 	}
 
+	const Error err = polynomial_roots(p, de->order, m, "Characteristic equation", roots, count);
+
+	canonical_SetFunction(de->y->symbol());
+
+	for (unsigned k = 0; k <= de->order; k++)
+		num::dispose(p[k]);
+
+	return err;
+}
+
+Error polynomial_roots(num **p, unsigned n, const ast &m, const char *text, Root *roots, unsigned *count) {
+	const unsigned degree = n;
 	ast *zero = integer(0);
 	num one(1);
 
+	*count = 0;
+
 	ast *left = polynomial(p, n, m, one);
-	work::step(work::Step::Type::Equation, "Characteristic equation", left, zero);
+	work::step(work::Step::Type::Equation, text, left, zero);
 	ast::dispose(left);
 
 	Error err = Error::Success;
 	if (!find_roots(p, &n, roots, count))
 		err = Error::DeRoots;
 
-	if (n < de->order) {
+	if (n < degree) {
 		left = factored_form(p, n, roots, *count, m);
 		work::step(work::Step::Type::Equation, nullptr, left, zero);
 		ast::dispose(left);
@@ -507,11 +543,6 @@ Error characteristic_roots(DiffEq *de, const ast &m, Root *roots, unsigned *coun
 
 	if (err == Error::Success)
 		record_roots(roots, *count, m);
-
-	canonical_SetFunction(de->y->symbol());
-
-	for (unsigned k = 0; k <= de->order; k++)
-		num::dispose(p[k]);
 
 	ast::dispose(zero);
 

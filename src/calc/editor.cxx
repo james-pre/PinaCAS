@@ -95,6 +95,7 @@ static const char *os_char(uint8_t c) {
 		case 0x1D: return "10";
 		case 0xD7: return "i";
 		case 0xDB: return "e";
+		case 0xF6: return "/";
 		default: ascii[0] = c >= 0x20 && c < 0x7F ? static_cast<char>(c) : '?'; return ascii;
 	}
 }

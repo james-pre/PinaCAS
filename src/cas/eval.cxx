@@ -262,6 +262,62 @@ static bool power_in_small_range(ast &a, ast &b) {
 	return static_cast<mp_small>(mp_int_count_bits(MP_NUMER_P(&a.num()))) * exponent <= 64;
 }
 
+/*Rewrites e = base^(p/q), for a positive integer base up to 2^24, as k^p m^(p/q) where m has no factor that is a qth power, then takes the integer part out of the exponent. Returns true if changed.*/
+static bool eval_rational_power(ast &e, const ast &base, const ast &p, const ast &q) {
+	mp_small n, numerator, index;
+
+	if (!base.num().isInteger() || !base.num().toInt(n) || n <= 1 || n > (1L << 24) || !p.num().toInt(numerator) ||
+		numerator <= 0 || numerator > 64 || !q.num().toInt(index) || index <= 1 || index > 24)
+		return false;
+
+	mp_small k = 1, m = n;
+
+	for (mp_small d = 2;; d++) {
+		mp_small power = 1;
+		for (mp_small i = 0; i < index && power != 0; i++)
+			power = power > m / d ? 0 : power * d;
+		if (power == 0)
+			break;
+
+		while (m % power == 0) {
+			m /= power;
+			k *= d;
+		}
+	}
+
+	const mp_small whole = numerator / index, remainder = numerator % index;
+
+	if (k == 1 && whole == 0)
+		return false;
+
+	num coefficient(1), factor;
+	for (mp_small i = 0; i < numerator; i++) {
+		mp_rat_set_value(&factor, k, 1);
+		coefficient *= factor;
+	}
+	for (mp_small i = 0; i < whole; i++) {
+		mp_rat_set_value(&factor, m, 1);
+		coefficient *= factor;
+	}
+
+	ast *result = ast::make(coefficient.copy());
+	if (m > 1 && remainder > 0) {
+		result = ast::make(
+			Op::Mult,
+			result,
+			ast::make(
+				Op::Pow,
+				ast::make(num::from(m)),
+				ast::make(Op::Div, ast::make(num::from(remainder)), ast::make(num::from(index)))
+			)
+		);
+	}
+
+	e.replace(result);
+
+	return true;
+}
+
 static bool eval_pow(ast &e, Eval flags) {
 	/*a^b*/
 	ast *a = e.childAt(0);
@@ -355,28 +411,9 @@ static bool eval_pow(ast &e, Eval flags) {
 		}
 	}
 
-	/*Do roots*/
-	if (has(flags, Eval::PowersSmall | Eval::PowersFull) && a->isNumber() && b->isOperator() && b->op() == Op::Div &&
-		b->childAt(0)->isInt(1) && b->childAt(1)->isNumber()) {
-		/*a root of b*/
-		ast &temp = *b;
-		b = a;
-		a = temp.childAt(1);
-
-		mp_small index;
-		if (a->num().toInt(index) && b->num().isInteger() && b->num() > 0) {
-			num answer, check;
-
-			mp_int_root(MP_NUMER_P(&b->num()), index, MP_NUMER_P(&answer));
-			mp_int_expt(MP_NUMER_P(&answer), index, MP_NUMER_P(&check));
-
-			/*The root is exact*/
-			if (check == b->num()) {
-				e.replace(ast::make(answer.copy()));
-				changed = true;
-			}
-		}
-	}
+	if (has(flags, Eval::PowersSmall | Eval::PowersFull) && a->isNumber() && b->isOp(Op::Div) &&
+		b->childAt(0)->isNumber() && b->childAt(1)->isNumber())
+		changed = eval_rational_power(e, *a, *b->childAt(0), *b->childAt(1));
 
 	return changed;
 }
