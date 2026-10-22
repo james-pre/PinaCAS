@@ -4,6 +4,7 @@
 #include <stdlib.h>
 /*For strlen*/
 #include <string.h>
+#include <utility>
 
 #include "cas.hxx"
 #include "../dbg.hxx"
@@ -166,33 +167,55 @@ Identity complex[] = {
 	{nullptr}
 };
 
-using Dictionary = ast **;
+/* Owns the value bound to each symbol */
+class Dictionary {
+  public:
+	Dictionary() = default;
 
-/*The entry for a symbol from A to Z*/
-static ast *&dict_Get(Dictionary dict, const ast *symbol) {
-	return dict[static_cast<unsigned>(symbol->symbol()) - 'A'];
-}
-
-static void dict_Copy(Dictionary dest, Dictionary source) {
-	for (unsigned i = 0; i < sym_count; i++) {
-		if (source[i] != nullptr)
-			dest[i] = source[i]->copy();
-		else
-			dest[i] = nullptr;
+	Dictionary(const Dictionary &other) {
+		for (unsigned i = 0; i < sym_count; i++) {
+			if (other.entries[i] != nullptr)
+				entries[i] = other.entries[i]->copy();
+		}
 	}
-}
 
-static void dict_Write(Dictionary dest, Dictionary source) {
-	memcpy(dest, source, sym_count * sizeof(ast *));
-}
+	/* Takes ownership of other's entries, leaving it empty */
+	Dictionary &operator=(Dictionary &&other) noexcept {
+		if (this == &other)
+			return *this;
 
-static void dict_Cleanup(Dictionary dict) {
-	for (unsigned i = 0; i < sym_count; i++) {
-		if (dict[i] != nullptr)
-			ast::dispose(dict[i]);
-		dict[i] = nullptr;
+		dispose();
+		for (unsigned i = 0; i < sym_count; i++) {
+			entries[i] = other.entries[i];
+			other.entries[i] = nullptr;
+		}
+		return *this;
 	}
-}
+
+	Dictionary &operator=(const Dictionary &) = delete;
+
+	~Dictionary() {
+		dispose();
+	}
+
+	ast *&operator[](Sym symbol) {
+		return entries[static_cast<unsigned>(symbol) - static_cast<unsigned>(Sym::A)];
+	}
+
+	ast *operator[](Sym symbol) const {
+		return entries[static_cast<unsigned>(symbol) - static_cast<unsigned>(Sym::A)];
+	}
+
+	void dispose() {
+		for (ast *&entry : entries) {
+			ast::dispose(entry);
+			entry = nullptr;
+		}
+	}
+
+  private:
+	ast *entries[sym_count] = {};
+};
 
 /*Simplifies 2N, 4 to N, 2 to correctly set N*/
 static bool divide_numerical_constants(ast &id, ast &e) {
@@ -224,10 +247,10 @@ static bool divide_numerical_constants(ast &id, ast &e) {
 }
 
 /*Fills in id->to with discovered values from dictionary */
-static void fill(ast *to, Dictionary dict) {
+static void fill(ast *to, const Dictionary &dict) {
 	if (to->isSymbol()) {
-		if (dict_Get(dict, to) != nullptr)
-			to->replace(dict_Get(dict, to)->copy());
+		if (dict[to->symbol()] != nullptr)
+			to->replace(dict[to->symbol()]->copy());
 	} else if (to->isOperator()) {
 		for (ast &child : to->children()) {
 			fill(&child, dict);
@@ -235,7 +258,7 @@ static void fill(ast *to, Dictionary dict) {
 	}
 }
 
-static bool matches(ast *id, ast &e, Dictionary dict) {
+static bool matches(ast *id, ast &e, Dictionary &dict) {
 	if (id->isSymbol() && id->symbol() < Sym::Imag) {
 		if (id->symbol() == Sym::N) {
 			/*Only integers allowed*/
@@ -248,25 +271,22 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 		}
 
 		/*Check if dictionary does not yet have value*/
-		if (dict_Get(dict, id) == nullptr) {
+		if (dict[id->symbol()] == nullptr) {
 			/*No value exists in dictionary, this node claims it*/
-			dict_Get(dict, id) = e.copy();
+			dict[id->symbol()] = e.copy();
 			return true;
 		} else {
 			/*Value already exists, we only match if we are the same*/
-			return dict_Get(dict, id)->compare(e);
+			return dict[id->symbol()]->compare(e);
 		}
 	} else if (id->isOperator()) {
-		/*Make a copy of the dictionary in case the children do not match
-        We do not fill the dictionary with bad values*/
-		ast *dict_copy[sym_count];
-
-		dict_Copy(dict_copy, dict);
+		/* Make a copy of the dictionary in case the children do not match. We do not fill the dictionary with bad values */
+		Dictionary dict_copy(dict);
 
 		if (is_op_commutative(id->op())) {
 			/*Order does not matter*/
 			bool combined = false;
-			char combined_character = '\0';
+			Sym combined_symbol = Sym::Invalid;
 
 			ast *id_copy = id->copy();
 			ast *e_copy = e.copy();
@@ -277,7 +297,6 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 
 			/*Id had numerical coefficients that e did not have.*/
 			if (e_copy->isOp(Op::Div)) {
-				dict_Cleanup(dict_copy);
 				ast::dispose(id_copy);
 				ast::dispose(e_copy);
 				return false;
@@ -296,25 +315,24 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 
 				if (child.isSymbol() && child.symbol() < Sym::Imag && child.symbol() != Sym::N) {
 					combined = true;
-					combined_character = static_cast<char>(child.symbol());
+					combined_symbol = child.symbol();
 
 					ast::dispose(id_copy->removeChildAt(i));
 
 					if (id->isOp(Op::Add))
-						dict_copy[combined_character - 'A'] = ast::make(num::from(0));
+						dict_copy[combined_symbol] = ast::make(num::from(0));
 					else /*Op::Mult*/
-						dict_copy[combined_character - 'A'] = ast::make(num::from(1));
+						dict_copy[combined_symbol] = ast::make(num::from(1));
 
 					break;
 				}
 			}
 
-			/*At this point, id_copy and e_copy are both the same either addition
-            or multiplication nodes and we can continue normally*/
+			/* At this point, id_copy and e_copy are both the same either addition
+			or multiplication nodes and we can continue normally */
 
 			/*We know they will not match if id has more elements than e*/
 			if (id_copy->childCount() > e_copy->childCount()) {
-				dict_Cleanup(dict_copy);
 				ast::dispose(id_copy);
 				ast::dispose(e_copy);
 				return false;
@@ -322,7 +340,6 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 
 			/*We know we are comparing constants, they need to be same size. */
 			if (!combined && id_copy->childCount() != e_copy->childCount()) {
-				dict_Cleanup(dict_copy);
 				ast::dispose(id_copy);
 				ast::dispose(e_copy);
 				return false;
@@ -344,25 +361,20 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 						continue;
 
 					for (unsigned j = 0; j < id_copy->childCount(); j++) {
-						ast *dict_copy_copy[sym_count];
-						ast *id_child = id_copy->childAt(j);
+						if (matched_id_children[j])
+							continue;
 
-						dict_Copy(dict_copy_copy, dict_copy);
+						Dictionary dict_copy_copy(dict_copy);
 
-						if (!matched_id_children[j]) {
-							if (matches(id_child, e_child, dict_copy_copy)) {
-								matched_e_children[i] = true;
-								matched_id_children[j] = true;
-								matched = true;
+						if (matches(id_copy->childAt(j), e_child, dict_copy_copy)) {
+							matched_e_children[i] = true;
+							matched_id_children[j] = true;
+							matched = true;
 
-								dict_Cleanup(dict_copy);
-								dict_Write(dict_copy, dict_copy_copy);
+							dict_copy = std::move(dict_copy_copy);
 
-								break;
-							}
+							break;
 						}
-
-						dict_Cleanup(dict_copy_copy);
 					}
 
 					if (matched)
@@ -394,10 +406,10 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 
 					/*If the combined parts need to be real and they are or if they don't need to be real*/
 					/*We assume something is real if it does not have an imaginary node. This could be wrong.*/
-					if (!((combined_character == 'I' || combined_character == 'J') && has_imaginary_node(*c))) {
+					if (!((combined_symbol == Sym::I || combined_symbol == Sym::J) && has_imaginary_node(*c))) {
 						/*Cleanup and overwrite dummy placeholder*/
-						ast::dispose(dict_copy[combined_character - 'A']);
-						dict_copy[combined_character - 'A'] = c;
+						ast::dispose(dict_copy[combined_symbol]);
+						dict_copy[combined_symbol] = c;
 					} else {
 						matched = false;
 						ast::dispose(c);
@@ -414,40 +426,29 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
 			ast::dispose(e_copy);
 			ast::dispose(id_copy);
 
-			if (matched) {
-				dict_Cleanup(dict);
-				dict_Write(dict, dict_copy);
-			} else {
-				dict_Cleanup(dict_copy);
-			}
+			if (matched)
+				dict = std::move(dict_copy);
 
 			return matched;
 
 		} else {
 			/*Order and length do matter*/
-			if (!e.isOperator()) {
-				dict_Cleanup(dict_copy);
+			if (!e.isOperator())
 				return false;
-			}
 
-			if (e.op() != id->op() || e.childCount() != id->childCount()) {
-				dict_Cleanup(dict_copy);
+			if (e.op() != id->op() || e.childCount() != id->childCount())
 				return false;
-			}
 
 			/*Reverse loop to better guess variables for derivative nodes*/
 			for (unsigned i = e.childCount(); i-- > 0;) {
 				ast &e_child = *e.childAt(i);
 				ast *id_child = id->childAt(i);
-				if (!matches(id_child, e_child, dict_copy)) {
-					dict_Cleanup(dict_copy);
+				if (!matches(id_child, e_child, dict_copy))
 					return false;
-				}
 			}
 
-			/*All children are matching. Write the copy to the actual dict*/
-			dict_Cleanup(dict);
-			dict_Write(dict, dict_copy);
+			/* All children are matching. Write the copy to the actual dict */
+			dict = std::move(dict_copy);
 			return true;
 		}
 	}
@@ -460,7 +461,7 @@ static bool matches(ast *id, ast &e, Dictionary dict) {
     Requires that constants are already evaluated.
 */
 bool execute(ast &e, Identity *id, bool recursive) {
-	ast *dict[sym_count] = {0};
+	Dictionary dict;
 	bool changed = false;
 
 	if (id->from == nullptr || id->to == nullptr) {
@@ -486,8 +487,6 @@ bool execute(ast &e, Identity *id, bool recursive) {
 		for (ast &child : e.children())
 			changed |= execute(child, id, recursive);
 	}
-
-	dict_Cleanup(dict);
 
 	return changed;
 }
