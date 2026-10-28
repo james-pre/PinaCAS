@@ -611,9 +611,12 @@ static bool fraction_coefficients(const ast &e, const ast &x, num **n, int *nd, 
 			for (int k = 0; k <= degree; k++)
 				n[k] = first[k];
 			*nd = degree;
-		} else if (fits && *dd + td <= static_cast<int>(MAX_DEGREE) &&
-				   *nd + td <= static_cast<int>(MAX_NUMERATOR) && tn + *dd <= static_cast<int>(MAX_NUMERATOR)) {
-			const int a = static_cast<int>(multiply(n, static_cast<unsigned>(*nd), term_d, static_cast<unsigned>(td), first));
+		} else if (
+			fits && *dd + td <= static_cast<int>(MAX_DEGREE) && *nd + td <= static_cast<int>(MAX_NUMERATOR) &&
+			tn + *dd <= static_cast<int>(MAX_NUMERATOR)
+		) {
+			const int a =
+				static_cast<int>(multiply(n, static_cast<unsigned>(*nd), term_d, static_cast<unsigned>(td), first));
 			const int b =
 				static_cast<int>(multiply(term_n, static_cast<unsigned>(tn), d, static_cast<unsigned>(*dd), second));
 			dispose_coefficients(n, static_cast<unsigned>(*nd));
@@ -621,7 +624,8 @@ static bool fraction_coefficients(const ast &e, const ast &x, num **n, int *nd, 
 			dispose_coefficients(first, static_cast<unsigned>(a));
 			dispose_coefficients(second, static_cast<unsigned>(b));
 
-			const int degree = static_cast<int>(multiply(d, static_cast<unsigned>(*dd), term_d, static_cast<unsigned>(td), first));
+			const int degree =
+				static_cast<int>(multiply(d, static_cast<unsigned>(*dd), term_d, static_cast<unsigned>(td), first));
 			dispose_coefficients(d, static_cast<unsigned>(*dd));
 			for (int k = 0; k <= degree; k++)
 				d[k] = first[k];

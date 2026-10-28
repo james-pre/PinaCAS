@@ -497,7 +497,9 @@ static ast *transform_unknown(const ast &g, const ast &t, const ast &s) {
 		}
 
 		const int exponent = order - 1 - k;
-		ast *power = exponent == 0 ? integer(1) : exponent == 1 ? s.copy() : ast::make(Op::Pow, s.copy(), integer(exponent));
+		ast *power = exponent == 0   ? integer(1)
+					 : exponent == 1 ? s.copy()
+									 : ast::make(Op::Pow, s.copy(), integer(exponent));
 		ast *value = ast::make(Op::At, DiffEq::derivative(*unknown, static_cast<unsigned>(k)), integer(0));
 		general->appendChild(negate(ast::make(Op::Mult, power->copy(), value)));
 		F->appendChild(negate(ast::make(Op::Mult, power, initial_values[k]->copy())));

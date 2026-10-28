@@ -1069,7 +1069,9 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 														   : "Solving..."
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
-			err = calculus::run(kind, items, count, *respect_to, transform, options->series, options->laplace, terms, buffer);
+			err = calculus::run(
+				kind, items, count, *respect_to, transform, options->series, options->laplace, terms, buffer
+			);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)
 				console_write(buffer);
