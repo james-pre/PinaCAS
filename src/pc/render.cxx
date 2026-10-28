@@ -23,6 +23,7 @@ static uint32_t symbol(char c) {
 		case ts::Infinity: return 0x221E;
 		case ts::ScriptL: return 0x2112;
 		case ts::Delta: return 0x03B4;
+		case ts::Tau: return 0x03C4;
 		default: return static_cast<unsigned char>(c);
 	}
 }

@@ -21,7 +21,7 @@ const char *operators[static_cast<size_t>(Op::Amount)] = {"+",     "*",    "/", 
 														  "cos",   "acos", "tan",   "atan", "sinh", "asinh", "cosh",
 														  "acosh", "tanh", "atanh", "delta"};
 
-const char *symbols[] = {"i", "pi", "e", "theta"};
+const char *symbols[] = {"i", "pi", "e", "theta", "tau"};
 
 void _print_tree(const ast *e, unsigned indent, unsigned index) {
 	if (e == nullptr)
@@ -38,7 +38,7 @@ void _print_tree(const ast *e, unsigned indent, unsigned index) {
 			break;
 		}
 		case ast::Type::Symbol:
-			if (e->symbol() >= Sym::Imag && e->symbol() <= Sym::Theta)
+			if (e->symbol() >= Sym::Imag && e->symbol() <= Sym::Tau)
 				DBG(("SYMBOL: %s\n", symbols[static_cast<unsigned>(e->symbol()) - static_cast<unsigned>(Sym::Imag)]));
 			else
 				DBG(("SYMBOL: %c\n", static_cast<char>(e->symbol())));

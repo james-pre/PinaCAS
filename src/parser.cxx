@@ -44,7 +44,8 @@ const TokenTable ti_table = {{
     {1, {0x2C}},                /*Tok::Imag*/
 
     {2, {0xBB, 0x31}},          /*TOK_E*/
-    {1, {0xAC}}, {1, {0x5B}}    /*Tok::Pi, Tok::Theta*/
+    {1, {0xAC}}, {1, {0x5B}},   /*Tok::Pi, Tok::Theta*/
+    {2, {0xBB, 0xCC}}           /*Tok::Tau*/
 }};
 
 const TokenTable str_table = {{
@@ -88,7 +89,8 @@ const TokenTable str_table = {{
     {1, "i"},                       /*Tok::Imag */
 
     {1, "e"},                       /*TOK_E*/
-    {2, "pi"}, {5, "theta"}         /*Tok::Pi, Tok::Theta*/
+    {2, "pi"}, {5, "theta"},        /*Tok::Pi, Tok::Theta*/
+    {3, "tau"}                      /*Tok::Tau*/
 
 }};
 

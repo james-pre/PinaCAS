@@ -11,6 +11,7 @@ constexpr char Dot = '\x03';
 constexpr char Infinity = '\x04';
 constexpr char ScriptL = '\x05';
 constexpr char Delta = '\x06';
+constexpr char Tau = '\x07';
 
 struct Box {
 	enum class Type : unsigned char {

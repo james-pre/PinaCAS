@@ -117,6 +117,7 @@ enum class Sym : unsigned char {
 	Pi,
 	Euler,
 	Theta,
+	Tau,
 
 	Invalid
 };

@@ -67,6 +67,7 @@ enum class Tok : unsigned char {
 	Euler,
 	Pi,
 	Theta,
+	Tau,
 
 	Amount,
 	Invalid
