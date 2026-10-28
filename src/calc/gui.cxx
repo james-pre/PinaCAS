@@ -124,6 +124,7 @@ struct CalculusOptions {
 	unsigned solution;
 	bool series;
 	char terms;
+	bool laplace;
 };
 
 static unsigned input = 0, output = 1;
@@ -207,6 +208,7 @@ static constexpr Element de_content[] = {
 	variable("Solution in:", &de_options.solution),
 	checkbox("Power series", &de_options.series),
 	digit("Series terms:", &de_options.terms),
+	checkbox("Laplace transform", &de_options.laplace),
 	button("Solve", [] { execute_calculus(calculus::Kind::DiffEq, &de_options, "Differential equation"); }),
 	end
 };
@@ -1067,7 +1069,7 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 														   : "Solving..."
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
-			err = calculus::run(kind, items, count, *respect_to, transform, options->series, terms, buffer);
+			err = calculus::run(kind, items, count, *respect_to, transform, options->series, options->laplace, terms, buffer);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)
 				console_write(buffer);

@@ -49,6 +49,8 @@ TestType resolve_type(char *type) {
 		return TestType::Laplace;
 	if (!strcmp(type, "ilaplace"))
 		return TestType::LaplaceInverse;
+	if (!strcmp(type, "lsolve"))
+		return TestType::LaplaceSolve;
 	if (!strcmp(type, "order"))
 		return TestType::DeOrder;
 	if (!strcmp(type, "linear"))
@@ -267,11 +269,44 @@ static bool run_solve(Test *t) {
 	return passed;
 }
 
+/*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable*/
+static bool run_laplace_solve(Test *t) {
+	ast *items[MAX_ITEMS], *solution = nullptr;
+	Error err;
+	bool passed = false;
+
+	const unsigned count =
+		parse_list(reinterpret_cast<uint8_t *>(t->arg1), strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	ast *expected = parse(reinterpret_cast<uint8_t *>(t->arg2), strlen(t->arg2), str_table, &err);
+	ast *x = parse(reinterpret_cast<uint8_t *>(t->arg3), strlen(t->arg3), str_table, &err);
+
+	if (count == 0 || items[0] == nullptr || expected == nullptr || x == nullptr) {
+		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
+	} else if ((err = laplace_solve(items, count, *x, &solution)) != Error::Success) {
+		printf("Test failed on line %u. %s\n", t->line, error_text(err));
+	} else {
+		laplace_normalize(*expected, *x);
+		simplify_solution(*solution);
+		simplify_solution(*expected);
+		passed = check(t, *solution, *expected);
+	}
+
+	for (unsigned i = 0; i < count; i++)
+		ast::dispose(items[i]);
+	ast::dispose(expected);
+	ast::dispose(x);
+	ast::dispose(solution);
+
+	return passed;
+}
+
 bool test_Run(Test *t) {
 	if (t->type == TestType::DeSolves || t->type == TestType::DeNotSolves)
 		return run_verify(t);
 	if (t->type == TestType::DeSolve || t->type == TestType::DeSeries)
 		return run_solve(t);
+	if (t->type == TestType::LaplaceSolve)
+		return run_laplace_solve(t);
 
 	Error err;
 	ast *a = parse(reinterpret_cast<uint8_t *>(t->arg1), strlen(t->arg1), str_table, &err);

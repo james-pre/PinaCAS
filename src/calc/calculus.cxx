@@ -14,6 +14,7 @@ Error calculus::run(
 	ast &respect_to,
 	const ast *transform,
 	bool series,
+	bool laplace,
 	unsigned terms,
 	char *summary
 ) {
@@ -63,6 +64,21 @@ Error calculus::run(
 			return err;
 		}
 		case calculus::Kind::DiffEq: {
+			if (laplace || laplace_needed(e)) {
+				ast *solution;
+				err = laplace_solve(items, count, respect_to, &solution);
+
+				if (err == Error::Success) {
+					if (summary != nullptr)
+						sprintf(summary, "Solved. Laplace transform.");
+					e.replace(solution->firstChild()->next()->copy());
+					ast::dispose(solution);
+					simplify_canonical_form(e, Canonical::All);
+				}
+
+				return err;
+			}
+
 			DiffEq de;
 			err = de.loadList(items, count, respect_to);
 

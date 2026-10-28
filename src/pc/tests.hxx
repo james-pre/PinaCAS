@@ -22,6 +22,8 @@ enum class TestType : unsigned char {
 	Laplace,
 	/*arg2 is s, and the inverse transform is in T*/
 	LaplaceInverse,
+	/*Like DeSolve by Laplace transforms*/
+	LaplaceSolve,
 	DeOrder,
 	DeLinear,
 	DeNonlinear,

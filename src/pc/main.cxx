@@ -39,6 +39,7 @@ void display_help(void) {
 	printf("\tpartial [expression] [respect to]\tWrites a quotient of polynomials as partial fractions\n");
 	printf("\tlaplace [expression] [t] [s]\tLaplace transform\n");
 	printf("\tilaplace [expression] [s] [t]\tInverse Laplace transform\n");
+	printf("\tlsolve [equation,conditions] [t]\tSolves a differential or integral equation by Laplace transforms\n");
 	printf("\tde [equation,conditions] [(optional) respect to]\tClassifies and solves a differential equation\n");
 	printf(
 		"\tseries [equation,conditions] [(optional) respect to] [(optional) terms]\tSolves a differential equation "
@@ -581,6 +582,45 @@ int run_laplace(int argc, char **argv, bool inverse) {
 
 constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
+int run_laplace_solve(int argc, char **argv) {
+	if (argc <= 3) {
+		display_help();
+		return -1;
+	}
+
+	ast *items[MAX_ITEMS], *t = nullptr, *solution = nullptr;
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	Error err;
+	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
+	free(trimmed);
+
+	if (err == Error::Success) {
+		trimmed = trim(argv[3], &trimmed_len);
+		t = parse(trimmed, trimmed_len, str_table, &err);
+		free(trimmed);
+	}
+
+	if (err == Error::Success && count > 0 && t != nullptr)
+		err = laplace_solve(items, count, *t, &solution);
+
+	if (solution != nullptr) {
+		simplify_canonical_form(*solution, Canonical::All);
+		printf("Solution: ");
+		print_ast(*solution);
+		printf("\n");
+	} else {
+		printf("%s\n", error_text(err));
+	}
+
+	for (unsigned i = 0; i < count; i++)
+		ast::dispose(items[i]);
+	ast::dispose(t);
+	ast::dispose(solution);
+
+	return err == Error::Success ? 0 : -1;
+}
+
 int run_de(int argc, char **argv) {
 	if (argc <= 2) {
 		display_help();
@@ -748,6 +788,8 @@ int main(int argc, char **argv) {
 			ret = run_integral(argc, argv);
 		else if (!strcmp(argv[1], "partial"))
 			ret = run_partial(argc, argv);
+		else if (!strcmp(argv[1], "lsolve"))
+			ret = run_laplace_solve(argc, argv);
 		else if (!strcmp(argv[1], "laplace") || !strcmp(argv[1], "ilaplace"))
 			ret = run_laplace(argc, argv, argv[1][0] == 'i');
 		else if (!strcmp(argv[1], "de") || !strcmp(argv[1], "series"))

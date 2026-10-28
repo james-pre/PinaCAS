@@ -576,6 +576,8 @@ laplace; (T_1)^2U(T_1); T; 2e^(-S)/S^3
 laplace; (T>=pi)sin(T); T; -e^(-piS)/(S^2+1)
 laplace; delta(T_pi); T; e^(-piS)
 laplace; e^Tdelta(T_2); T; e^(2_2S)
+laplace; integ((T_tau)^2cos(2tau),tau,0,T); T; 2/(S^2(S^2+4))
+laplace; integ(e^tausin(T_tau),tau,0,T); T; 1/((S_1)(S^2+1))
 
 #Inverse Laplace transforms
 ilaplace; (S+1)/(S^2+6S+10); S; (cos(T)_2sin(T))e^(-3T)
@@ -589,4 +591,12 @@ ilaplace; 1/(S^2_4); S; e^(2T)/4_e^(-2T)/4
 ilaplace; 1/(S(S^2+1)); S; 1_cos(T)
 ilaplace; 5/(S^2+4S+13); S; 5e^(-2T)sin(3T)/3
 ilaplace; (1_e^(-S))/S; S; 1_(T>=1)
-ilaplace; e^(-piS)/(S^2+4); S; (T>=pi)sin(2(T_pi))/2
+ilaplace; e^(-piS)/(S^2+4); S; (T>=pi)sin(2T)/2
+
+#Equations solved by Laplace transforms
+lsolve; Y''+4Y=delta(T_pi)_delta(T_2pi),Y(0)=0,Y'(0)=0; Y=(T>=pi)sin(2T)/2_(T>=2pi)sin(2T)/2; T
+lsolve; F=cos(T)+integ(e^(-tau)F(T_tau),tau,0,T); F=cos(T)+sin(T); T
+lsolve; Y''_3Y'+2Y=e^(3T),Y(0)=1,Y'(0)=0; Y=5e^T/2_2e^(2T)+e^(3T)/2; T
+lsolve; Y'+Y=U(T_1),Y(0)=0; Y=(1_e^(-(T_1)))(T>=1); T
+lsolve; Y''+Y=sin(T),Y(0)=0,Y'(0)=0; Y=(sin(T)_Tcos(T))/2; T
+lsolve; Y'_Y=1+integ(Y(tau),tau,0,T),Y(0)=0; Y=2sqrt(5)e^(T/2)sinh(sqrt(5)T/2)/5; T
