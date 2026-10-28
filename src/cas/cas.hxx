@@ -247,5 +247,41 @@ bool is_negative_for_sure(const ast &a);
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
 bool absolute_val(ast &e);
 
-/*Returns e, a quotient of polynomials in x with rational coefficients, as a polynomial plus partial fractions over linear and quadratic factors with integer coefficients, recording the work. Returns nullptr if e is not such a quotient, its denominator cannot be factored that way, or it is already a single fraction of that form.*/
+/*A quotient of polynomials as a polynomial plus terms (numerator[1]x + numerator[0])/divisor^power, where each divisor has integer coefficients, constant first, and degree 1 or 2*/
+struct PartialFractions {
+	static constexpr unsigned max_degree = 8;
+
+	struct Term {
+		num *numerator[2];
+		num *divisor[3];
+		unsigned degree, power;
+	};
+
+	num *quotient[2 * max_degree + 1] = {};
+	/*-1 when the polynomial is zero*/
+	int quotient_degree = -1;
+	Term terms[max_degree] = {};
+	unsigned count = 0;
+	/*True when splitting took a division or a decomposition*/
+	bool changed = false;
+	/*The polynomial plus the terms*/
+	ast *sum = nullptr;
+
+	PartialFractions() = default;
+	PartialFractions(const PartialFractions &) = delete;
+	PartialFractions &operator=(const PartialFractions &) = delete;
+	~PartialFractions();
+};
+
+/*Splits e, a quotient of polynomials in x with rational coefficients, into fractions over linear and quadratic factors and records the work. Returns false if e is not such a quotient or its denominator cannot be factored that way.*/
+bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions);
+
+/*Returns e written as partial fractions, or nullptr if split_fractions fails or leaves it unchanged*/
 ast *partial_fractions(const ast &e, const ast &x);
+
+/*Rewrites each U(u) and each (u ≥ v) in e, where the argument is linear in t, as the unit step (t ≥ a)*/
+void laplace_normalize(ast &e, const ast &t);
+/*Returns the Laplace transform of f(t) as a function of s, recording the work, or nullptr if it is not found*/
+ast *laplace_transform(const ast &f, const ast &t, const ast &s);
+/*Returns the inverse Laplace transform of F(s) as a function of t, recording the work, or nullptr if it is not found*/
+ast *laplace_inverse(const ast &F, const ast &s, const ast &t);

@@ -20,6 +20,7 @@ enum class Error : unsigned char {
 	EvalNoMapping,
 
 	PartialFractions,
+	Laplace,
 
 	/*Differential equations*/
 	DeNoDerivative,

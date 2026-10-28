@@ -18,6 +18,7 @@ static const char *const messages[] = {
 	"No mapping for symbol",
 
 	"Cannot split into partial fractions",
+	"No transform found",
 
 	"No derivative in equation",
 	"Primes must follow one function",

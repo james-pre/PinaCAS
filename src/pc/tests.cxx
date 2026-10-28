@@ -45,6 +45,10 @@ TestType resolve_type(char *type) {
 		return TestType::Integral;
 	if (!strcmp(type, "partial"))
 		return TestType::Partial;
+	if (!strcmp(type, "laplace"))
+		return TestType::Laplace;
+	if (!strcmp(type, "ilaplace"))
+		return TestType::LaplaceInverse;
 	if (!strcmp(type, "order"))
 		return TestType::DeOrder;
 	if (!strcmp(type, "linear"))
@@ -419,6 +423,38 @@ bool test_Run(Test *t) {
 			passed = check(t, *actual, *expected);
 			ast::dispose(actual);
 			break;
+		case TestType::Laplace:
+		case TestType::LaplaceInverse: {
+			if (c == nullptr) {
+				printf("Test failed on line %u. Empty third argument.\n", t->line);
+				break;
+			}
+
+			const bool forward = t->type == TestType::Laplace;
+			ast *other = ast::make(forward ? Sym::S : Sym::T);
+			if (forward)
+				laplace_normalize(*a, *b);
+			simplify(*a, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			actual = forward ? laplace_transform(*a, *b, *other) : laplace_inverse(*a, *b, *other);
+
+			if (actual == nullptr) {
+				printf("Test failed on line %u. No transform found.\n", t->line);
+				ast::dispose(other);
+				break;
+			}
+
+			expected = c;
+			laplace_normalize(*expected, forward ? *b : *other);
+			ast::dispose(other);
+			simplify(*actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(*actual, Canonical::All);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(*expected, Canonical::All);
+
+			passed = check(t, *actual, *expected);
+			ast::dispose(actual);
+			break;
+		}
 		case TestType::DeOrder:
 		case TestType::DeLinear:
 		case TestType::DeNonlinear: {

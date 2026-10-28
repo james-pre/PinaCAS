@@ -37,6 +37,8 @@ void display_help(void) {
 	printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
 	printf("\tintegral [expression] [respect to]\n");
 	printf("\tpartial [expression] [respect to]\tWrites a quotient of polynomials as partial fractions\n");
+	printf("\tlaplace [expression] [t] [s]\tLaplace transform\n");
+	printf("\tilaplace [expression] [s] [t]\tInverse Laplace transform\n");
 	printf("\tde [equation,conditions] [(optional) respect to]\tClassifies and solves a differential equation\n");
 	printf(
 		"\tseries [equation,conditions] [(optional) respect to] [(optional) terms]\tSolves a differential equation "
@@ -533,6 +535,50 @@ int run_partial(int argc, char **argv) {
 	return result != nullptr ? 0 : -1;
 }
 
+/*Transforms argv[2] from the variable argv[3] to argv[4], or inverts it when inverse is true*/
+int run_laplace(int argc, char **argv, bool inverse) {
+	if (argc <= 4) {
+		display_help();
+		return -1;
+	}
+
+	ast *e = nullptr, *from = nullptr, *to = nullptr, *result = nullptr;
+	Error err = Error::Success;
+	ast **targets[] = {&e, &from, &to};
+
+	for (unsigned i = 0; i < 3 && err == Error::Success; i++) {
+		unsigned trimmed_len;
+		uint8_t *trimmed = trim(argv[i + 2], &trimmed_len);
+		*targets[i] = parse(trimmed, trimmed_len, str_table, &err);
+		free(trimmed);
+	}
+
+	if (err == Error::Success && e != nullptr && from != nullptr && to != nullptr) {
+		if (!inverse)
+			laplace_normalize(*e, *from);
+		simplify(*e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+		result = inverse ? laplace_inverse(*e, *from, *to) : laplace_transform(*e, *from, *to);
+
+		if (result != nullptr) {
+			simplify_canonical_form(*result, Canonical::All);
+			printf("Output: ");
+			print_ast(*result);
+			printf("\n");
+		} else {
+			printf("No transform found\n");
+		}
+	} else {
+		printf("%s\n", error_text(err));
+	}
+
+	ast::dispose(e);
+	ast::dispose(from);
+	ast::dispose(to);
+	ast::dispose(result);
+
+	return result != nullptr ? 0 : -1;
+}
+
 constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
 int run_de(int argc, char **argv) {
@@ -702,6 +748,8 @@ int main(int argc, char **argv) {
 			ret = run_integral(argc, argv);
 		else if (!strcmp(argv[1], "partial"))
 			ret = run_partial(argc, argv);
+		else if (!strcmp(argv[1], "laplace") || !strcmp(argv[1], "ilaplace"))
+			ret = run_laplace(argc, argv, argv[1][0] == 'i');
 		else if (!strcmp(argv[1], "de") || !strcmp(argv[1], "series"))
 			ret = run_de(argc, argv);
 		else if (!strcmp(argv[1], "verify"))

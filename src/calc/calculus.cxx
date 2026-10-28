@@ -12,6 +12,7 @@ Error calculus::run(
 	ast **items,
 	unsigned count,
 	ast &respect_to,
+	const ast *transform,
 	bool series,
 	unsigned terms,
 	char *summary
@@ -41,6 +42,22 @@ Error calculus::run(
 				return Error::PartialFractions;
 			e.replace(sum);
 			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(e, Canonical::All);
+			return err;
+		}
+		case calculus::Kind::Laplace:
+		case calculus::Kind::LaplaceInverse: {
+			const bool forward = kind == calculus::Kind::Laplace;
+			if (forward)
+				laplace_normalize(e, respect_to);
+			work::pause();
+			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			work::resume();
+			work::step(work::Step::Type::State, nullptr, nullptr, &e);
+			ast *result = forward ? laplace_transform(e, respect_to, *transform) : laplace_inverse(e, respect_to, *transform);
+			if (result == nullptr)
+				return Error::Laplace;
+			e.replace(result);
 			simplify_canonical_form(e, Canonical::All);
 			return err;
 		}

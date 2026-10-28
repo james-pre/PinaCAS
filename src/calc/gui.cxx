@@ -117,6 +117,8 @@ static constexpr Element button(const char *label, void (*action)()) {
 
 struct CalculusOptions {
 	char respect_to;
+	char transform;
+	bool inverse;
 	bool show_work;
 	bool verify;
 	unsigned solution;
@@ -142,6 +144,7 @@ static struct {
 static CalculusOptions derivative_options = {.respect_to = 'X', .show_work = true};
 static CalculusOptions integral_options = {.respect_to = 'X', .show_work = true};
 static CalculusOptions partial_options = {.respect_to = 'X', .show_work = true};
+static CalculusOptions laplace_options = {.respect_to = 'T', .transform = 'S', .show_work = true};
 static CalculusOptions de_options =
 	{.respect_to = 'X', .show_work = true, .solution = 2, .terms = '0' + DiffEq::default_terms};
 
@@ -208,6 +211,24 @@ static constexpr Element de_content[] = {
 	end
 };
 
+static constexpr Element laplace_content[] = {
+	checkbox("Inverse transform", &laplace_options.inverse),
+	letter("Variable t:", &laplace_options.respect_to),
+	letter("Variable s:", &laplace_options.transform),
+	checkbox("Show work", &laplace_options.show_work),
+	button(
+		"Transform",
+		[] {
+			execute_calculus(
+				laplace_options.inverse ? calculus::Kind::LaplaceInverse : calculus::Kind::Laplace,
+				&laplace_options,
+				"Laplace transform"
+			);
+		}
+	),
+	end
+};
+
 static constexpr Element about_content[] = {
 	text("PinaCAS v" PCAS_VERSION " " PCAS_BUILD_DATE),
 	text("github.com/james-pre/PinaCAS"),
@@ -226,6 +247,7 @@ static const Menu menus[] = {
 	{"Derivative", derivative_content},
 	{"Integral", integral_content},
 	{"Solve DE", de_content},
+	{"Laplace", laplace_content},
 	{"About", about_content}
 };
 
@@ -1012,7 +1034,15 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 		if (is_ans(input))
 			console_write("Make sure Ans is a string.");
 	} else {
+		const bool transforming = kind == calculus::Kind::Laplace || kind == calculus::Kind::LaplaceInverse;
 		ast *respect_to = parse_respect_to(options->respect_to, &err);
+		ast *transform = transforming ? parse_respect_to(options->transform, &err) : nullptr;
+
+		if (kind == calculus::Kind::LaplaceInverse) {
+			ast *swap = respect_to;
+			respect_to = transform;
+			transform = swap;
+		}
 
 		work::Record work;
 		if (show_work)
@@ -1033,10 +1063,11 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 				kind == calculus::Kind::Derivative         ? "Differentiating..."
 				: kind == calculus::Kind::Integral         ? "Integrating..."
 				: kind == calculus::Kind::PartialFractions ? "Splitting..."
+				: transforming                             ? "Transforming..."
 														   : "Solving..."
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
-			err = calculus::run(kind, items, count, *respect_to, options->series, terms, buffer);
+			err = calculus::run(kind, items, count, *respect_to, transform, options->series, terms, buffer);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)
 				console_write(buffer);
@@ -1051,6 +1082,7 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 		}
 
 		ast::dispose(respect_to);
+		ast::dispose(transform);
 
 		if (err == Error::Success && show_work) {
 			while (count > 0)

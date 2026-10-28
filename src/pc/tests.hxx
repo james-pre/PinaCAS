@@ -18,6 +18,10 @@ enum class TestType : unsigned char {
 	Deriv,
 	Integral,
 	Partial,
+	/*arg2 is t, and the transform is in S*/
+	Laplace,
+	/*arg2 is s, and the inverse transform is in T*/
+	LaplaceInverse,
 	DeOrder,
 	DeLinear,
 	DeNonlinear,
