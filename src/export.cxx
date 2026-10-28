@@ -113,6 +113,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 				case Sym::Pi: add_token(Tok::Pi); break;
 				case Sym::Euler: add_token(Tok::Euler); break;
 				case Sym::Theta: add_token(Tok::Theta); break;
+				case Sym::Tau: add_token(Tok::Tau); break;
 				default: add_byte(static_cast<uint8_t>(e->symbol())); break;
 			}
 
@@ -292,9 +293,11 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 				}
 				case Op::Integral: {
 					add_token(Tok::Integral);
-					index = _to_binary(e->childAt(0), data, index, lookup, err);
-					add_token(Tok::Comma);
-					index = _to_binary(e->childAt(1), data, index, lookup, err);
+					for (const ast &child : e->children()) {
+						if (&child != e->firstChild())
+							add_token(Tok::Comma);
+						index = _to_binary(&child, data, index, lookup, err);
+					}
 					add_token(Tok::ClosePar);
 					break;
 				}

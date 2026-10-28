@@ -26,7 +26,7 @@ struct Box {
 		Root,
 		/*Child surrounded by left and right delimiters*/
 		Delimited,
-		/*Child preceded by an integral sign*/
+		/*First child preceded by an integral sign, with the second and third children as its lower and upper limits when present*/
 		Integral,
 		/*Summation sign with the first child below it and the second above it*/
 		Summation

@@ -933,7 +933,7 @@ static bool integrate_all(ast &e, unsigned budget);
 static bool integrate_node(ast &e, unsigned budget) {
 	bool progress = false;
 
-	if (budget == 0)
+	if (budget == 0 || e.childCount() != 2)
 		return false;
 
 	ast *f = e.childAt(0)->copy();

@@ -98,6 +98,8 @@ const TokenTable str_table = {{
 
 struct Token {
 	Tok type;
+	/*Number of arguments of a function, counted while parsing*/
+	unsigned char arguments;
 
 	union {
 		num *number;
@@ -192,6 +194,7 @@ Sym read_symbol(
 		case Tok::Euler: return Sym::Euler;
 		case Tok::Pi: return Sym::Pi;
 		case Tok::Theta: return Sym::Theta;
+		case Tok::Tau: return Sym::Tau;
 		default: return Sym::Invalid;
 	}
 }
@@ -204,6 +207,7 @@ Token read_token(
 	unsigned *consumed
 ) {
 	Token tok;
+	tok.arguments = 1;
 
 	if (is_num(equation[index], lookup)) {
 		tok.type = Tok::Number;
@@ -445,10 +449,15 @@ bool collapse_precedence(Stack<const Token *> &operators, Stack<ast *> &expressi
 		if (op->type == Tok::OpenPar)
 			continue;
 
+		const unsigned operands = is_tok_nary_function(op->type) ? op->arguments : operand_count(op->type);
+		if (is_tok_nary_function(op->type) && operands != operand_count(op->type) &&
+			!(op->type == Tok::Integral && operands == 4))
+			return false;
+
 		/*Store the token type into the operand type. This will
         Be fixed in make_operator*/
 		ast *collapsed = ast::make(Op::Amount);
-		for (unsigned i = 0; i < operand_count(op->type); i++) {
+		for (unsigned i = 0; i < operands; i++) {
 			ast *operand = expressions.pop();
 
 			if (operand == nullptr) {
@@ -610,6 +619,7 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 				return fail(Error::ParseBadOperator);
 			if (operators.empty() || !is_tok_function(operators.peek()->type))
 				return fail(Error::ParseBadComma);
+			const_cast<Token *>(operators.peek())->arguments++;
 		}
 	}
 

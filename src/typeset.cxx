@@ -280,7 +280,10 @@ static Box *operator_box(const ast &e) {
 		case Op::Integral: {
 			Box *integrand = row2(parenthesized(*a, a->isOp(Op::Add)), text(" d"));
 			integrand->append(convert(*b));
-			return (new Box(Box::Type::Integral))->append(integrand);
+			Box *integral = (new Box(Box::Type::Integral))->append(integrand);
+			if (e.childCount() == 4)
+				integral->append(convert(*b->next()))->append(convert(*b->next()->next()));
+			return integral;
 		}
 		case Op::Equals: return row2(convert(*a), text(" = "))->append(convert(*b));
 		case Op::Prime: return row2(parenthesized(*a, !is_atom(*a)), text("'"));
@@ -401,9 +404,10 @@ void measure(Box *b, const Metrics &m) {
 			break;
 		}
 		case Box::Type::Integral:
-			b->ascent = first->ascent + 2 * m.gap;
-			b->descent = first->descent + 2 * m.gap;
-			b->width = m.integral_width(height(b)) + first->width;
+			b->ascent = first->ascent + 2 * m.gap + (second != nullptr ? height(second->next) : 0);
+			b->descent = first->descent + 2 * m.gap + (second != nullptr ? height(second) : 0);
+			b->width = m.integral_width(height(b)) + first->width +
+					   (second != nullptr ? max(second->width, second->next->width) + m.gap : 0);
 			break;
 		case Box::Type::Summation:
 			b->width = max(m.summation_width, max(first->width, second->width));
@@ -458,10 +462,18 @@ void draw(const Box *b, int x, int baseline, const Metrics &m, const Renderer &r
 				r.delimiter(x + first->width, top, height(b), b->right);
 			break;
 		}
-		case Box::Type::Integral:
+		case Box::Type::Integral: {
+			int left = x + m.integral_width(height(b));
 			r.integral(x, top, height(b));
-			draw(first, x + m.integral_width(height(b)), baseline, m, r);
+			if (second != nullptr) {
+				const Box *upper = second->next;
+				draw(upper, left, top + upper->ascent, m, r);
+				draw(second, left, top + height(b) - second->descent, m, r);
+				left += max(second->width, upper->width) + m.gap;
+			}
+			draw(first, left, baseline, m, r);
 			break;
+		}
 		case Box::Type::Summation: {
 			const int sign_top = baseline - m.ascent - m.gap, sign_bottom = baseline + m.descent + m.gap;
 			r.summation(x + (b->width - m.summation_width) / 2, sign_top, sign_bottom - sign_top);
