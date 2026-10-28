@@ -113,7 +113,7 @@ static bool _expand(ast &e, Expand flags) {
 
 		if (e.isOp(Op::Mult)) {
 			repeat = distribute_product(e, flags);
-		} else if (e.isOp(Op::Div) && has(flags, Expand::DistribDivision)) {
+		} else if (e.isOp(Op::Div) && has(flags, Expand::DistribDivision) && !e.childAt(1)->isOp(Op::Add)) {
 			split_division(e);
 			_expand(
 				e,

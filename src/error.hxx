@@ -19,6 +19,8 @@ enum class Error : unsigned char {
 
 	EvalNoMapping,
 
+	PartialFractions,
+
 	/*Differential equations*/
 	DeNoDerivative,
 	DeBadFunction,

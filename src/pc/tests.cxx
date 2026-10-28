@@ -43,6 +43,8 @@ TestType resolve_type(char *type) {
 		return TestType::Deriv;
 	if (!strcmp(type, "integ"))
 		return TestType::Integral;
+	if (!strcmp(type, "partial"))
+		return TestType::Partial;
 	if (!strcmp(type, "order"))
 		return TestType::DeOrder;
 	if (!strcmp(type, "linear"))
@@ -394,6 +396,28 @@ bool test_Run(Test *t) {
 			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
 			passed = check(t, *actual, *expected);
+			break;
+		case TestType::Partial:
+			if (c == nullptr) {
+				printf("Test failed on line %u. Empty third argument.\n", t->line);
+				break;
+			}
+
+			simplify(*a, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			actual = partial_fractions(*a, *b);
+			if (actual == nullptr) {
+				printf("Test failed on line %u. Cannot split into partial fractions.\n", t->line);
+				break;
+			}
+
+			expected = c;
+			simplify(*actual, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(*actual, Canonical::All);
+			simplify(*expected, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(*expected, Canonical::All);
+
+			passed = check(t, *actual, *expected);
+			ast::dispose(actual);
 			break;
 		case TestType::DeOrder:
 		case TestType::DeLinear:

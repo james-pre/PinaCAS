@@ -136,11 +136,12 @@ static struct {
 } evaluate_options = {true, false, 10, 11};
 
 static struct {
-	bool multiplication, powers;
-} expand_options = {true, true};
+	bool multiplication, powers, partial;
+} expand_options = {true, true, false};
 
 static CalculusOptions derivative_options = {.respect_to = 'X', .show_work = true};
 static CalculusOptions integral_options = {.respect_to = 'X', .show_work = true};
+static CalculusOptions partial_options = {.respect_to = 'X', .show_work = true};
 static CalculusOptions de_options =
 	{.respect_to = 'X', .show_work = true, .solution = 2, .terms = '0' + DiffEq::default_terms};
 
@@ -175,6 +176,9 @@ static constexpr Element evaluate_content[] = {
 static constexpr Element expand_content[] = {
 	checkbox("Expand multiplication", &expand_options.multiplication),
 	checkbox("Expand powers", &expand_options.powers),
+	checkbox("Partial fractions", &expand_options.partial),
+	letter("Respect to:", &partial_options.respect_to),
+	checkbox("Show work", &partial_options.show_work),
 	button("Expand", execute_expand),
 	end
 };
@@ -910,6 +914,11 @@ static void execute_evaluate(void) {
 static void execute_expand(void) {
 	char buffer[50];
 
+	if (expand_options.partial) {
+		execute_calculus(calculus::Kind::PartialFractions, &partial_options, "Partial fractions");
+		return;
+	}
+
 	Expand flags{};
 
 	if (expand_options.multiplication) {
@@ -1021,9 +1030,10 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 				console_write("Found a second solution by reduction of order.");
 		} else {
 			console_write(
-				kind == calculus::Kind::Derivative ? "Differentiating..."
-				: kind == calculus::Kind::Integral ? "Integrating..."
-												   : "Solving..."
+				kind == calculus::Kind::Derivative         ? "Differentiating..."
+				: kind == calculus::Kind::Integral         ? "Integrating..."
+				: kind == calculus::Kind::PartialFractions ? "Splitting..."
+														   : "Solving..."
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
 			err = calculus::run(kind, items, count, *respect_to, options->series, terms, buffer);

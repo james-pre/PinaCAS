@@ -246,3 +246,6 @@ bool is_negative_for_sure(const ast &a);
 
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
 bool absolute_val(ast &e);
+
+/*Returns e, a quotient of polynomials in x with rational coefficients, as a polynomial plus partial fractions over linear and quadratic factors with integer coefficients, recording the work. Returns nullptr if e is not such a quotient, its denominator cannot be factored that way, or it is already a single fraction of that form.*/
+ast *partial_fractions(const ast &e, const ast &x);

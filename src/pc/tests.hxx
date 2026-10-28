@@ -17,6 +17,7 @@ enum class TestType : unsigned char {
 	Expand,
 	Deriv,
 	Integral,
+	Partial,
 	DeOrder,
 	DeLinear,
 	DeNonlinear,

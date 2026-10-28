@@ -322,6 +322,30 @@ static ast *table_special_power(ast &u, ast &n, ast &x) {
 	return nullptr;
 }
 
+/*Returns the linear u divided by the greatest common divisor of its slope and intercept when both are integers*/
+static ast *without_content(ast &u, ast &slope, ast &x) {
+	ast *intercept = add(u.copy(), negate(mul(slope.copy(), x.copy())));
+	simplify_quietly(*intercept);
+
+	num divisor;
+	if (slope.isNumber() && slope.num().isInteger() && intercept->isNumber() && intercept->num().isInteger())
+		mp_int_gcd(MP_NUMER_P(&slope.num()), MP_NUMER_P(&intercept->num()), MP_NUMER_P(&divisor));
+
+	ast::dispose(intercept);
+
+	if (divisor <= 1)
+		return u.copy();
+
+	ast *reduced = quotient(u.copy(), ast::make(divisor.copy()));
+	work::pause();
+	simplify(*reduced, Simp::Basic);
+	expand(*reduced, Expand::DistribDivision);
+	simplify(*reduced, Simp::Basic);
+	work::resume();
+
+	return reduced;
+}
+
 /*Antiderivative of a single non-constant factor h from the table of elementary integrals*/
 static ast *table(ast &h, ast &x) {
 	ast *u;
@@ -344,7 +368,7 @@ static ast *table(ast &h, ast &x) {
 					return table_special_power(*u, n, x);
 
 				if (is_ast_fraction(n, -1, 1))
-					return quotient(ln(ast::make(Op::Abs, u->copy())), slope);
+					return quotient(ln(ast::make(Op::Abs, without_content(*u, *slope, x))), slope);
 
 				return quotient(power(u->copy(), add(n.copy(), integer(1))), mul(add(n.copy(), integer(1)), slope));
 			}
@@ -537,6 +561,12 @@ static ast *substitution(ast &f, ast &x) {
 		simplify_quietly(*ratio);
 
 		if (!is_constant(*ratio, x)) {
+			work::pause();
+			factor_cancel(*ratio);
+			work::resume();
+		}
+
+		if (!is_constant(*ratio, x)) {
 			ast::dispose(ratio);
 			continue;
 		}
@@ -632,24 +662,34 @@ static ast *polynomial(ast **c, int degree, ast &x) {
 	return sum;
 }
 
-/*Rewrites the integral of a quotient of polynomials whose numerator has at least the degree of the denominator as the integral of a polynomial plus a proper fraction. Records the step.*/
-static ast *divide(ast &f, ast &x) {
-	ast *product = factors_of(f), *numerator = ast::make(Op::Mult), *denominator = ast::make(Op::Mult);
+/*Sets numerator and denominator to the products of the factors of f with positive and negative powers*/
+static void fraction_parts(ast &f, ast **numerator, ast **denominator) {
+	ast *product = factors_of(f);
+
+	*numerator = ast::make(Op::Mult);
+	*denominator = ast::make(Op::Mult);
+
 	for (ast &child : product->children()) {
 		num *exponent;
 
 		if (child.isOp(Op::Pow) && (exponent = number_value(*child.childAt(1))) != nullptr) {
 			if (*exponent < 0)
-				denominator->appendChild(reciprocal(child));
+				(*denominator)->appendChild(reciprocal(child));
 			else
-				numerator->appendChild(child.copy());
+				(*numerator)->appendChild(child.copy());
 			num::dispose(exponent);
 		} else {
-			numerator->appendChild(child.copy());
+			(*numerator)->appendChild(child.copy());
 		}
 	}
 
 	ast::dispose(product);
+}
+
+/*Rewrites the integral of a quotient of polynomials whose numerator has at least the degree of the denominator as the integral of a polynomial plus a proper fraction. Records the step.*/
+static ast *divide(ast &f, ast &x) {
+	ast *numerator, *denominator;
+	fraction_parts(f, &numerator, &denominator);
 
 	ast *n[MAX_DEGREE + 1], *d[MAX_DEGREE + 1], *q[MAX_DEGREE + 1], *rewritten = nullptr;
 	int nd = -1, dd = -1;
@@ -692,6 +732,118 @@ static ast *divide(ast &f, ast &x) {
 		rewritten = integral_node(rewritten, x);
 		ast *before = integral_node(f.copy(), x);
 		work::step(work::Step::Type::Integral, "Divide", before, rewritten);
+		ast::dispose(before);
+	}
+
+	ast::dispose(numerator);
+	ast::dispose(denominator);
+
+	return rewritten;
+}
+
+/*Rewrites the integral of a quotient of polynomials as the integral of its partial fractions. Records the steps.*/
+static ast *partial(ast &f, ast &x) {
+	ast *sum = partial_fractions(f, x);
+
+	if (sum == nullptr)
+		return nullptr;
+
+	ast *before = integral_node(f.copy(), x);
+	ast *rewritten = integral_node(sum, x);
+	work::step(work::Step::Type::Integral, nullptr, before, rewritten);
+	ast::dispose(before);
+
+	return rewritten;
+}
+
+/*Returns the rewritten integral of (Bx + C)/(ax^2 + bx + c) with the square completed, given rational coefficients with b not zero and no real roots, or nullptr*/
+static ast *completed_square(ast &denominator, num **n, num **d, ast &x) {
+	const num &a = *d[2], &b = *d[1], &c = *d[0];
+	num discriminant, t, two(2), four(4);
+
+	mp_rat_mul(&b, &b, &discriminant);
+	mp_rat_mul(&a, &c, &t);
+	t *= four;
+	discriminant -= t;
+
+	if (b == 0 || discriminant >= 0)
+		return nullptr;
+
+	num *slope = n[1]->copy(), *shift = b.copy(), *offset = c.copy(), *constant = n[0]->copy();
+	t = a;
+	t *= two;
+	*slope /= t;
+	*shift /= t;
+
+	mp_rat_mul(&b, shift, &t);
+	t /= two;
+	*offset -= t;
+
+	mp_rat_mul(slope, &b, &t);
+	*constant -= t;
+
+	ast *sum = ast::make(Op::Add);
+
+	if (*slope != 0) {
+		ast *derivative = add(mul(ast::make(a.copy()), mul(integer(2), x.copy())), ast::make(b.copy()));
+		sum->appendChild(mul(ast::make(slope), integral_node(quotient(derivative, denominator.copy()), x)));
+	} else {
+		num::dispose(slope);
+	}
+
+	if (*constant != 0) {
+		ast *square = mul(ast::make(a.copy()), power(add(x.copy(), ast::make(shift)), integer(2)));
+		ast *integrand = quotient(integer(1), add(square, ast::make(offset)));
+		sum->appendChild(mul(ast::make(constant), integral_node(integrand, x)));
+	} else {
+		num::dispose(shift);
+		num::dispose(offset);
+		num::dispose(constant);
+	}
+
+	return sum;
+}
+
+/*Integrates (Bx + C)/(ax^2 + bx + c) with rational coefficients and no real roots by completing the square. Records the step.*/
+static ast *complete_square(ast &f, ast &x) {
+	ast *numerator, *denominator;
+	fraction_parts(f, &numerator, &denominator);
+
+	ast *n[MAX_DEGREE + 1], *d[MAX_DEGREE + 1], *rewritten = nullptr;
+	int nd = -1, dd = -1;
+
+	work::pause();
+
+	if (denominator->childCount() > 0 && is_polynomial(*numerator, x) && is_polynomial(*denominator, x) &&
+		(dd = coefficients(*denominator, x, d)) == 2 && (nd = coefficients(*numerator, x, n)) >= 0 && nd <= 1) {
+		num *values[2][3] = {};
+		bool rational = true;
+
+		for (int k = 0; k <= 2; k++)
+			rational &= (values[1][k] = number_value(*d[k])) != nullptr;
+		for (int k = 0; k <= 1; k++)
+			rational &= (values[0][k] = k <= nd ? number_value(*n[k]) : num::from(0)) != nullptr;
+
+		if (rational)
+			rewritten = completed_square(*denominator, values[0], values[1], x);
+
+		for (unsigned i = 0; i < 2; i++) {
+			for (unsigned k = 0; k < 3; k++)
+				num::dispose(values[i][k]);
+		}
+	}
+
+	for (int k = 0; k <= dd; k++)
+		ast::dispose(d[k]);
+	for (int k = 0; k <= nd; k++)
+		ast::dispose(n[k]);
+
+	work::resume();
+
+	if (rewritten != nullptr) {
+		simplify_quietly(*rewritten);
+		ast *before = integral_node(f.copy(), x);
+		work::step(work::Step::Type::Integral, "Complete the square", before, rewritten);
 		ast::dispose(before);
 	}
 
@@ -798,7 +950,8 @@ static bool integrate_node(ast &e, unsigned budget) {
 		progress = true;
 	} else if (
 		!f->isOp(Op::Add) &&
-		((F = divide(*f, *x)) != nullptr || (F = substitution(*f, *x)) != nullptr || (F = by_parts(*f, *x)) != nullptr)
+		((F = divide(*f, *x)) != nullptr || (F = substitution(*f, *x)) != nullptr || (F = partial(*f, *x)) != nullptr ||
+		 (F = complete_square(*f, *x)) != nullptr || (F = by_parts(*f, *x)) != nullptr)
 	) {
 		e.replace(F);
 		integrate_all(e, budget - 1);

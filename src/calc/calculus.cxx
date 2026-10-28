@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "../cas/cas.hxx"
+#include "../work.hxx"
 
 Error calculus::run(
 	Kind kind,
@@ -30,6 +31,19 @@ Error calculus::run(
 			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 			integral_Indefinite(e, respect_to);
 			break;
+		case calculus::Kind::PartialFractions: {
+			work::pause();
+			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			work::resume();
+			work::step(work::Step::Type::State, nullptr, nullptr, &e);
+			ast *sum = partial_fractions(e, respect_to);
+			if (sum == nullptr)
+				return Error::PartialFractions;
+			e.replace(sum);
+			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+			simplify_canonical_form(e, Canonical::All);
+			return err;
+		}
 		case calculus::Kind::DiffEq: {
 			DiffEq de;
 			err = de.loadList(items, count, respect_to);

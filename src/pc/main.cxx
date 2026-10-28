@@ -36,6 +36,7 @@ void display_help(void) {
 	printf("\texpand [expression]\t\tExpands expression\n");
 	printf("\tderivative [expression] [respect to] [(optional) eval at]\n");
 	printf("\tintegral [expression] [respect to]\n");
+	printf("\tpartial [expression] [respect to]\tWrites a quotient of polynomials as partial fractions\n");
 	printf("\tde [equation,conditions] [(optional) respect to]\tClassifies and solves a differential equation\n");
 	printf(
 		"\tseries [equation,conditions] [(optional) respect to] [(optional) terms]\tSolves a differential equation "
@@ -489,6 +490,49 @@ int run_integral(int argc, char **argv) {
 	return 0;
 }
 
+int run_partial(int argc, char **argv) {
+	if (argc <= 3) {
+		display_help();
+		return -1;
+	}
+
+	ast *respect_to = nullptr, *result = nullptr;
+
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	Error err;
+	ast *e = parse(trimmed, trimmed_len, str_table, &err);
+	free(trimmed);
+
+	if (err == Error::Success) {
+		trimmed = trim(argv[3], &trimmed_len);
+		respect_to = parse(trimmed, trimmed_len, str_table, &err);
+		free(trimmed);
+	}
+
+	if (err == Error::Success && e != nullptr && respect_to != nullptr) {
+		simplify(*e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+		result = partial_fractions(*e, *respect_to);
+
+		if (result != nullptr) {
+			simplify_canonical_form(*result, Canonical::All);
+			printf("Output: ");
+			print_ast(*result);
+			printf("\n");
+		} else {
+			printf("Cannot split into partial fractions\n");
+		}
+	} else {
+		printf("%s\n", error_text(err));
+	}
+
+	ast::dispose(e);
+	ast::dispose(respect_to);
+	ast::dispose(result);
+
+	return result != nullptr ? 0 : -1;
+}
+
 constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
 int run_de(int argc, char **argv) {
@@ -656,6 +700,8 @@ int main(int argc, char **argv) {
 			ret = run_derivative(argc, argv);
 		else if (!strcmp(argv[1], "integral"))
 			ret = run_integral(argc, argv);
+		else if (!strcmp(argv[1], "partial"))
+			ret = run_partial(argc, argv);
 		else if (!strcmp(argv[1], "de") || !strcmp(argv[1], "series"))
 			ret = run_de(argc, argv);
 		else if (!strcmp(argv[1], "verify"))
