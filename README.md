@@ -10,7 +10,9 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Differential equations entered with primes, such as `Y''+2Y'=3X`, classified by order and linearity
 - Checking that a function solves a differential equation and its initial conditions, and finding a second solution from it for second order linear equations
 - Solving first order equations (separable, linear, exact, Bernoulli, homogeneous, and y' = f(ax + by)), linear equations with constant coefficients by undetermined coefficients or variation of parameters, Cauchy-Euler equations, second order equations by reduction of order, and linear equations with polynomial coefficients by power series about an ordinary point, with initial value problems
-- Integral and Solve DE functions in the GUI
+- Partial fractions over linear and quadratic factors, also used for integrating quotients of polynomials
+- Laplace transforms and inverse Laplace transforms, with unit step and delta functions
+- Integral, Solve DE, and Laplace functions in the GUI
 - An editor for the input and output variables inside the app, with a live preview of the expression
 - Much faster simplification, especially when showing work
 - Runs as a Flash app named PinaCAS, so it is not limited to the 64 KB size of a program, and uses spare RAM for a larger heap
@@ -34,6 +36,16 @@ Linear equations with constant coefficients are solved from the roots of the cha
 Linear equations with polynomial coefficients and right side that no other method solves, like `Y''+XY'+Y=0`, are solved with a power series about an ordinary point. Check "Power series" to use it for any such equation. The work shows the series and its derivatives as sums, shifts their indices, separates the first terms, and finds the recurrence relation, then the coefficients until each solution has the chosen number of nonzero terms (1 to 9, 4 by default) or ends. The series is about the point of the initial conditions, or about another point given after the equation like `Y''+(X-1)Y=0,X=1`, and about 0 otherwise.
 
 To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X)` or just `2cos(4X)-1/2sin(4X)`. On the Solve DE page, check "Verify solution" and choose that variable under "Solution in". PinaCAS differentiates the solution, substitutes it into both sides of the equation, and checks each initial condition. When the equation is homogeneous, second order, and linear without initial conditions, and the solution has no constants of its own, PinaCAS goes on to find a second solution by reduction of order and writes the general solution to the output.
+
+## Partial fractions
+
+On the Expand page, check "Partial fractions" to write a quotient of polynomials in the "Respect to" variable as partial fractions, like `1/(X²+X-2)` giving `1/(3(X-1))-1/(3(X+2))`. The denominator is factored into linear and quadratic factors with integer coefficients, then the work writes the fractions with unknown constants, multiplies by the denominator, and equates coefficients. An improper fraction is divided first.
+
+## Laplace transforms
+
+The Laplace page transforms the input from "Variable t" (T by default) to "Variable s" (S by default), or back when "Inverse transform" is checked. Transforms use linearity, a table of tⁿ, e^(at), sin, cos, sinh, and cosh, the first and second translation theorems, and derivatives of transforms for tⁿ times sin or cos. Inverse transforms split each group of terms with the same e^(-as) into partial fractions, complete the square for quadratic factors, and use the second translation theorem.
+
+Write the unit step U(t - a) as `(T≥A)`, with ≥ from the TEST menu or the editor's [math] menu; `U(T-A)` is also accepted on the Laplace page and written as `(T≥A)`. Write the delta function δ(t - a) as `δ(T-A)`, with δ from the editor's [math] menu.
 
 <hr>
 
