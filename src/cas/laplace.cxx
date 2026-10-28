@@ -145,10 +145,36 @@ void laplace_normalize(ast &e, const ast &t) {
 	normalize_steps(e, t);
 }
 
+/*The unknown function while solving an equation and the symbol standing for its transform, or nullptr*/
+static const ast *unknown = nullptr, *unknown_transform = nullptr;
+/*Values of the unknown function and its derivatives at 0 while solving, or nullptr where not given*/
+static ast *initial_values[DiffEq::max_order];
+
+/*Returns a copy of e with the symbol standing for the transform of the unknown written as its transform*/
+static ast *shown(const ast &e) {
+	ast *copy = e.copy();
+
+	if (unknown_transform != nullptr) {
+		ast *transform = ast::make(Op::Laplace, unknown->copy());
+		work::pause();
+		substitute(*copy, *unknown_transform, *transform);
+		work::resume();
+		ast::dispose(transform);
+	}
+
+	return copy;
+}
+
 static void record(const char *text, Op op, const ast &before, const ast &after) {
-	ast *transform = ast::make(op, before.copy());
-	work::step(work::Step::Type::Equation, text, transform, &after);
+	ast *transform = ast::make(op, before.copy()), *right = shown(after);
+	work::step(work::Step::Type::Equation, text, transform, right);
 	ast::dispose(transform);
+	ast::dispose(right);
+}
+
+/*True if e involves v or the unknown function*/
+static bool depends(const ast &e, const ast &v) {
+	return involves(e, v) || (unknown != nullptr && involves(e, *unknown));
 }
 
 /*Splits the product e into its factors that do not involve v and the rest*/
@@ -160,7 +186,7 @@ static void collect(const ast &e, const ast &v, bool inverted, ast &constant, as
 	} else if (e.isOp(Op::Div)) {
 		collect(*e.childAt(0), v, inverted, constant, rest);
 		collect(*e.childAt(1), v, !inverted, constant, rest);
-	} else if (!involves(e, v)) {
+	} else if (!depends(e, v)) {
 		constant.appendChild(inverted ? ast::make(Op::Div, integer(1), e.copy()) : e.copy());
 	} else if (!inverted) {
 		rest.appendChild(e.copy());
@@ -441,9 +467,133 @@ static ast *base_transform(const Shape &shape, const ast &t, const ast &s, ast *
 	return G;
 }
 
+/*Returns the order of the derivative of y that e is, or -1 if it is not one*/
+static int prime_order(const ast *e, const ast &y) {
+	int order = 0;
+
+	for (; e->isOp(Op::Prime); e = e->firstChild())
+		order++;
+
+	return e->compare(y) ? order : -1;
+}
+
+/*Transforms the unknown function or one of its derivatives, using its initial values*/
+static ast *transform_unknown(const ast &g, const ast &t, const ast &s) {
+	const ast *base = g.isOp(Op::At) && g.childAt(1)->compare(t) ? g.childAt(0) : &g;
+	const int order = prime_order(base, *unknown);
+
+	if (order < 0)
+		return nullptr;
+
+	ast *power = order == 1 ? s.copy() : ast::make(Op::Pow, s.copy(), integer(order));
+	ast *F = ast::make(Op::Add, ast::make(Op::Mult, power, unknown_transform->copy()));
+	ast *general = F->copy();
+
+	for (int k = 0; k < order; k++) {
+		if (initial_values[k] == nullptr) {
+			ast::dispose(F);
+			ast::dispose(general);
+			return nullptr;
+		}
+
+		const int exponent = order - 1 - k;
+		ast *power = exponent == 0 ? integer(1) : exponent == 1 ? s.copy() : ast::make(Op::Pow, s.copy(), integer(exponent));
+		ast *value = ast::make(Op::At, DiffEq::derivative(*unknown, static_cast<unsigned>(k)), integer(0));
+		general->appendChild(negate(ast::make(Op::Mult, power->copy(), value)));
+		F->appendChild(negate(ast::make(Op::Mult, power, initial_values[k]->copy())));
+	}
+
+	settle(F);
+	if (order > 0) {
+		work::pause();
+		simplify(*general, Simp::Commutative);
+		work::resume();
+		ast *chain = ast::make(Op::Equals, general, F->copy());
+		record("Transform of a derivative", Op::Laplace, g, *chain);
+		ast::dispose(chain);
+	} else {
+		ast::dispose(general);
+	}
+
+	return F;
+}
+
+static bool is_convolution(const ast &e, const ast &t) {
+	return e.isOp(Op::Integral) && e.childCount() == 4 && e.childAt(1)->isSymbol() && e.childAt(2)->isInt(0) &&
+		   e.childAt(3)->compare(t);
+}
+
+/*Transforms the integral from 0 to t of f(tau)g(t - tau) as F(s)G(s)*/
+static ast *transform_convolution(const ast &integral, const ast &t, const ast &s) {
+	const ast &tau = *integral.childAt(1);
+	ast *constant = ast::make(Op::Mult, integer(1), integer(1)), *factors = ast::make(Op::Mult);
+	ast *f = ast::make(Op::Mult, integer(1)), *g = ast::make(Op::Mult, integer(1));
+	ast *moved = ast::make(Op::Add, t.copy(), tau.copy());
+
+	collect(*integral.childAt(0), tau, false, *constant, *factors);
+	bool split = !involves(*constant, t);
+
+	for (const ast &factor : factors->children()) {
+		if (!involves(factor, t)) {
+			f->appendChild(factor.copy());
+			continue;
+		}
+
+		ast *shifted = factor.copy();
+		work::pause();
+		substitute(*shifted, t, *moved);
+		simplify(*shifted, Simp::Basic);
+		work::resume();
+
+		split &= !involves(*shifted, tau);
+		g->appendChild(shifted);
+	}
+
+	work::pause();
+	substitute(*f, tau, t);
+	work::resume();
+	settle(f);
+	settle(g);
+	settle(constant);
+	ast::dispose(factors);
+	ast::dispose(moved);
+
+	ast *F = nullptr;
+
+	if (split) {
+		ast *product = ast::make(Op::Mult, constant->copy(), ast::make(Op::Laplace, f->copy()));
+		product->appendChild(ast::make(Op::Laplace, g->copy()));
+		record("Convolution theorem", Op::Laplace, integral, *settle(product));
+		ast::dispose(product);
+
+		ast *first = transform_sum(*f, t, s);
+		ast *second = first != nullptr ? transform_sum(*g, t, s) : nullptr;
+
+		if (second != nullptr) {
+			F = ast::make(Op::Mult, constant->copy(), first);
+			F->appendChild(second);
+			settle(F);
+		} else {
+			ast::dispose(first);
+		}
+	}
+
+	ast::dispose(constant);
+	ast::dispose(f);
+	ast::dispose(g);
+
+	return F;
+}
+
 /*Returns the transform of g, a product of factors that each involve t, recording the work, or nullptr*/
 static ast *transform_term(const ast &g, const ast &t, const ast &s) {
 	const unsigned count = g.isOp(Op::Mult) ? g.childCount() : 1;
+
+	if (is_convolution(g, t))
+		return transform_convolution(g, t, s);
+
+	if (unknown != nullptr && involves(g, *unknown))
+		return transform_unknown(g, t, s);
 
 	for (unsigned i = 0; i < count; i++) {
 		const ast &factor = g.isOp(Op::Mult) ? *g.childAt(i) : g;
@@ -491,9 +641,9 @@ static ast *transform_term(const ast &g, const ast &t, const ast &s) {
 	return G;
 }
 
-/*True if e is a unit step or delta function, or a product with one as a factor*/
+/*True if e is a unit step, delta function, or integral, or a product with one as a factor*/
 static bool has_impulse_or_step(const ast &e) {
-	if (e.isOp(Op::Step) || e.isOp(Op::Delta))
+	if (e.isOp(Op::Step) || e.isOp(Op::Delta) || e.isOp(Op::Integral))
 		return true;
 
 	if (e.isOp(Op::Mult) || e.isOp(Op::Div)) {
@@ -857,6 +1007,19 @@ ast *laplace_inverse(const ast &F, const ast &s, const ast &t) {
 			work::resume();
 			ast::dispose(moved);
 
+			ast *added = g->copy();
+			work::pause();
+			if (add_angles(*added, t)) {
+				simplify(*added, Simp::All);
+				if (node_count(*added) < node_count(*g)) {
+					ast *simpler = added;
+					added = g;
+					g = simpler;
+				}
+			}
+			work::resume();
+			ast::dispose(added);
+
 			g = settle(ast::make(Op::Mult, g, unit_step(t, *shifts[i])));
 			record("Second translation theorem", Op::LaplaceInverse, *before, *g);
 			ast::dispose(before);
@@ -880,4 +1043,223 @@ ast *laplace_inverse(const ast &F, const ast &s, const ast &t) {
 	}
 
 	return f;
+}
+
+static bool has_impulse_or_convolution(const ast &e) {
+	if (e.isOp(Op::Delta) || (e.isOp(Op::Integral) && e.childCount() == 4))
+		return true;
+
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
+			if (has_impulse_or_convolution(child))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+bool laplace_needed(const ast &equation) {
+	return has_impulse_or_convolution(equation);
+}
+
+/*Returns the unknown function of the equation: the function with primes, or else the left side when it is a single letter other than t*/
+static const ast *find_unknown(const ast &e, const ast &t) {
+	if (e.isOp(Op::Prime)) {
+		const ast *base = &e;
+		while (base->isOp(Op::Prime))
+			base = base->firstChild();
+		return base->isSymbol() ? base : nullptr;
+	}
+
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
+			const ast *found = find_unknown(child, t);
+			if (found != nullptr)
+				return found;
+		}
+	}
+
+	return nullptr;
+}
+
+/*Rewrites each product of y and a following factor that involves t or tau as y evaluated there*/
+static void apply_unknown(ast &e, const ast &y, const ast &t) {
+	if (!e.isOperator())
+		return;
+
+	for (ast &child : e.children())
+		apply_unknown(child, y, t);
+
+	if (!e.isOp(Op::Mult))
+		return;
+
+	for (ast *child = e.firstChild(); child != nullptr && child->next() != nullptr; child = child->next()) {
+		ast *argument = child->next();
+
+		if (child->compare(y) && (involves(*argument, t) || contains_symbol(*argument, Sym::Tau))) {
+			ast *point = e.removeChild(*argument);
+			child->replace(ast::make(Op::At, y.copy(), point));
+		}
+	}
+}
+
+/*Reads an initial condition like Y(0)=1 or Y'(0)=-3 into initial_values. Returns false if it is not one at 0.*/
+static bool read_condition(const ast &condition, const ast &y) {
+	if (!condition.isOp(Op::Equals) || !condition.firstChild()->isOp(Op::Mult) ||
+		condition.firstChild()->childCount() != 2)
+		return false;
+
+	const ast &left = *condition.firstChild();
+	const int order = prime_order(left.firstChild(), y);
+	num *point = rational_value(*left.childAt(1));
+	const bool at_zero = point != nullptr && *point == 0;
+	num::dispose(point);
+
+	if (order < 0 || order >= static_cast<int>(DiffEq::max_order) || !at_zero || initial_values[order] != nullptr)
+		return false;
+
+	initial_values[order] = settle(condition.childAt(1)->copy());
+	return true;
+}
+
+/*Returns a letter that is not in scope*/
+static ast *free_letter(const ast &scope, Sym preferred) {
+	const Sym symbol = contains_symbol(scope, preferred) ? fresh_symbol(scope) : preferred;
+	return symbol != Sym::Invalid ? ast::make(symbol) : nullptr;
+}
+
+/*True if e has a power of e whose exponent involves s*/
+static bool has_exponential(const ast &e, const ast &s) {
+	if (e.isOp(Op::Pow) && is_euler(*e.childAt(0)) && involves(*e.childAt(1), s))
+		return true;
+
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
+			if (has_exponential(child, s))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+Error laplace_solve(ast **items, unsigned count, const ast &t, ast **solution) {
+	*solution = nullptr;
+
+	ast *equation = items[0]->copy();
+	if (!equation->isOp(Op::Equals))
+		equation = ast::make(Op::Equals, equation, integer(0));
+
+	const ast *found = find_unknown(*equation, t);
+	if (found == nullptr && equation->firstChild()->isSymbol() && !equation->firstChild()->compare(t))
+		found = equation->firstChild();
+
+	if (found == nullptr) {
+		ast::dispose(equation);
+		return Error::DeBadFunction;
+	}
+
+	ast *y = found->copy();
+	Error err = Error::Success;
+
+	for (unsigned k = 0; k < DiffEq::max_order; k++)
+		initial_values[k] = nullptr;
+	for (unsigned i = 1; i < count && err == Error::Success; i++) {
+		if (!read_condition(*items[i], *y))
+			err = Error::DeBadCondition;
+	}
+
+	ast *scope = ast::make(Op::Add, equation->copy(), t.copy());
+	ast *s = free_letter(*scope, Sym::S);
+	if (s != nullptr)
+		scope->appendChild(s->copy());
+	ast *transform = s != nullptr ? free_letter(*scope, Sym::L) : nullptr;
+	ast::dispose(scope);
+
+	if (err == Error::Success && transform == nullptr)
+		err = Error::DeUnsolved;
+
+	ast *left = nullptr, *right = nullptr;
+
+	if (err == Error::Success) {
+		laplace_normalize(*equation, t);
+		apply_unknown(*equation, *y, t);
+		work::step(work::Step::Type::State, nullptr, nullptr, equation);
+
+		ast *sides = ast::make(Op::Laplace, equation->childAt(1)->copy());
+		work::text("Laplace transform");
+		record("Transform both sides", Op::Laplace, *equation->firstChild(), *sides);
+		ast::dispose(sides);
+
+		unknown = y;
+		unknown_transform = transform;
+
+		left = transform_sum(*equation->firstChild(), t, *s);
+		right = left != nullptr ? transform_sum(*equation->childAt(1), t, *s) : nullptr;
+
+		if (right == nullptr)
+			err = Error::Laplace;
+	}
+
+	ast *F = nullptr;
+
+	if (err == Error::Success) {
+		ast *shown_left = shown(*left), *shown_right = shown(*right);
+		work::step(work::Step::Type::Equation, nullptr, shown_left, shown_right);
+		ast::dispose(shown_left);
+		ast::dispose(shown_right);
+
+		ast *difference_ = settle(difference(left->copy(), right->copy()));
+		ast *slope = difference_->copy(), *zero = integer(0);
+
+		work::pause();
+		derivative(*slope, *transform, *transform);
+		simplify(*slope, Simp::Basic);
+		substitute(*difference_, *transform, *zero);
+		simplify(*difference_, Simp::Basic);
+		work::resume();
+
+		if (involves(*slope, *transform) || is_zero(*slope)) {
+			err = Error::DeUnsolved;
+		} else {
+			F = settle(ast::make(Op::Div, negate(difference_->copy()), slope->copy()));
+			if (!has_exponential(*F, *s))
+				single_fraction(*F);
+
+			ast *named = ast::make(Op::Laplace, y->copy());
+			work::step(work::Step::Type::Equation, "Solve for the transform", named, F);
+			ast::dispose(named);
+		}
+
+		ast::dispose(difference_);
+		ast::dispose(slope);
+		ast::dispose(zero);
+	}
+
+	unknown = nullptr;
+	unknown_transform = nullptr;
+
+	if (F != nullptr) {
+		ast *f = laplace_inverse(*F, *s, t);
+
+		if (f == nullptr) {
+			err = Error::Laplace;
+		} else {
+			work::step(work::Step::Type::Equation, "Solution", y, f);
+			*solution = ast::make(Op::Equals, y->copy(), f);
+		}
+	}
+
+	for (unsigned k = 0; k < DiffEq::max_order; k++)
+		ast::dispose(initial_values[k]);
+	ast::dispose(F);
+	ast::dispose(left);
+	ast::dispose(right);
+	ast::dispose(s);
+	ast::dispose(transform);
+	ast::dispose(y);
+	ast::dispose(equation);
+
+	return err;
 }

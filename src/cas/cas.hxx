@@ -285,3 +285,7 @@ void laplace_normalize(ast &e, const ast &t);
 ast *laplace_transform(const ast &f, const ast &t, const ast &s);
 /*Returns the inverse Laplace transform of F(s) as a function of t, recording the work, or nullptr if it is not found*/
 ast *laplace_inverse(const ast &F, const ast &s, const ast &t);
+/*True if equation has a delta function or a definite integral, which only laplace_solve handles*/
+bool laplace_needed(const ast &equation);
+/*Solves items[0], a linear differential equation in the unknown function of t with initial conditions at 0 in the other items, or an integral equation with convolutions, by Laplace transforms, recording the work. Sets solution to y = f.*/
+Error laplace_solve(ast **items, unsigned count, const ast &t, ast **solution);
