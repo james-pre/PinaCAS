@@ -555,27 +555,124 @@ PartialFractions::~PartialFractions() {
 	ast::dispose(sum);
 }
 
+static bool same_polynomial(num *const *a, int a_degree, num *const *b, int b_degree) {
+	if (a_degree != b_degree)
+		return false;
+
+	for (int k = 0; k <= a_degree; k++) {
+		if (*a[k] != *b[k])
+			return false;
+	}
+
+	return true;
+}
+
+/*Sets sum to a plus b and returns its degree*/
+static int add_polynomials(num *const *a, int a_degree, num *const *b, int b_degree, num **sum) {
+	const int degree = a_degree > b_degree ? a_degree : b_degree;
+
+	for (int k = 0; k <= degree; k++) {
+		sum[k] = num::from(0);
+		if (k <= a_degree)
+			*sum[k] += *a[k];
+		if (k <= b_degree)
+			*sum[k] += *b[k];
+	}
+
+	return degree;
+}
+
+/*Fills n and d with the coefficients of a numerator and denominator of e, adding the terms of a sum over a common denominator when they share one. Returns false if e is not a quotient of polynomials within the degree limits.*/
+static bool fraction_coefficients(const ast &e, const ast &x, num **n, int *nd, num **d, int *dd) {
+	const unsigned count = e.isOp(Op::Add) ? e.childCount() : 1;
+	num *term_n[MAX_NUMERATOR + 1], *term_d[MAX_DEGREE + 1], *first[MAX_NUMERATOR + 1], *second[MAX_NUMERATOR + 1];
+
+	*nd = 0;
+	*dd = 0;
+	n[0] = num::from(0);
+	d[0] = num::from(1);
+
+	for (unsigned i = 0; i < count; i++) {
+		ast *numerator, *denominator;
+		rational_parts(e.isOp(Op::Add) ? *e.childAt(i) : e, &numerator, &denominator);
+		tidy(numerator);
+		tidy(denominator);
+
+		const int tn = coefficients(*numerator, x, term_n, MAX_NUMERATOR);
+		const int td = tn < 0 ? -1 : coefficients(*denominator, x, term_d, MAX_DEGREE);
+		ast::dispose(numerator);
+		ast::dispose(denominator);
+
+		bool fits = tn >= 0 && td >= 0;
+
+		if (fits && same_polynomial(term_d, td, d, *dd)) {
+			const int degree = add_polynomials(n, *nd, term_n, tn, first);
+			dispose_coefficients(n, static_cast<unsigned>(*nd));
+			for (int k = 0; k <= degree; k++)
+				n[k] = first[k];
+			*nd = degree;
+		} else if (fits && *dd + td <= static_cast<int>(MAX_DEGREE) &&
+				   *nd + td <= static_cast<int>(MAX_NUMERATOR) && tn + *dd <= static_cast<int>(MAX_NUMERATOR)) {
+			const int a = static_cast<int>(multiply(n, static_cast<unsigned>(*nd), term_d, static_cast<unsigned>(td), first));
+			const int b =
+				static_cast<int>(multiply(term_n, static_cast<unsigned>(tn), d, static_cast<unsigned>(*dd), second));
+			dispose_coefficients(n, static_cast<unsigned>(*nd));
+			*nd = add_polynomials(first, a, second, b, n);
+			dispose_coefficients(first, static_cast<unsigned>(a));
+			dispose_coefficients(second, static_cast<unsigned>(b));
+
+			const int degree = static_cast<int>(multiply(d, static_cast<unsigned>(*dd), term_d, static_cast<unsigned>(td), first));
+			dispose_coefficients(d, static_cast<unsigned>(*dd));
+			for (int k = 0; k <= degree; k++)
+				d[k] = first[k];
+			*dd = degree;
+		} else {
+			fits = false;
+		}
+
+		if (tn >= 0)
+			dispose_coefficients(term_n, static_cast<unsigned>(tn));
+		if (td >= 0)
+			dispose_coefficients(term_d, static_cast<unsigned>(td));
+
+		if (!fits) {
+			dispose_coefficients(n, static_cast<unsigned>(*nd));
+			dispose_coefficients(d, static_cast<unsigned>(*dd));
+			return false;
+		}
+	}
+
+	while (*nd > 0 && *n[*nd] == 0)
+		num::dispose(n[(*nd)--]);
+
+	return true;
+}
+
 bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 	num *n[MAX_NUMERATOR + 1], *d[MAX_DEGREE + 1], *r[MAX_DEGREE];
 	ast *numerator, *denominator;
 	Divisor factors[MAX_DEGREE];
 	num lead;
 
-	rational_parts(e, &numerator, &denominator);
-	tidy(numerator);
-	tidy(denominator);
+	int nd, dd;
 
-	const int nd = coefficients(*numerator, x, n, MAX_NUMERATOR);
-	const int dd = nd < 0 ? -1 : coefficients(*denominator, x, d, MAX_DEGREE);
-
-	if (nd < 0 || dd < 1) {
-		if (nd >= 0)
-			dispose_coefficients(n, static_cast<unsigned>(nd));
-		if (dd >= 0)
-			dispose_coefficients(d, static_cast<unsigned>(dd));
-		ast::dispose(numerator);
-		ast::dispose(denominator);
+	if (!fraction_coefficients(e, x, n, &nd, d, &dd))
 		return false;
+
+	if (dd < 1) {
+		dispose_coefficients(n, static_cast<unsigned>(nd));
+		dispose_coefficients(d, static_cast<unsigned>(dd));
+		return false;
+	}
+
+	const num one(1);
+	if (e.isOp(Op::Add)) {
+		numerator = polynomial(n, static_cast<unsigned>(nd), x, one);
+		denominator = polynomial(d, static_cast<unsigned>(dd), x, one);
+	} else {
+		rational_parts(e, &numerator, &denominator);
+		tidy(numerator);
+		tidy(denominator);
 	}
 
 	const unsigned size = static_cast<unsigned>(dd);
