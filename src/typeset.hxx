@@ -9,6 +9,8 @@ constexpr char Pi = '\x01';
 constexpr char Theta = '\x02';
 constexpr char Dot = '\x03';
 constexpr char Infinity = '\x04';
+constexpr char ScriptL = '\x05';
+constexpr char Delta = '\x06';
 
 struct Box {
 	enum class Type : unsigned char {

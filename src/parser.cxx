@@ -15,6 +15,7 @@ const TokenTable ti_table = {{
     {1, {0x3B}},                /*Tok::Scientific*/
     {1, {0xF1}},                /*Tok::Root*/
     {1, {0x6A}},                /*Tok::Equals*/
+    {1, {0x6E}},                /*Tok::GreaterEqual*/
 
     {1, {0xB0}},                            /*Tok::Negate*/
     {1, {0x0C}}, {1, {0x0D}}, {1, {0x0F}},  /*Tok::Reciprocal, Tok::Square, Tok::Cube*/
@@ -35,6 +36,7 @@ const TokenTable ti_table = {{
     {1, {0xC8}}, {1, {0xC9}},   /*Tok::SinH, Tok::SinH_Inv*/
     {1, {0xCA}}, {1, {0xCB}},   /*Tok::CosH, Tok::CosH_Inv*/
     {1, {0xCC}}, {1, {0xCD}},   /*Tok::TanH, Tok::TanH_Inv*/
+    {3, {0xBB, 0xA3, 0x10}},    /*Tok::Delta*/
 
     {1, {0x10}}, {1, {0x11}},   /*Tok::OpenPar, Tok::ClosePar*/
     {1, {0x2B}}, {1, {0x3A}},   /*Tok::Comma, Tok::Period*/
@@ -57,6 +59,7 @@ const TokenTable str_table = {{
     {3, "[E]"},                     /*Tok::Scientific*/
     {4, "root"},                    /*Tok::Root*/
     {1, "="},                       /*Tok::Equals*/
+    {2, ">="},                      /*Tok::GreaterEqual*/
 
     {1, "-"},                               /*Tok::Negate*/
     {5, "^(-1)"}, {2, "^2"}, {2, "^3"},     /*Tok::Reciprocal, Tok::Square, Tok::Cube*/
@@ -77,6 +80,7 @@ const TokenTable str_table = {{
     {5, "sinh("}, {6, "asinh("},    /*Tok::SinH, Tok::SinH_Inv*/
     {5, "cosh("}, {6, "acosh("},    /*Tok::SinH, Tok::SinH_Inv*/
     {5, "tanh("}, {6, "atanh("},    /*Tok::TanH, Tok::TanH_Inv*/
+    {6, "delta("},                  /*Tok::Delta*/
 
     {1, "("}, {1, ")"},             /*Tok::OpenPar, Tok::ClosePar*/
     {1, ","}, {1, "."},             /*Tok::Comma, Tok::Period*/
@@ -269,6 +273,7 @@ Error tokenize(Tokenizer *t, const uint8_t *equation, unsigned length, const Tok
 uint8_t precedence(Tok type) {
 	switch (type) {
 		case Tok::Equals: return 1;
+		case Tok::GreaterEqual: return 2;
 		case Tok::Plus:
 		case Tok::Minus: return 5;
 		case Tok::Multiply:
@@ -350,6 +355,7 @@ void translate(ast &e, Tok type) {
 		}
 		case Tok::Root: e.setOp(Op::Root); break;
 		case Tok::Equals: e.setOp(Op::Equals); break;
+		case Tok::GreaterEqual: e.setOp(Op::Step); break;
 		case Tok::Prime: e.setOp(Op::Prime); break;
 		case Tok::Negate:
 			e.setOp(Op::Mult);
@@ -413,6 +419,7 @@ void translate(ast &e, Tok type) {
 		case Tok::CosH_Inv: e.setOp(Op::CosH_Inv); break;
 		case Tok::TanH: e.setOp(Op::TanH); break;
 		case Tok::TanH_Inv: e.setOp(Op::TanH_Inv); break;
+		case Tok::Delta: e.setOp(Op::Delta); break;
 		default: break;
 	}
 }

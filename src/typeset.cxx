@@ -153,6 +153,7 @@ static Box *parenthesized(const ast &e, bool parens) {
 }
 
 static Box *function_box(const ast &e) {
+	const char delta[2] = {Delta, '\0'};
 	const char *name;
 	bool inverse = false;
 
@@ -170,6 +171,7 @@ static Box *function_box(const ast &e) {
 		case Op::CosH: name = "cosh"; break;
 		case Op::TanH_Inv: inverse = true; /*FALLTHROUGH*/
 		case Op::TanH: name = "tanh"; break;
+		case Op::Delta: name = delta; break;
 		default: name = "?"; break;
 	}
 
@@ -289,6 +291,19 @@ static Box *operator_box(const ast &e) {
 			return row2(pair(Box::Type::Summation, under, text(infinity)), parenthesized(*a, a->isOp(Op::Add)));
 		}
 		case Op::Subscript: return pair(Box::Type::Subscript, convert(*a), convert(*b));
+		case Op::Step: {
+			ast *argument = b->isInt(0) ? a->copy()
+										: ast::make(Op::Add, a->copy(), ast::make(Op::Mult, ast::make(num::from(-1)), b->copy()));
+			Box *box = row2(text("U"), delimited(convert(*argument), '(', ')'));
+			delete argument;
+			return box;
+		}
+		case Op::Laplace:
+		case Op::LaplaceInverse: {
+			const char name[2] = {ScriptL, '\0'};
+			Box *transform = e.isOp(Op::Laplace) ? text(name) : pair(Box::Type::Superscript, text(name), text("-1"));
+			return row2(transform, delimited(convert(*a), '{', '}'));
+		}
 		case Op::Factorial: return row2(parenthesized(*a, !is_atom(*a)), text("!"));
 		case Op::Abs: return delimited(convert(*a), '|', '|');
 		default: return function_box(e);

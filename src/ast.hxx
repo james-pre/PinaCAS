@@ -28,10 +28,15 @@ enum class Op : unsigned char {
 	Prime,
 	/*1st child = function, 2nd child = point it is evaluated at*/
 	At,
+	/*Unit step: 1 when the 1st child is at least the 2nd, otherwise 0*/
+	Step,
 	/*Shown in work only: 1st child = term, 2nd child = index, 3rd child = lower limit of a sum to infinity*/
 	Sum,
 	/*Shown in work only: 1st child = name, 2nd child = subscript*/
 	Subscript,
+	/*Shown in work only: the Laplace transform and the inverse Laplace transform of the child*/
+	Laplace,
+	LaplaceInverse,
 
 	/*Unary*/
 	Factorial,
@@ -53,6 +58,9 @@ enum class Op : unsigned char {
 	TanH,
 	TanH_Inv,
 
+	/*Dirac delta*/
+	Delta,
+
 	Amount
 };
 
@@ -65,7 +73,7 @@ constexpr bool is_op_operator(Op op) {
 }
 
 constexpr bool is_op_function(Op op) {
-	return op >= Op::Int && op <= Op::TanH_Inv;
+	return op >= Op::Int && op <= Op::Delta;
 }
 
 constexpr bool is_op_nary(Op op) {
@@ -73,7 +81,7 @@ constexpr bool is_op_nary(Op op) {
 }
 
 constexpr bool is_op_unary(Op op) {
-	return op >= Op::Factorial && op <= Op::TanH_Inv;
+	return op >= Op::Factorial && op <= Op::Delta;
 }
 
 enum class Sym : unsigned char {

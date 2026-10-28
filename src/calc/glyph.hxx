@@ -9,8 +9,8 @@ struct Glyph {
 	uint8_t rows[8];
 };
 
-extern const Glyph glyph_pi, glyph_theta, glyph_dot, glyph_infinity;
-extern const Glyph glyph_root, glyph_square, glyph_cube, glyph_inverse, glyph_negative;
+extern const Glyph glyph_pi, glyph_theta, glyph_dot, glyph_infinity, glyph_root, glyph_square, glyph_cube,
+	glyph_inverse, glyph_negative, glyph_delta, glyph_greater_equal, glyph_script_l;
 
 /*Draws g with its top left corner at x, y, leaving out pixels outside of left <= x < right and top <= y < bottom*/
 void glyph_draw(int x, int y, const Glyph *g, int left, int top, int right, int bottom);

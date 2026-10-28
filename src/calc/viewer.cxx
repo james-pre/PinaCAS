@@ -25,6 +25,8 @@ static const Glyph *special_glyph(char c) {
 		case ts::Theta: return &glyph_theta;
 		case ts::Dot: return &glyph_dot;
 		case ts::Infinity: return &glyph_infinity;
+		case ts::ScriptL: return &glyph_script_l;
+		case ts::Delta: return &glyph_delta;
 		default: return nullptr;
 	}
 }
@@ -89,6 +91,16 @@ static void draw_delimiter(int x, int y, int height, char kind) {
 			gfx_Line(x + 2, y + 1, x + 1, y);
 			gfx_Line(x + 2, y + height - 2, x + 1, y + height - 1);
 			break;
+		case '{':
+		case '}': {
+			const int middle = y + height / 2, outer = kind == '{' ? x + 3 : x + 1, inner = kind == '{' ? x + 1 : x + 3;
+			gfx_VertLine(x + 2, y + 1, middle - y - 1);
+			gfx_VertLine(x + 2, middle + 1, y + height - middle - 2);
+			gfx_SetPixel(outer, y);
+			gfx_SetPixel(outer, y + height - 1);
+			gfx_SetPixel(inner, middle);
+			break;
+		}
 		default: gfx_VertLine(x + 2, y, height); break;
 	}
 }

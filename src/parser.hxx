@@ -18,6 +18,7 @@ enum class Tok : unsigned char {
 	Scientific,
 	Root,
 	Equals,
+	GreaterEqual,
 
 	/*Unary*/
 	Negate,
@@ -54,6 +55,7 @@ enum class Tok : unsigned char {
 	CosH_Inv,
 	TanH,
 	TanH_Inv,
+	Delta,
 
 	OpenPar,
 	ClosePar,
@@ -75,7 +77,7 @@ constexpr bool is_tok_unary_operator(Tok tok) {
 }
 
 constexpr bool is_tok_binary_operator(Tok tok) {
-	return tok >= Tok::Plus && tok <= Tok::Equals;
+	return tok >= Tok::Plus && tok <= Tok::GreaterEqual;
 }
 
 constexpr bool is_tok_operator(Tok tok) {
@@ -83,7 +85,7 @@ constexpr bool is_tok_operator(Tok tok) {
 }
 
 constexpr bool is_tok_unary_function(Tok tok) {
-	return tok >= Tok::Int && tok <= Tok::TanH_Inv;
+	return tok >= Tok::Int && tok <= Tok::Delta;
 }
 
 constexpr bool is_tok_nary_function(Tok tok) {

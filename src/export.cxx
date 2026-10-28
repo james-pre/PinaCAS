@@ -304,6 +304,14 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 					index = _to_binary(e->childAt(1), data, index, lookup, err);
 					break;
 				}
+				case Op::Step: {
+					add_token(Tok::OpenPar);
+					index = _to_binary(e->childAt(0), data, index, lookup, err);
+					add_token(Tok::GreaterEqual);
+					index = _to_binary(e->childAt(1), data, index, lookup, err);
+					add_token(Tok::ClosePar);
+					break;
+				}
 				case Op::At: {
 					index = _to_binary(e->childAt(0), data, index, lookup, err);
 					add_token(Tok::OpenPar);
@@ -342,6 +350,7 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 						case Op::CosH_Inv: add_token(Tok::CosH_Inv); break;
 						case Op::TanH: add_token(Tok::TanH); break;
 						case Op::TanH_Inv: add_token(Tok::TanH_Inv); break;
+						case Op::Delta: add_token(Tok::Delta); break;
 						default: break;
 					}
 
