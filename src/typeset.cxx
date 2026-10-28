@@ -292,8 +292,9 @@ static Box *operator_box(const ast &e) {
 		}
 		case Op::Subscript: return pair(Box::Type::Subscript, convert(*a), convert(*b));
 		case Op::Step: {
-			ast *argument = b->isInt(0) ? a->copy()
-										: ast::make(Op::Add, a->copy(), ast::make(Op::Mult, ast::make(num::from(-1)), b->copy()));
+			ast *argument =
+				b->isInt(0) ? a->copy()
+							: ast::make(Op::Add, a->copy(), ast::make(Op::Mult, ast::make(num::from(-1)), b->copy()));
 			Box *box = row2(text("U"), delimited(convert(*argument), '(', ')'));
 			delete argument;
 			return box;

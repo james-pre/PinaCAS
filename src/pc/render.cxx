@@ -77,7 +77,15 @@ static void draw_delimiter(int x, int y, int height, char kind) {
 		case ')': column(x, y, height, ')', 0x239E, 0x239F, 0x23A0); break;
 		case '{':
 		case '}':
-			column(x, y, height, static_cast<uint32_t>(kind), kind == '{' ? 0x23A7 : 0x23AB, 0x23AA, kind == '{' ? 0x23A9 : 0x23AD);
+			column(
+				x,
+				y,
+				height,
+				static_cast<uint32_t>(kind),
+				kind == '{' ? 0x23A7 : 0x23AB,
+				0x23AA,
+				kind == '{' ? 0x23A9 : 0x23AD
+			);
 			if (height > 2)
 				put(x, y + height / 2, kind == '{' ? 0x23A8 : 0x23AC);
 			break;

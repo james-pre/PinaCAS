@@ -409,7 +409,13 @@ static void record_rows(num *(*m)[MAX_DEGREE + 1], unsigned size, ast *const *un
 }
 
 /*Adds the term numerator/divisor^power, where numerator is slope x + constant*/
-static void add_term(PartialFractions &fractions, const Divisor &f, unsigned power, const num &slope, const num &constant) {
+static void add_term(
+	PartialFractions &fractions,
+	const Divisor &f,
+	unsigned power,
+	const num &slope,
+	const num &constant
+) {
 	PartialFractions::Term &term = fractions.terms[fractions.count++];
 
 	term.numerator[0] = constant.copy();

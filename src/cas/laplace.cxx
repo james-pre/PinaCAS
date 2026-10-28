@@ -188,7 +188,6 @@ static void separate(const ast &e, const ast &v, ast **constant, ast **rest) {
 	}
 }
 
-
 static ast *transform_sum(const ast &f, const ast &t, const ast &s);
 
 /*Transforms g δ(t - a) as g(a) e^(-as)*/
@@ -397,8 +396,7 @@ static ast *base_transform(const Shape &shape, const ast &t, const ast &s, ast *
 	ast *square = ast::make(Op::Pow, shape.frequency->copy(), integer(2));
 	ast *quadratic =
 		settle(ast::make(Op::Add, ast::make(Op::Pow, s.copy(), integer(2)), hyperbolic ? negate(square) : square));
-	ast *numerator =
-		shape.trig->isOp(Op::Sin) || shape.trig->isOp(Op::SinH) ? shape.frequency->copy() : s.copy();
+	ast *numerator = shape.trig->isOp(Op::Sin) || shape.trig->isOp(Op::SinH) ? shape.frequency->copy() : s.copy();
 	G = settle(ast::make(Op::Div, numerator->copy(), quadratic->copy()));
 
 	*base = settle(ast::make(Op::Mult, power, shape.trig->copy()));
@@ -623,9 +621,9 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 				completed = ast::make(Op::Pow, completed, integer(term.power));
 			ast *rewritten = ast::make(Op::Add);
 			if (slope != 0)
-				rewritten->appendChild(settle(
-					ast::make(Op::Div, ast::make(Op::Mult, number(slope), shifted->copy()), completed->copy())
-				));
+				rewritten->appendChild(
+					settle(ast::make(Op::Div, ast::make(Op::Mult, number(slope), shifted->copy()), completed->copy()))
+				);
 			if (remainder != 0)
 				rewritten->appendChild(settle(ast::make(Op::Div, number(remainder), completed->copy())));
 			ast::dispose(shifted);
@@ -643,9 +641,7 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 		const bool oscillating = square > 0;
 
 		if (term.power == 1) {
-			ast *sum = ast::make(
-				Op::Mult, number(slope), ast::make(oscillating ? Op::Cos : Op::CosH, kt->copy())
-			);
+			ast *sum = ast::make(Op::Mult, number(slope), ast::make(oscillating ? Op::Cos : Op::CosH, kt->copy()));
 			ast *second = ast::make(
 				Op::Mult,
 				ast::make(Op::Div, number(remainder), k->copy()),
@@ -663,7 +659,9 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 				ast::make(
 					Op::Mult,
 					number(remainder),
-					difference(ast::make(Op::Sin, kt->copy()), ast::make(Op::Mult, kt->copy(), ast::make(Op::Cos, kt->copy())))
+					difference(
+						ast::make(Op::Sin, kt->copy()), ast::make(Op::Mult, kt->copy(), ast::make(Op::Cos, kt->copy()))
+					)
 				),
 				ast::make(Op::Mult, integer(2), ast::make(Op::Pow, k->copy(), integer(3)))
 			);

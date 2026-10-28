@@ -54,7 +54,8 @@ Error calculus::run(
 			simplify(e, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 			work::resume();
 			work::step(work::Step::Type::State, nullptr, nullptr, &e);
-			ast *result = forward ? laplace_transform(e, respect_to, *transform) : laplace_inverse(e, respect_to, *transform);
+			ast *result =
+				forward ? laplace_transform(e, respect_to, *transform) : laplace_inverse(e, respect_to, *transform);
 			if (result == nullptr)
 				return Error::Laplace;
 			e.replace(result);

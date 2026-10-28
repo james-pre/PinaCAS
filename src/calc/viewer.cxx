@@ -96,9 +96,9 @@ static void draw_delimiter(int x, int y, int height, char kind) {
 			const int middle = y + height / 2, outer = kind == '{' ? x + 3 : x + 1, inner = kind == '{' ? x + 1 : x + 3;
 			gfx_VertLine(x + 2, y + 1, middle - y - 1);
 			gfx_VertLine(x + 2, middle + 1, y + height - middle - 2);
-			gfx_SetPixel(outer, y);
-			gfx_SetPixel(outer, y + height - 1);
-			gfx_SetPixel(inner, middle);
+			gfx_HorizLine(outer, y, 1);
+			gfx_HorizLine(outer, y + height - 1, 1);
+			gfx_HorizLine(inner, middle, 1);
 			break;
 		}
 		default: gfx_VertLine(x + 2, y, height); break;
