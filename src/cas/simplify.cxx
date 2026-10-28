@@ -313,6 +313,9 @@ static unsigned function_rank(const ast &e) {
 	if (e.isSymbol())
 		return is_function(e);
 
+	if (e.isOp(Op::At))
+		return 0;
+
 	if (e.isOp(Op::Prime)) {
 		const unsigned rank = function_rank(*e.firstChild());
 		return (rank == 0 ? 1 : rank) + 1;
