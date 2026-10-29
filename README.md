@@ -11,7 +11,7 @@ PinaCAS is a computer algebra system for the TI-84 Plus CE calculators that show
 - Checking that a function solves a differential equation and its initial conditions, and finding a second solution from it for second order linear equations
 - Solving first order equations (separable, linear, exact, Bernoulli, homogeneous, and y' = f(ax + by)), linear equations with constant coefficients by undetermined coefficients or variation of parameters, Cauchy-Euler equations, second order equations by reduction of order, and linear equations with polynomial coefficients by power series about an ordinary point, with initial value problems
 - Partial fractions over linear and quadratic factors, also used for integrating quotients of polynomials
-- Laplace transforms and inverse Laplace transforms, with unit step and delta functions
+- Laplace transforms and inverse Laplace transforms, with unit step and delta functions and convolutions, and solving linear differential equations and integral equations with them
 - Integral, Solve DE, and Laplace functions in the GUI
 - An editor for the input and output variables inside the app, with a live preview of the expression
 - Much faster simplification, especially when showing work
@@ -45,7 +45,9 @@ On the Expand page, check "Partial fractions" to write a quotient of polynomials
 
 The Laplace page transforms the input from "Variable t" (T by default) to "Variable s" (S by default), or back when "Inverse transform" is checked. Transforms use linearity, a table of tⁿ, e^(at), sin, cos, sinh, and cosh, the first and second translation theorems, and derivatives of transforms for tⁿ times sin or cos. Inverse transforms split each group of terms with the same e^(-as) into partial fractions, complete the square for quadratic factors, and use the second translation theorem.
 
-Write the unit step U(t - a) as `(T≥A)`, with ≥ from the TEST menu or the editor's [math] menu; `U(T-A)` is also accepted on the Laplace page and written as `(T≥A)`. Write the delta function δ(t - a) as `δ(T-A)`, with δ from the editor's [math] menu.
+Write the unit step U(t - a) as `(T≥A)`, with ≥ from the TEST menu or the editor's [math] menu; `U(T-A)` is also accepted on the Laplace page and written as `(T≥A)`. Write the delta function δ(t - a) as `δ(T-A)`, with δ from the editor's [math] menu. A convolution ∫₀ᵗ f(τ)g(t - τ) dτ is `fnInt(F(τ)G(T-τ),τ,0,T)`, with τ from the editor's [math] menu, and transforms to F(s)G(s).
+
+On the Solve DE page, check "Laplace transform" to solve a linear equation with initial conditions at 0 by Laplace transforms. Equations with a delta function or an integral, such as `Y''+4Y=δ(T-π),Y(0)=0,Y'(0)=0` or the integral equation `F=cos(T)+fnInt(e^(-τ)F(T-τ),τ,0,T)`, always use them. The work transforms both sides, solves for the transform of the unknown, and finds its inverse transform.
 
 <hr>
 
