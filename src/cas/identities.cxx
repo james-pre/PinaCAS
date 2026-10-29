@@ -320,9 +320,9 @@ static bool matches(ast *id, ast &e, Dictionary &dict) {
 					ast::dispose(id_copy->removeChildAt(i));
 
 					if (id->isOp(Op::Add))
-						dict_copy[combined_symbol] = ast::make(num::from(0));
+						dict_copy[combined_symbol] = ast::make(Num::from(0));
 					else /*Op::Mult*/
-						dict_copy[combined_symbol] = ast::make(num::from(1));
+						dict_copy[combined_symbol] = ast::make(Num::from(1));
 
 					break;
 				}

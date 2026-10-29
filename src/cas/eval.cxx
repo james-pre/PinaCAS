@@ -33,7 +33,7 @@ static bool eval_commutative(ast &e, Eval flags) {
 			return false;
 	}
 
-	num *accumulator = num::from(e.op() == Op::Mult ? 1 : 0);
+	Num *accumulator = Num::from(e.op() == Op::Mult ? 1 : 0);
 
 	for (unsigned i = 0; i < e.childCount(); i++) {
 		const ast &child = *e.childAt(i);
@@ -71,7 +71,7 @@ static bool eval_commutative(ast &e, Eval flags) {
 	else if (!((e.op() == Op::Add && *accumulator == 0) || (e.op() == Op::Mult && *accumulator == 1))) {
 		e.insertChild(ast::make(accumulator), 0);
 	} else
-		num::dispose(accumulator);
+		Num::dispose(accumulator);
 
 	return num_changed > 1;
 }
@@ -110,7 +110,7 @@ static bool eval_div_mult(ast &numer, ast &denom, Eval flags) {
 
 				if (eval_div(*temp_div, flags)) {
 					ast::dispose(numer.removeChildAt(i));
-					denom.replace(ast::make(num::from(1)));
+					denom.replace(ast::make(Num::from(1)));
 
 					numer.appendChild(temp_div);
 
@@ -165,12 +165,12 @@ static bool eval_div(ast &e, Eval flags) {
 
 		/*If numerator and denominator are equal, replace node with "1"*/
 		if (numer.compare(denom)) {
-			e.replace(ast::make(num::from(1)));
+			e.replace(ast::make(Num::from(1)));
 			return true;
 		}
 
 		if (numer.isNumber() && numer.num() == 0) {
-			e.replace(ast::make(num::from(0)));
+			e.replace(ast::make(Num::from(0)));
 			return true;
 		}
 
@@ -182,7 +182,7 @@ static bool eval_div(ast &e, Eval flags) {
 		/*Move the sign of a negative denominator to the numerator*/
 		if (denom.isNumber() && denom.num() < 0) {
 			mp_rat_neg(&denom.num(), &denom.num());
-			numer.replace(ast::make(Op::Mult, ast::make(num::from(-1)), numer.copy()));
+			numer.replace(ast::make(Op::Mult, ast::make(Num::from(-1)), numer.copy()));
 			return true;
 		}
 	}
@@ -201,16 +201,16 @@ static bool eval_div(ast &e, Eval flags) {
 			if (base1.compare(base2)) {
 				/*Subtract powers*/
 				power1.replace(
-					ast::make(Op::Add, power1.copy(), ast::make(Op::Mult, ast::make(num::from(-1)), power2.copy()))
+					ast::make(Op::Add, power1.copy(), ast::make(Op::Mult, ast::make(Num::from(-1)), power2.copy()))
 				);
-				denom.replace(ast::make(num::from(1)));
+				denom.replace(ast::make(Num::from(1)));
 				return true;
 			}
 
 		} else if (base1.compare(denom)) {
 			/*Subtract powers*/
-			power1.replace(ast::make(Op::Add, ast::make(num::from(-1)), power1.copy()));
-			denom.replace(ast::make(num::from(1)));
+			power1.replace(ast::make(Op::Add, ast::make(Num::from(-1)), power1.copy()));
+			denom.replace(ast::make(Num::from(1)));
 
 			return true;
 		}
@@ -218,8 +218,8 @@ static bool eval_div(ast &e, Eval flags) {
 		/*Subtract powers*/
 		ast &power2 = *denom.childAt(1);
 
-		power2.replace(ast::make(Op::Add, ast::make(num::from(-1)), power2.copy()));
-		numer.replace(ast::make(num::from(1)));
+		power2.replace(ast::make(Op::Add, ast::make(Num::from(-1)), power2.copy()));
+		numer.replace(ast::make(Num::from(1)));
 
 		return true;
 	}
@@ -232,7 +232,7 @@ static bool eval_div(ast &e, Eval flags) {
 
 	/*Simplify fractions using GCD*/
 	if (numer.num().isInteger() && denom.num().isInteger()) {
-		num divisor;
+		Num divisor;
 		mp_int a = MP_NUMER_P(&numer.num()), b = MP_NUMER_P(&denom.num());
 
 		/*TODO: check for division by zero?*/
@@ -290,7 +290,7 @@ static bool eval_rational_power(ast &e, const ast &base, const ast &p, const ast
 	if (k == 1 && whole == 0)
 		return false;
 
-	num coefficient(1), factor;
+	Num coefficient(1), factor;
 	for (mp_small i = 0; i < numerator; i++) {
 		mp_rat_set_value(&factor, k, 1);
 		coefficient *= factor;
@@ -307,8 +307,8 @@ static bool eval_rational_power(ast &e, const ast &base, const ast &p, const ast
 			result,
 			ast::make(
 				Op::Pow,
-				ast::make(num::from(m)),
-				ast::make(Op::Div, ast::make(num::from(remainder)), ast::make(num::from(index)))
+				ast::make(Num::from(m)),
+				ast::make(Op::Div, ast::make(Num::from(remainder)), ast::make(Num::from(index)))
 			)
 		);
 	}
@@ -333,7 +333,7 @@ static bool eval_pow(ast &e, Eval flags) {
 		if (a->isInt(0)) {
 			/*If b != 0, e = 0*/
 			if (!b->isInt(0)) {
-				e.replace(ast::make(num::from(0)));
+				e.replace(ast::make(Num::from(0)));
 				return true;
 			}
 		}
@@ -342,7 +342,7 @@ static bool eval_pow(ast &e, Eval flags) {
 		else if (b->isInt(0)) {
 			/*If a != 0, e = 1*/
 			if (!a->isInt(0)) {
-				e.replace(ast::make(num::from(1)));
+				e.replace(ast::make(Num::from(1)));
 				return true;
 			}
 		}
@@ -368,7 +368,7 @@ static bool eval_pow(ast &e, Eval flags) {
 		/*A^(-B) = 1/(A^B) */
 		if (is_negative_for_sure(*b)) {
 			absolute_val(*b);
-			e.replace(ast::make(Op::Div, ast::make(num::from(1)), e.copy()));
+			e.replace(ast::make(Op::Div, ast::make(Num::from(1)), e.copy()));
 			return true;
 		}
 	}
@@ -377,7 +377,7 @@ static bool eval_pow(ast &e, Eval flags) {
 	if (a->isNumber() && b->isNumber()) {
 		if (a->num().isInteger() && b->num().isInteger() && b->num() > 0) {
 			if (has(flags, Eval::PowersFull) || (has(flags, Eval::PowersSmall) && power_in_small_range(*a, *b))) {
-				num *result = num::from(1);
+				Num *result = Num::from(1);
 
 				mp_int_expt_full(MP_NUMER_P(&a->num()), MP_NUMER_P(&b->num()), MP_NUMER_P(result));
 
@@ -398,13 +398,13 @@ static bool eval_pow(ast &e, Eval flags) {
 			mp_int_mod_value(MP_NUMER_P(&b->num()), 4, &remainder);
 
 			if (remainder == 0) {
-				e.replace(ast::make(num::from(1)));
+				e.replace(ast::make(Num::from(1)));
 			} else if (remainder == 1) {
 				e.replace(ast::make(Sym::Imag));
 			} else if (remainder == 2) {
-				e.replace(ast::make(num::from(-1)));
+				e.replace(ast::make(Num::from(-1)));
 			} else if (remainder == 3) {
-				e.replace(ast::make(Op::Mult, ast::make(num::from(-1)), ast::make(Sym::Imag)));
+				e.replace(ast::make(Op::Mult, ast::make(Num::from(-1)), ast::make(Sym::Imag)));
 			}
 
 			return true;
@@ -426,10 +426,10 @@ static bool eval_int(ast &e, Eval flags) {
 
 	const ast &a = *e.childAt(0);
 
-	num remainder;
+	Num remainder;
 
 	if (a.isNumber()) {
-		num *res = num::from(1);
+		Num *res = Num::from(1);
 
 		mp_int_div(MP_NUMER_P(&a.num()), MP_DENOM_P(&a.num()), MP_NUMER_P(res), MP_NUMER_P(&remainder));
 
@@ -444,7 +444,7 @@ static bool eval_int(ast &e, Eval flags) {
 		const ast &denom = *a.childAt(1);
 
 		if (numer.isNumber() && denom.isNumber()) {
-			num *res = num::from(1);
+			Num *res = Num::from(1);
 
 			/*That is a lot of num lol*/
 			mp_int_div(MP_NUMER_P(&numer.num()), MP_NUMER_P(&denom.num()), MP_NUMER_P(res), MP_NUMER_P(&remainder));
@@ -481,7 +481,7 @@ static bool eval_log(ast &e, Eval flags) {
 	if (has(flags, Eval::BasicIdentities)) {
 		/*log(1) = 0*/
 		if (val.isInt(1)) {
-			e.replace(ast::make(num::from(0)));
+			e.replace(ast::make(Num::from(0)));
 			return true;
 		}
 
@@ -510,14 +510,14 @@ static bool eval_factorial(ast &e, Eval flags) {
 		if (has(flags, Eval::BasicIdentities)) {
 			/*0! = 1*/
 			if (a->num() == 0) {
-				e.replace(ast::make(num::from(1)));
+				e.replace(ast::make(Num::from(1)));
 				return true;
 			}
 		}
 
 		if (a->num().isInteger() && a->num() > 0) {
 			if (has(flags, Eval::FactorialFull) || (has(flags, Eval::FactorialSmall) && a->num() <= 10)) {
-				num *accumulator = num::from(1);
+				Num *accumulator = Num::from(1);
 				mp_int i = mp_int_alloc();
 				mp_int_init_copy(i, MP_NUMER_P(&a->num()));
 

@@ -5,7 +5,7 @@
 /*A root re, or the pair re ± im*i when im is not nullptr. value is the root when it is rational, otherwise nullptr.*/
 struct Root {
 	ast *re, *im;
-	num *value;
+	Num *value;
 	unsigned multiplicity;
 };
 
@@ -78,7 +78,7 @@ With euler, the functions are ln(x)^j x^r, ln(x)^j x^a cos(b ln(x)) and ln(x)^j 
 unsigned fill_basis(const DiffEq *de, const Root *roots, unsigned count, ast **basis, bool euler);
 
 /*Records p = 0 under text, a polynomial of degree n in m, and finds its roots with their multiplicities, recording the work. Divides the rational roots out of p.*/
-Error polynomial_roots(num **p, unsigned n, const ast &m, const char *text, Root *roots, unsigned *count);
+Error polynomial_roots(Num **p, unsigned n, const ast &m, const char *text, Root *roots, unsigned *count);
 
 /*Solves a linear equation with constant coefficients from the roots of its characteristic polynomial, finding a particular solution by undetermined coefficients or variation of parameters when it is not homogeneous*/
 Error solve_constant_coefficients(DiffEq *de, ast **solution);
@@ -91,27 +91,27 @@ Error solve_cauchy_euler(DiffEq *de, ast **solution);
 Error solve_reduction_of_order(DiffEq *de, bool checked, ast **solution);
 
 /*Returns the value of e if it is a rational number, otherwise nullptr*/
-num *rational_value(const ast &e);
+Num *rational_value(const ast &e);
 
 /*Sets value to p(r), where p has degree n*/
-void evaluate(num **p, unsigned n, const num &r, num &value);
+void evaluate(Num **p, unsigned n, const Num &r, Num &value);
 
-bool is_root(num **p, unsigned n, const num &r);
+bool is_root(Num **p, unsigned n, const Num &r);
 
 /*Divides p of degree n by m - r, which must be a factor*/
-void deflate(num **p, unsigned n, const num &r);
+void deflate(Num **p, unsigned n, const Num &r);
 
 /*Finds the roots of p of degree n, dividing out the rational ones. Returns false if some cannot be found.*/
-bool find_roots(num **p, unsigned *n, Root *roots, unsigned *count);
+bool find_roots(Num **p, unsigned *n, Root *roots, unsigned *count);
 
 /*Returns the polynomial in m with coefficients p[k]/divisor*/
-ast *polynomial(num *const *p, unsigned n, const ast &m, const num &divisor);
+ast *polynomial(Num *const *p, unsigned n, const ast &m, const Num &divisor);
 
 /*Returns the polynomial in m with coefficients c[k]*/
 ast *polynomial(ast *const *c, unsigned n, const ast &m);
 
 /*Returns the polynomial as the factors (bm - a)^k of its rational roots a/b times p, what remains of it after dividing them out*/
-ast *factored_form(num **p, unsigned n, const Root *roots, unsigned count, const ast &m);
+ast *factored_form(Num **p, unsigned n, const Root *roots, unsigned count, const ast &m);
 
 /*Fills constants with n letters that do not appear in the equation or in exclude unless it is nullptr. Returns false if there are not enough.*/
 bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, unsigned n);

@@ -913,7 +913,7 @@ Error solve_constant_coefficients(DiffEq *de, ast **solution) {
 }
 
 /*Returns a[k] x^(order - k) / a[order] if it is a rational number, otherwise nullptr*/
-static num *euler_ratio(const DiffEq *de, unsigned k) {
+static Num *euler_ratio(const DiffEq *de, unsigned k) {
 	ast *ratio = ast::make(
 		Op::Div,
 		ast::make(Op::Mult, de->a[k]->copy(), ast::make(Op::Pow, de->x->copy(), integer(de->order - k))),
@@ -924,7 +924,7 @@ static num *euler_ratio(const DiffEq *de, unsigned k) {
 	simplify(*ratio, Simp::Basic);
 	work::resume();
 
-	num *value = rational_value(*ratio);
+	Num *value = rational_value(*ratio);
 	ast::dispose(ratio);
 
 	return value;
@@ -945,7 +945,7 @@ static ast *falling_factorial(const ast &m, unsigned k) {
 
 Error solve_cauchy_euler(DiffEq *de, ast **solution) {
 	const unsigned order = de->order;
-	num *c[DiffEq::max_order + 1];
+	Num *c[DiffEq::max_order + 1];
 
 	if (!de->linear || order > DiffEq::max_order || (!de->g->isInt(0) && order != 2))
 		return Error::DeUnsolved;
@@ -953,7 +953,7 @@ Error solve_cauchy_euler(DiffEq *de, ast **solution) {
 	for (unsigned k = 0; k <= order; k++) {
 		if ((c[k] = euler_ratio(de, k)) == nullptr) {
 			while (k > 0)
-				num::dispose(c[--k]);
+				Num::dispose(c[--k]);
 			return Error::DeUnsolved;
 		}
 	}
@@ -963,12 +963,12 @@ Error solve_cauchy_euler(DiffEq *de, ast **solution) {
 	simplify(*lead, Simp::Basic);
 	work::resume();
 
-	num *scale = rational_value(*lead);
+	Num *scale = rational_value(*lead);
 	if (scale != nullptr) {
 		for (unsigned k = 0; k <= order; k++)
 			*c[k] *= *scale;
 		lead->replace(integer(1));
-		num::dispose(scale);
+		Num::dispose(scale);
 	}
 
 	de->method = "Cauchy-Euler";
@@ -1024,13 +1024,13 @@ Error solve_cauchy_euler(DiffEq *de, ast **solution) {
 	ast::dispose(auxiliary);
 	ast::dispose(zero);
 
-	num *p[DiffEq::max_order + 1], *falling[DiffEq::max_order + 1];
+	Num *p[DiffEq::max_order + 1], *falling[DiffEq::max_order + 1];
 	for (unsigned d = 0; d <= order; d++) {
-		p[d] = num::from(0);
-		falling[d] = num::from(d == 0 ? 1 : 0);
+		p[d] = Num::from(0);
+		falling[d] = Num::from(d == 0 ? 1 : 0);
 	}
 
-	num t;
+	Num t;
 	for (unsigned k = 0; k <= order; k++) {
 		for (unsigned d = 0; d <= k; d++) {
 			t = *falling[d];
@@ -1063,9 +1063,9 @@ Error solve_cauchy_euler(DiffEq *de, ast **solution) {
 		free_roots(roots, count);
 
 	for (unsigned d = 0; d <= order; d++) {
-		num::dispose(p[d]);
-		num::dispose(falling[d]);
-		num::dispose(c[d]);
+		Num::dispose(p[d]);
+		Num::dispose(falling[d]);
+		Num::dispose(c[d]);
 	}
 	ast::dispose(m);
 

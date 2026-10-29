@@ -10,7 +10,7 @@ constexpr int MAX_SERIES_INDEX = 30;
 /*The term p (x - x0)^j y^(k) of the equation*/
 struct SeriesTerm {
 	unsigned k, j;
-	num *p;
+	Num *p;
 };
 
 struct Series {
@@ -22,20 +22,20 @@ struct Series {
 	SeriesTerm *terms;
 	unsigned count;
 	/*The right side in powers of the base, up to g_degree, which is -1 when it is zero*/
-	num *g[MAX_SERIES_DEGREE + 1];
+	Num *g[MAX_SERIES_DEGREE + 1];
 	int g_degree;
 	/*Lowest k - j of a term*/
 	int lowest_shift;
 	/*Index from which the recurrence relation holds*/
 	unsigned start;
 	/*Coefficient of y^(order) at the center*/
-	num *lead;
+	Num *lead;
 };
 
 /*Fills p with the coefficients of e in powers of x - center and returns its degree, -1 if e is zero, or -2 if e is not a polynomial with rational coefficients*/
-static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center, num **p) {
+static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center, Num **p) {
 	ast *d = e.copy();
-	num factorial(1), scale;
+	Num factorial(1), scale;
 	int count = 0, degree = -1;
 	bool polynomial = false;
 
@@ -75,14 +75,14 @@ static int taylor_coefficients(const DiffEq *de, const ast &e, const ast &center
 	ast::dispose(d);
 
 	for (int j = polynomial ? degree + 1 : 0; j < count; j++)
-		num::dispose(p[j]);
+		Num::dispose(p[j]);
 
 	return polynomial ? degree : -2;
 }
 
 /*Reads the terms of the equation and its right side in powers of x - center. Returns false if they are not polynomials with rational coefficients.*/
 static bool load_terms(Series *s, const ast &center) {
-	num *p[MAX_SERIES_DEGREE + 1];
+	Num *p[MAX_SERIES_DEGREE + 1];
 
 	s->terms = static_cast<SeriesTerm *>(malloc(sizeof(SeriesTerm) * (s->de->order + 1) * (MAX_SERIES_DEGREE + 1)));
 	s->count = 0;
@@ -95,7 +95,7 @@ static bool load_terms(Series *s, const ast &center) {
 
 		for (int j = 0; j <= degree; j++) {
 			if (*p[j] == 0) {
-				num::dispose(p[j]);
+				Num::dispose(p[j]);
 				continue;
 			}
 
@@ -112,9 +112,9 @@ static bool load_terms(Series *s, const ast &center) {
 
 static void free_series(Series *s) {
 	for (unsigned i = 0; i < s->count; i++)
-		num::dispose(s->terms[i].p);
+		Num::dispose(s->terms[i].p);
 	for (int j = 0; j <= s->g_degree; j++)
-		num::dispose(s->g[j]);
+		Num::dispose(s->g[j]);
 
 	free(s->terms);
 	ast::dispose(s->base);
@@ -142,8 +142,8 @@ static ast *falling(const Series *s, int top, unsigned k) {
 }
 
 /*Sets r to (m + top)(m + top - 1)...(m + top - k + 1)*/
-static void falling_value(num &r, unsigned m, unsigned top, unsigned k) {
-	num factor;
+static void falling_value(Num &r, unsigned m, unsigned top, unsigned k) {
+	Num factor;
 
 	mp_rat_set_value(&r, 1, 1);
 	for (unsigned i = 0; i < k; i++) {
@@ -162,9 +162,9 @@ static ast *base_power(const Series *s, ast *exponent) {
 }
 
 /*Returns the sum of term from the index equal to lower to infinity, written with a minus sign in front when p is negative. Takes ownership of term.*/
-static ast *series_sum(const Series *s, const num &p, ast *term, unsigned lower) {
+static ast *series_sum(const Series *s, const Num &p, ast *term, unsigned lower) {
 	ast *sum = ast::make(Op::Sum);
-	num *magnitude = p.copy();
+	Num *magnitude = p.copy();
 
 	mp_rat_abs(magnitude, magnitude);
 	term = tidy(ast::make(Op::Mult, ast::make(magnitude), term));
@@ -181,7 +181,7 @@ static ast *right_side(const Series *s) {
 	if (s->g_degree < 0)
 		return integer(0);
 
-	num one(1);
+	Num one(1);
 	ast *g = polynomial(s->g, static_cast<unsigned>(s->g_degree), *s->base, one);
 
 	return g;
@@ -239,7 +239,7 @@ static void record_substitution(const Series *s) {
 		ast::dispose(right);
 	}
 
-	num one(1);
+	Num one(1);
 
 	for (unsigned k = 0; k <= s->de->order; k++) {
 		ast *term = ast::make(Op::Mult, falling(s, 0, k), coefficient(s, s->index->copy()));
@@ -256,11 +256,11 @@ static void record_substitution(const Series *s) {
 }
 
 /*Adds p times the polynomial in the index n, of degree n_degree, to sum, multiplying by (n + top)...(n + top - k + 1)*/
-static void add_falling(num **sum, const num &p, int top, unsigned k) {
-	num *product[DiffEq::max_order + 1], *factor = num::from(0);
+static void add_falling(Num **sum, const Num &p, int top, unsigned k) {
+	Num *product[DiffEq::max_order + 1], *factor = Num::from(0);
 
 	for (unsigned d = 0; d <= DiffEq::max_order; d++)
-		product[d] = num::from(0);
+		product[d] = Num::from(0);
 	mp_rat_copy(&p, product[0]);
 
 	for (unsigned i = 0; i < k; i++) {
@@ -275,14 +275,14 @@ static void add_falling(num **sum, const num &p, int top, unsigned k) {
 
 	for (unsigned d = 0; d <= DiffEq::max_order; d++) {
 		*sum[d] += *product[d];
-		num::dispose(product[d]);
+		Num::dispose(product[d]);
 	}
 
-	num::dispose(factor);
+	Num::dispose(factor);
 }
 
 /*Returns the degree of p, or -1 if it is zero*/
-static int degree_of(num **p) {
+static int degree_of(Num **p) {
 	int d = DiffEq::max_order;
 
 	while (d >= 0 && *p[d] == 0)
@@ -292,8 +292,8 @@ static int degree_of(num **p) {
 }
 
 /*Returns the polynomial p of degree n in the index with its rational roots factored out*/
-static ast *factored_polynomial(const Series *s, num **p, unsigned n) {
-	num *copy[DiffEq::max_order + 1];
+static ast *factored_polynomial(const Series *s, Num **p, unsigned n) {
+	Num *copy[DiffEq::max_order + 1];
 	Root roots[DiffEq::max_order];
 	unsigned count = 0;
 
@@ -304,7 +304,7 @@ static ast *factored_polynomial(const Series *s, num **p, unsigned n) {
 	ast *e = factored_form(copy, n, roots, count, *s->index);
 
 	for (unsigned d = 0; d <= n; d++)
-		num::dispose(copy[d]);
+		Num::dispose(copy[d]);
 	free_roots(roots, count);
 
 	return e;
@@ -312,7 +312,7 @@ static ast *factored_polynomial(const Series *s, num **p, unsigned n) {
 
 /*Records the first equations, the sum from the start of the recurrence, and the recurrence relation*/
 static void record_recurrence(Series *s) {
-	num *P[DiffEq::max_order + 1], *r = num::from(0), *value = num::from(0);
+	Num *P[DiffEq::max_order + 1], *r = Num::from(0), *value = Num::from(0);
 	ast *left = ast::make(Op::Add), *right = ast::make(Op::Add), *zero = integer(0);
 	const unsigned order = s->de->order;
 
@@ -341,7 +341,7 @@ static void record_recurrence(Series *s) {
 
 	for (int shift = static_cast<int>(order); shift >= s->lowest_shift; shift--) {
 		for (unsigned d = 0; d <= DiffEq::max_order; d++)
-			P[d] = num::from(0);
+			P[d] = Num::from(0);
 
 		for (unsigned i = 0; i < s->count; i++) {
 			if (static_cast<int>(s->terms[i].k) - static_cast<int>(s->terms[i].j) == shift)
@@ -387,7 +387,7 @@ static void record_recurrence(Series *s) {
 		}
 
 		for (unsigned d = 0; d <= DiffEq::max_order; d++)
-			num::dispose(P[d]);
+			Num::dispose(P[d]);
 	}
 
 	ast *sum = ast::make(Op::Sum);
@@ -405,12 +405,12 @@ static void record_recurrence(Series *s) {
 	ast::dispose(left);
 	ast::dispose(right);
 	ast::dispose(zero);
-	num::dispose(r);
-	num::dispose(value);
+	Num::dispose(r);
+	Num::dispose(value);
 }
 
 /*Returns the coefficient with the components c, the multiples of the constants followed by a constant part*/
-static ast *combination_of(num **c, ast **constants, unsigned free_count) {
+static ast *combination_of(Num **c, ast **constants, unsigned free_count) {
 	ast *sum = ast::make(Op::Add);
 
 	for (unsigned b = 0; b < free_count; b++) {
@@ -428,7 +428,7 @@ static ast *combination_of(num **c, ast **constants, unsigned free_count) {
 }
 
 /*Returns c times the base to the power i, keeping a factor of 1 on a sum so that it stays one term*/
-static ast *series_term(const Series *s, const num &c, unsigned i) {
+static ast *series_term(const Series *s, const Num &c, unsigned i) {
 	ast *power = i == 0 ? nullptr : i == 1 ? s->base->copy() : base_power(s, integer(i));
 
 	if (power == nullptr)
@@ -545,14 +545,14 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 	}
 
 	const unsigned components = free_count + 1;
-	num value, denominator;
-	num **coefficients[MAX_SERIES_INDEX + 1];
+	Num value, denominator;
+	Num **coefficients[MAX_SERIES_INDEX + 1];
 	bool labelled_free = false, labelled_conditions = false;
 
 	for (unsigned k = 0; k < order; k++) {
-		coefficients[k] = static_cast<num **>(malloc(sizeof(num *) * components));
+		coefficients[k] = static_cast<Num **>(malloc(sizeof(Num *) * components));
 		for (unsigned b = 0; b < components; b++)
-			coefficients[k][b] = num::from(0);
+			coefficients[k][b] = Num::from(0);
 
 		if (conditions[k] == nullptr) {
 			mp_rat_set_value(coefficients[k][free_index[k]], 1, 1);
@@ -565,9 +565,9 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 			continue;
 		}
 
-		num::dispose(coefficients[k][free_count]);
+		Num::dispose(coefficients[k][free_count]);
 		if ((coefficients[k][free_count] = rational_value(*conditions[k]->value)) == nullptr) {
-			coefficients[k][free_count] = num::from(0);
+			coefficients[k][free_count] = Num::from(0);
 			err = Error::DeUnsolved;
 		}
 
@@ -606,13 +606,13 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 	for (unsigned m = 0; !done && m + order <= MAX_SERIES_INDEX; m++) {
 		const unsigned t = m + order;
-		coefficients[t] = static_cast<num **>(malloc(sizeof(num *) * components));
+		coefficients[t] = static_cast<Num **>(malloc(sizeof(Num *) * components));
 
 		falling_value(denominator, m, order, order);
 		denominator *= *s.lead;
 
 		for (unsigned b = 0; b < components; b++) {
-			coefficients[t][b] = num::from(0);
+			coefficients[t][b] = Num::from(0);
 
 			if (b == free_count && static_cast<int>(m) <= s.g_degree)
 				mp_rat_copy(s.g[m], coefficients[t][b]);
@@ -696,7 +696,7 @@ Error solve_power_series(DiffEq *de, ast **solution) {
 
 	for (unsigned i = 0; i < computed; i++) {
 		for (unsigned b = 0; b < components; b++)
-			num::dispose(coefficients[i][b]);
+			Num::dispose(coefficients[i][b]);
 		free(coefficients[i]);
 	}
 

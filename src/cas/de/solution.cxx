@@ -14,7 +14,7 @@ static ast *logarithm(const ast &base, ast *e) {
 /*Returns 1 or -1 when the sign of e is known, otherwise 0*/
 static int sign_of(const ast &e) {
 	if (e.isNumber()) {
-		const int compared = num::compare(e.num(), 0);
+		const int compared = Num::compare(e.num(), 0);
 		return (compared > 0) - (compared < 0);
 	}
 
@@ -421,7 +421,7 @@ static void merge_absolute_values(ast &e) {
 
 /*Returns the least common multiple of the integer denominators of the terms of e*/
 static ast *common_denominator(const ast &e) {
-	num *multiple = num::from(1);
+	Num *multiple = Num::from(1);
 
 	for (const ast &child : e.children()) {
 		ast *numerator, *denominator;

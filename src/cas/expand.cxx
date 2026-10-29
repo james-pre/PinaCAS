@@ -51,7 +51,7 @@ static void split_division(ast &e) {
 	const ast &num = *e.childAt(0);
 	const ast &den = *num.next();
 
-	e.replace(ast::make(Op::Mult, num.copy(), ast::make(Op::Div, ast::make(num::from(1)), den.copy())));
+	e.replace(ast::make(Op::Mult, num.copy(), ast::make(Op::Div, ast::make(Num::from(1)), den.copy())));
 }
 
 /*Writes (AB)^n as A^nB^n and (A/B)^n as A^n/B^n*/

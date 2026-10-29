@@ -51,7 +51,7 @@ static ast *gcd_div(const ast &div, const ast &b) {
 		den2 = b.childAt(1);
 	} else {
 		num2 = &b;
-		den2 = one = ast::make(num::from(1));
+		den2 = one = ast::make(Num::from(1));
 	}
 
 	ast *num_g = gcd(num1, *num2);
@@ -86,7 +86,7 @@ static ast *gcd_pow(const ast &pow, const ast &b) {
 		return b.copy();
 	}
 
-	return ast::make(num::from(1));
+	return ast::make(Num::from(1));
 }
 
 ast *gcd(const ast &a, const ast &b) {
@@ -97,7 +97,7 @@ ast *gcd(const ast &a, const ast &b) {
 
 	if (a.isNumber() && b.isNumber()) {
 		if (a.num().isInteger() && b.num().isInteger()) {
-			num *gcd = num::from(1);
+			Num *gcd = Num::from(1);
 
 			mp_int_gcd(MP_NUMER_P(&a.num()), MP_NUMER_P(&b.num()), MP_NUMER_P(gcd));
 
@@ -128,7 +128,7 @@ ast *gcd(const ast &a, const ast &b) {
 		return ret;
 	}
 
-	return ast::make(num::from(1));
+	return ast::make(Num::from(1));
 }
 
 /*Collects the non-numeric factors of e, with divisors in den*/

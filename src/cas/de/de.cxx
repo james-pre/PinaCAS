@@ -6,13 +6,13 @@
 constexpr int MAX_EXPANDED_TERMS = 4096;
 
 ast *integer(mp_small n) {
-	return ast::make(num::from(n));
+	return ast::make(Num::from(n));
 }
 
 template <std::unsigned_integral T>
 	requires(!std::same_as<T, bool>)
 ast *integer(T n) {
-	return ast::make(num::from(static_cast<long>(n)));
+	return ast::make(Num::from(static_cast<long>(n)));
 }
 
 ast *negate(ast *a) {
@@ -112,7 +112,7 @@ static bool linear_form(DiffEq *de, ast &f) {
 		de->g = negate(f.copy());
 
 		for (unsigned k = 0; k <= de->order; k++) {
-			ast *zero = ast::make(num::from(0));
+			ast *zero = ast::make(Num::from(0));
 			substitute(*de->g, *symbols[k], *zero);
 			ast::dispose(zero);
 		}
@@ -143,7 +143,7 @@ Error DiffEq::load(const ast &entered, const ast &variable) {
 	if (entered.isOp(Op::Equals))
 		equation = entered.copy();
 	else
-		equation = ast::make(Op::Equals, entered.copy(), ast::make(num::from(0)));
+		equation = ast::make(Op::Equals, entered.copy(), ast::make(Num::from(0)));
 
 	ast *function = nullptr;
 	const Error err = find_function(equation, &function, &order);
@@ -508,7 +508,7 @@ void rational_parts(const ast &e, ast **numer, ast **denom) {
 		ast::dispose(dens);
 	} else if (e.isOp(Op::Pow) && e.firstChild()->next()->isNumber()) {
 		ast *n, *d;
-		num *exponent = e.firstChild()->next()->num().copy();
+		Num *exponent = e.firstChild()->next()->num().copy();
 		const bool negative = *exponent < 0;
 
 		mp_rat_abs(exponent, exponent);
@@ -518,7 +518,7 @@ void rational_parts(const ast &e, ast **numer, ast **denom) {
 		*denom = ast::make(Op::Pow, negative ? n : d, ast::make(exponent));
 	} else {
 		*numer = e.copy();
-		*denom = ast::make(num::from(1));
+		*denom = ast::make(Num::from(1));
 	}
 }
 

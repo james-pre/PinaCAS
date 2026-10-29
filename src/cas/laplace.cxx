@@ -12,7 +12,7 @@ static ast *settle(ast *e) {
 	return e;
 }
 
-static ast *number(const num &n) {
+static ast *number(const Num &n) {
 	return ast::make(n.copy());
 }
 
@@ -46,12 +46,12 @@ static ast *shift_of(const ast &e, const ast &t) {
 	ast *slope, *intercept, *a = nullptr;
 
 	if (linear_parts(*u, t, &slope, &intercept)) {
-		num *value = rational_value(*slope);
+		Num *value = rational_value(*slope);
 
 		if (value != nullptr && *value > 0)
 			a = settle(negate(ast::make(Op::Div, intercept->copy(), slope->copy())));
 
-		num::dispose(value);
+		Num::dispose(value);
 		ast::dispose(slope);
 		ast::dispose(intercept);
 	}
@@ -359,7 +359,7 @@ static bool analyze(const ast &g, const ast &t, Shape &shape) {
 	for (unsigned i = 0; i < count; i++) {
 		const ast &factor = g.isOp(Op::Mult) ? *g.childAt(i) : g;
 		ast *slope, *intercept;
-		num *exponent;
+		Num *exponent;
 		mp_small value;
 
 		if (!involves(factor, t)) {
@@ -371,7 +371,7 @@ static bool analyze(const ast &g, const ast &t, Shape &shape) {
 			(exponent = rational_value(*factor.childAt(1))) != nullptr
 		) {
 			const bool natural = exponent->toInt(value) && value >= 0;
-			num::dispose(exponent);
+			Num::dispose(exponent);
 			if (!natural)
 				return false;
 			shape.power += static_cast<unsigned>(value);
@@ -409,7 +409,7 @@ static ast *base_transform(const Shape &shape, const ast &t, const ast &s, ast *
 	ast *G;
 
 	if (shape.trig == nullptr) {
-		num factorial(1), index;
+		Num factorial(1), index;
 		for (unsigned k = 2; k <= shape.power; k++) {
 			mp_rat_set_value(&index, static_cast<mp_small>(k), 1);
 			factorial *= index;
@@ -724,14 +724,14 @@ ast *laplace_transform(const ast &f, const ast &t, const ast &s) {
 
 /*True if the expression for square in (s + h)^2 + square is positive, taking a symbolic one as positive unless it has a negative factor. Sets zero if it is zero.*/
 static bool is_positive(const ast &square, bool *zero) {
-	num *value = rational_value(square);
+	Num *value = rational_value(square);
 	*zero = value != nullptr && *value == 0;
 
 	if (value == nullptr)
 		return !is_negative_for_sure(square);
 
 	const bool positive = *value > 0;
-	num::dispose(value);
+	Num::dispose(value);
 	return positive;
 }
 
@@ -757,7 +757,7 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 
 	if (term.degree == 1) {
 		ast *r = coefficient(negate(ast::make(Op::Div, term.divisor[0]->copy(), term.divisor[1]->copy())));
-		num factorial(1), index;
+		Num factorial(1), index;
 		for (unsigned k = 2; k < term.power; k++) {
 			mp_rat_set_value(&index, static_cast<mp_small>(k), 1);
 			factorial *= index;
@@ -799,7 +799,7 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 			ast::dispose(rewritten);
 		}
 
-		ast *k = ast::make(Op::Pow, oscillating ? square : negate(square), ast::make(num::from(1, 2)));
+		ast *k = ast::make(Op::Pow, oscillating ? square : negate(square), ast::make(Num::from(1, 2)));
 		work::pause();
 		simplify(*k, Simp::Basic);
 		work::resume();
@@ -1138,9 +1138,9 @@ static bool read_condition(const ast &condition, const ast &y) {
 
 	const ast &left = *condition.firstChild();
 	const int order = prime_order(left.firstChild(), y);
-	num *point = rational_value(*left.childAt(1));
+	Num *point = rational_value(*left.childAt(1));
 	const bool at_zero = point != nullptr && *point == 0;
-	num::dispose(point);
+	Num::dispose(point);
 
 	if (order < 0 || order >= static_cast<int>(DiffEq::max_order) || !at_zero || initial_values[order] != nullptr)
 		return false;

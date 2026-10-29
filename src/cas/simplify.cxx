@@ -97,13 +97,13 @@ static bool simplify_normalize(ast &e) {
 			ast *a = e.childAt(0)->copy();
 			ast *b = e.childAt(1)->copy();
 
-			e.replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(num::from(1)), a)));
+			e.replace(ast::make(Op::Pow, b, ast::make(Op::Div, ast::make(Num::from(1)), a)));
 
 			changed = true;
 		}
 	} else if (e.isNumber() && !e.num().isInteger()) {
-		num *numer = num::from(1);
-		num *denom = num::from(1);
+		Num *numer = Num::from(1);
+		Num *denom = Num::from(1);
 
 		mp_rat_reduce(&e.num());
 		mp_int_copy(MP_NUMER_P(&e.num()), MP_NUMER_P(numer));
@@ -376,7 +376,7 @@ static ast *factors_or_self(const ast &e) {
 /*Takes ownership of product. Returns its only factor, 1 if it has none, or product itself.*/
 static ast *unwrap_product(ast *product) {
 	switch (product->childCount()) {
-		case 0: ast::dispose(product); return ast::make(num::from(1));
+		case 0: ast::dispose(product); return ast::make(Num::from(1));
 		case 1: {
 			ast *only = product->removeChildAt(0);
 			ast::dispose(product);
@@ -387,18 +387,18 @@ static ast *unwrap_product(ast *product) {
 }
 
 /*Splits e into a base and a numeric exponent, which is 1 unless e is a power of a number*/
-static const ast *power_base(const ast &e, num &exponent) {
+static const ast *power_base(const ast &e, Num &exponent) {
 	if (e.isOp(Op::Pow) && e.childAt(1)->isNumber()) {
 		exponent = e.childAt(1)->num();
 		return e.firstChild();
 	}
 
-	exponent = num(1);
+	exponent = Num(1);
 	return &e;
 }
 
 /*Replaces the factor at index i of product with base raised to exponent, or removes it if exponent is 0*/
-static void set_power(ast &product, unsigned i, const ast &base, const num &exponent) {
+static void set_power(ast &product, unsigned i, const ast &base, const Num &exponent) {
 	ast *replacement = nullptr;
 
 	if (exponent == 1)
@@ -418,16 +418,16 @@ static bool remove_common_factors(const ast &a, const ast &b, ast **rest_a, ast 
 	unsigned i = 0;
 
 	while (i < fa->childCount()) {
-		num exponent_a;
+		Num exponent_a;
 		const ast *base_a = power_base(*fa->childAt(i), exponent_a);
 		bool factor_gone = false;
 
 		for (unsigned j = 0; j < fb->childCount(); j++) {
-			num exponent_b;
+			Num exponent_b;
 			const ast *base_b = power_base(*fb->childAt(j), exponent_b);
 
 			if (base_a->compare(*base_b) && exponent_a > 0 && exponent_b > 0) {
-				const num common = exponent_a < exponent_b ? exponent_a : exponent_b;
+				const Num common = exponent_a < exponent_b ? exponent_a : exponent_b;
 				ast *base = base_a->copy();
 
 				exponent_a -= common;
@@ -553,7 +553,7 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 		return 0;
 
 	switch (a->type()) {
-		case ast::Type::Number: return multiplier * num::compare(a->num(), b->num());
+		case ast::Type::Number: return multiplier * Num::compare(a->num(), b->num());
 		case ast::Type::Symbol: return multiplier * (static_cast<int>(a->symbol()) - static_cast<int>(b->symbol()));
 		case ast::Type::Operator: return multiplier * (static_cast<int>(a->op()) - static_cast<int>(b->op()));
 	}
@@ -576,7 +576,7 @@ static bool exponentials_to_numerator(ast &e) {
 			(is_exponential(child) ? moved : rest)->appendChild(child.copy());
 	} else if (is_exponential(den)) {
 		moved->appendChild(den.copy());
-		rest = ast::make(num::from(1));
+		rest = ast::make(Num::from(1));
 	} else {
 		ast::dispose(moved);
 		return false;
@@ -590,7 +590,7 @@ static bool exponentials_to_numerator(ast &e) {
 
 	for (ast &child : moved->children()) {
 		ast &exponent = *child.childAt(1);
-		exponent.replace(ast::make(Op::Mult, ast::make(num::from(-1)), exponent.copy()));
+		exponent.replace(ast::make(Op::Mult, ast::make(Num::from(-1)), exponent.copy()));
 		simplify(exponent, Simp::Normalize | Simp::Commutative | Simp::Eval);
 	}
 
@@ -755,7 +755,7 @@ static const ast *base_of(const ast &e) {
 
 /*Returns a copy of the exponent of e, which is 1 unless e is a power*/
 static ast *exponent_of(const ast &e) {
-	return e.isOp(Op::Pow) ? e.childAt(1)->copy() : ast::make(num::from(1));
+	return e.isOp(Op::Pow) ? e.childAt(1)->copy() : ast::make(Num::from(1));
 }
 
 /*True for a number n and a power n^(p/q), which eval separates*/
@@ -820,7 +820,7 @@ bool simplify_periodic(ast &e) {
 	ast *copy = ast::make(Op::Div, e.childAt(0)->copy(), ast::make(Sym::Pi));
 	simplify(*copy, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
 
-	const num *numer = nullptr, *denom = nullptr;
+	const Num *numer = nullptr, *denom = nullptr;
 
 	if (copy->isNumber()) {
 		numer = &copy->num();
@@ -869,8 +869,8 @@ bool simplify_periodic(ast &e) {
 		if (is_negative)
 			mp_int_neg(a, a);
 
-		num *new_num = num::from(1);
-		num *new_den = num::from(1);
+		Num *new_num = Num::from(1);
+		Num *new_den = Num::from(1);
 
 		mp_int_copy(a, MP_NUMER_P(new_num));
 		mp_int_copy(b, MP_NUMER_P(new_den));

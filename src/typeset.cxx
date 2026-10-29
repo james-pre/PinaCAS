@@ -69,7 +69,7 @@ static Box *integer_box(const mpz_t *z) {
 	return b;
 }
 
-static Box *number_box(const num &r) {
+static Box *number_box(const Num &r) {
 	if (r.isInteger())
 		return integer_box(MP_NUMER_P(&r));
 
@@ -124,7 +124,7 @@ static Box *convert(const ast &e);
 
 /*Writes a numeric fraction on one line, as in an exponent, or returns nullptr if e is not one*/
 static Box *inline_fraction(const ast &e) {
-	num value;
+	Num value;
 
 	if (e.isNumber() && !e.num().isInteger())
 		value = e.num();
@@ -298,7 +298,7 @@ static Box *operator_box(const ast &e) {
 		case Op::Step: {
 			ast *argument =
 				b->isInt(0) ? a->copy()
-							: ast::make(Op::Add, a->copy(), ast::make(Op::Mult, ast::make(num::from(-1)), b->copy()));
+							: ast::make(Op::Add, a->copy(), ast::make(Op::Mult, ast::make(Num::from(-1)), b->copy()));
 			Box *box = row2(text("U"), delimited(convert(*argument), '(', ')'));
 			delete argument;
 			return box;

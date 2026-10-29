@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <utility>
 
-ast *ast::make(::num *value) {
+ast *ast::make(::Num *value) {
 	ast *node = new ast(Type::Number);
 	node->num_ = value;
 	return node;
@@ -75,7 +75,7 @@ ast &ast::operator=(ast &&other) noexcept {
 
 ast::~ast() {
 	switch (type_) {
-		case Type::Number: ::num::dispose(num_); break;
+		case Type::Number: ::Num::dispose(num_); break;
 		case Type::Symbol: break;
 		case Type::Operator: {
 			ast *child = op_.content;

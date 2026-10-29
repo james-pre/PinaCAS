@@ -179,7 +179,7 @@ class ast {
 	// make and dispose exist solely because without them a lot of garbage is inlined.
 	// this saves about 21.5 KB of flash space!
 	/* Allocates a node, which dispose frees */
-	static ast *make(::num *value);
+	static ast *make(::Num *value);
 	static ast *make(Sym symbol);
 	static ast *make(Op op);
 	static ast *make(Op op, ast *operand);
@@ -224,14 +224,14 @@ class ast {
 	}
 
 	/* Expects a number node */
-	::num &num() {
+	::Num &num() {
 #ifdef COMPILE_PC
 		assert(isNumber());
 #endif
 		return *num_;
 	}
 
-	const ::num &num() const {
+	const ::Num &num() const {
 #ifdef COMPILE_PC
 		assert(isNumber());
 #endif
@@ -312,7 +312,7 @@ class ast {
 	ast *next_ = nullptr;
 
 	union {
-		::num *num_;
+		::Num *num_;
 		Sym symbol_;
 		Operator op_;
 	};

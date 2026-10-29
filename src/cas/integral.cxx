@@ -8,7 +8,7 @@ constexpr int MAX_METHOD_DEPTH = 12;
 constexpr int MAX_DEGREE = 8;
 
 static ast *integer(mp_small n) {
-	return ast::make(num::from(n));
+	return ast::make(Num::from(n));
 }
 
 static ast *mul(ast *a, ast *b) {
@@ -41,26 +41,26 @@ static ast *integral_node(ast *f, const ast &x) {
 }
 
 /*Returns the value of e if it is a number or a quotient of numbers, otherwise nullptr*/
-static num *number_value(const ast &e) {
+static Num *number_value(const ast &e) {
 	if (e.isNumber())
 		return e.num().copy();
 
 	if (!e.isOp(Op::Div) || !e.childAt(0)->isNumber() || !e.childAt(1)->isNumber())
 		return nullptr;
 
-	num *value = e.childAt(0)->num().copy();
+	Num *value = e.childAt(0)->num().copy();
 	*value /= e.childAt(1)->num();
 	return value;
 }
 
 static bool is_ast_fraction(const ast &e, mp_small numer, mp_small denom) {
-	num *value = number_value(e);
+	Num *value = number_value(e);
 
 	if (value == nullptr)
 		return false;
 
 	const bool equal = mp_rat_compare_value(value, numer, denom) == 0;
-	num::dispose(value);
+	Num::dispose(value);
 	return equal;
 }
 
@@ -121,7 +121,7 @@ static bool is_polynomial(ast &e, ast &x) {
 }
 
 static ast *reciprocal(ast &e) {
-	num *exponent;
+	Num *exponent;
 
 	if (e.isOp(Op::Pow) && (exponent = number_value(*e.childAt(1))) != nullptr) {
 		mp_rat_neg(exponent, exponent);
@@ -216,7 +216,7 @@ static ast *match_square_sum(ast &e, mp_small c, mp_small k) {
 }
 
 /*Returns v if e is c + k*v^2 for positive numbers c and k, setting them, otherwise nullptr*/
-static ast *match_positive_square_sum(ast &e, num **c, num **k) {
+static ast *match_positive_square_sum(ast &e, Num **c, Num **k) {
 	if (!e.isOp(Op::Add) || e.childCount() != 2)
 		return nullptr;
 
@@ -231,14 +231,14 @@ static ast *match_positive_square_sum(ast &e, num **c, num **k) {
 			(*k = number_value(*square->childAt(0))) != nullptr) {
 			square = square->childAt(1);
 		} else {
-			*k = num::from(1);
+			*k = Num::from(1);
 		}
 
 		if (*(*c) > 0 && *(*k) > 0 && square->isOp(Op::Pow) && square->childAt(1)->isInt(2))
 			return square->childAt(0);
 
-		num::dispose(*c);
-		num::dispose(*k);
+		Num::dispose(*c);
+		Num::dispose(*k);
 	}
 
 	return nullptr;
@@ -287,14 +287,14 @@ static ast *table_special_power(ast &u, ast &n, ast &x) {
 	if (is_ast_fraction(n, -1, 1) && (v = match_square_sum(u, 1, 1)) != nullptr)
 		return over_slope(ast::make(Op::Tan_Inv, v->copy()), *v, x);
 
-	num *c, *k;
+	Num *c, *k;
 	if (is_ast_fraction(n, -1, 1) && (v = match_positive_square_sum(u, &c, &k)) != nullptr) {
 		ast *F = ast::make(k->copy());
-		F = power(quotient(F, ast::make(c->copy())), ast::make(num::from(1, 2)));
+		F = power(quotient(F, ast::make(c->copy())), ast::make(Num::from(1, 2)));
 		F = ast::make(Op::Tan_Inv, mul(F, v->copy()));
 		*c *= *k;
-		F = quotient(F, power(ast::make(c), ast::make(num::from(1, 2))));
-		num::dispose(k);
+		F = quotient(F, power(ast::make(c), ast::make(Num::from(1, 2))));
+		Num::dispose(k);
 		return over_slope(F, *v, x);
 	}
 
@@ -327,7 +327,7 @@ static ast *without_content(ast &u, ast &slope, ast &x) {
 	ast *intercept = add(u.copy(), negate(mul(slope.copy(), x.copy())));
 	simplify_quietly(*intercept);
 
-	num divisor;
+	Num divisor;
 	if (slope.isNumber() && slope.num().isInteger() && intercept->isNumber() && intercept->num().isInteger())
 		mp_int_gcd(MP_NUMER_P(&slope.num()), MP_NUMER_P(&intercept->num()), MP_NUMER_P(&divisor));
 
@@ -670,14 +670,14 @@ static void fraction_parts(ast &f, ast **numerator, ast **denominator) {
 	*denominator = ast::make(Op::Mult);
 
 	for (ast &child : product->children()) {
-		num *exponent;
+		Num *exponent;
 
 		if (child.isOp(Op::Pow) && (exponent = number_value(*child.childAt(1))) != nullptr) {
 			if (*exponent < 0)
 				(*denominator)->appendChild(reciprocal(child));
 			else
 				(*numerator)->appendChild(child.copy());
-			num::dispose(exponent);
+			Num::dispose(exponent);
 		} else {
 			(*numerator)->appendChild(child.copy());
 		}
@@ -757,9 +757,9 @@ static ast *partial(ast &f, ast &x) {
 }
 
 /*Returns the rewritten integral of (Bx + C)/(ax^2 + bx + c) with the square completed, given rational coefficients with b not zero and no real roots, or nullptr*/
-static ast *completed_square(ast &denominator, num **n, num **d, ast &x) {
-	const num &a = *d[2], &b = *d[1], &c = *d[0];
-	num discriminant, t, two(2), four(4);
+static ast *completed_square(ast &denominator, Num **n, Num **d, ast &x) {
+	const Num &a = *d[2], &b = *d[1], &c = *d[0];
+	Num discriminant, t, two(2), four(4);
 
 	mp_rat_mul(&b, &b, &discriminant);
 	mp_rat_mul(&a, &c, &t);
@@ -769,7 +769,7 @@ static ast *completed_square(ast &denominator, num **n, num **d, ast &x) {
 	if (b == 0 || discriminant >= 0)
 		return nullptr;
 
-	num *slope = n[1]->copy(), *shift = b.copy(), *offset = c.copy(), *constant = n[0]->copy();
+	Num *slope = n[1]->copy(), *shift = b.copy(), *offset = c.copy(), *constant = n[0]->copy();
 	t = a;
 	t *= two;
 	*slope /= t;
@@ -788,7 +788,7 @@ static ast *completed_square(ast &denominator, num **n, num **d, ast &x) {
 		ast *derivative = add(mul(ast::make(a.copy()), mul(integer(2), x.copy())), ast::make(b.copy()));
 		sum->appendChild(mul(ast::make(slope), integral_node(quotient(derivative, denominator.copy()), x)));
 	} else {
-		num::dispose(slope);
+		Num::dispose(slope);
 	}
 
 	if (*constant != 0) {
@@ -796,9 +796,9 @@ static ast *completed_square(ast &denominator, num **n, num **d, ast &x) {
 		ast *integrand = quotient(integer(1), add(square, ast::make(offset)));
 		sum->appendChild(mul(ast::make(constant), integral_node(integrand, x)));
 	} else {
-		num::dispose(shift);
-		num::dispose(offset);
-		num::dispose(constant);
+		Num::dispose(shift);
+		Num::dispose(offset);
+		Num::dispose(constant);
 	}
 
 	return sum;
@@ -816,20 +816,20 @@ static ast *complete_square(ast &f, ast &x) {
 
 	if (denominator->childCount() > 0 && is_polynomial(*numerator, x) && is_polynomial(*denominator, x) &&
 		(dd = coefficients(*denominator, x, d)) == 2 && (nd = coefficients(*numerator, x, n)) >= 0 && nd <= 1) {
-		num *values[2][3] = {};
+		Num *values[2][3] = {};
 		bool rational = true;
 
 		for (int k = 0; k <= 2; k++)
 			rational &= (values[1][k] = number_value(*d[k])) != nullptr;
 		for (int k = 0; k <= 1; k++)
-			rational &= (values[0][k] = k <= nd ? number_value(*n[k]) : num::from(0)) != nullptr;
+			rational &= (values[0][k] = k <= nd ? number_value(*n[k]) : Num::from(0)) != nullptr;
 
 		if (rational)
 			rewritten = completed_square(*denominator, values[0], values[1], x);
 
 		for (unsigned i = 0; i < 2; i++) {
 			for (unsigned k = 0; k < 3; k++)
-				num::dispose(values[i][k]);
+				Num::dispose(values[i][k]);
 		}
 	}
 
