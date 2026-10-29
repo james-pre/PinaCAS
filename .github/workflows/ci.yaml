@@ -26,6 +26,9 @@ jobs:
                   scripts/install-toolchain.sh "$CEDEV_VERSION"
                   echo /opt/CEdev/bin >> "$GITHUB_PATH"
 
+            - name: Version
+              run: scripts/version.sh
+
             - name: Build for PC
               run: make pc
 
