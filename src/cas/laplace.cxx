@@ -722,62 +722,74 @@ ast *laplace_transform(const ast &f, const ast &t, const ast &s) {
 	return F;
 }
 
-/*Returns the square root of the absolute value of q*/
-static ast *root_of(const num &q) {
-	num magnitude = q;
-	mp_rat_abs(&magnitude, &magnitude);
+/*True if the expression for square in (s + h)^2 + square is positive, taking a symbolic one as positive unless it has a negative factor. Sets zero if it is zero.*/
+static bool is_positive(const ast &square, bool *zero) {
+	num *value = rational_value(square);
+	*zero = value != nullptr && *value == 0;
 
-	ast *root = ast::make(Op::Pow, number(magnitude), ast::make(num::from(1, 2)));
+	if (value == nullptr)
+		return !is_negative_for_sure(square);
+
+	const bool positive = *value > 0;
+	num::dispose(value);
+	return positive;
+}
+
+/*Simplifies a coefficient, adding numbers and like terms*/
+static ast *coefficient(ast *e) {
 	work::pause();
-	simplify(*root, Simp::Basic);
+	simplify(*e, Simp::Basic);
 	work::resume();
-	return root;
+	return e;
 }
 
 /*Returns the inverse transform of one partial fraction, recording the work, or nullptr*/
 static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const ast &t) {
-	const num one(1), two(2);
-	num scale(1);
+	ast *scale = ast::make(Op::Pow, term.divisor[term.degree]->copy(), integer(term.power));
+	ast *slope = coefficient(ast::make(Op::Div, term.numerator[1]->copy(), scale->copy()));
+	ast *constant = coefficient(ast::make(Op::Div, term.numerator[0]->copy(), scale));
 
-	for (unsigned k = 0; k < term.power; k++)
-		scale *= *term.divisor[term.degree];
-
-	num slope = *term.numerator[1] / scale, constant = *term.numerator[0] / scale;
-
-	ast *divisor = polynomial(term.divisor, term.degree, s, one);
+	ast *divisor = polynomial(term.divisor, term.degree, s);
 	if (term.power > 1)
 		divisor = ast::make(Op::Pow, divisor, integer(term.power));
-	ast *fraction = settle(ast::make(Op::Div, polynomial(term.numerator, 1, s, one), divisor));
+	ast *fraction = settle(ast::make(Op::Div, polynomial(term.numerator, 1, s), divisor));
 	ast *f = nullptr;
 
 	if (term.degree == 1) {
-		num r = -*term.divisor[0] / *term.divisor[1], factorial(1), index;
+		ast *r = coefficient(negate(ast::make(Op::Div, term.divisor[0]->copy(), term.divisor[1]->copy())));
+		num factorial(1), index;
 		for (unsigned k = 2; k < term.power; k++) {
 			mp_rat_set_value(&index, static_cast<mp_small>(k), 1);
 			factorial *= index;
 		}
-		constant /= factorial;
 
-		f = ast::make(Op::Mult, number(constant), ast::make(Op::Pow, t.copy(), integer(term.power - 1)));
-		f->appendChild(ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, number(r), t.copy())));
+		f = ast::make(
+			Op::Mult,
+			ast::make(Op::Div, constant->copy(), ast::make(factorial.copy())),
+			ast::make(Op::Pow, t.copy(), integer(term.power - 1))
+		);
+		f->appendChild(ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, r, t.copy())));
 	} else {
-		const num &a = *term.divisor[2];
-		num h = *term.divisor[1] / a / two;
-		num square = *term.divisor[0] / a - h * h;
-		num remainder = constant - slope * h;
+		const ast &a = *term.divisor[2];
+		ast *h = coefficient(ast::make(Op::Div, term.divisor[1]->copy(), ast::make(Op::Mult, integer(2), a.copy())));
+		ast *square = ast::make(Op::Div, term.divisor[0]->copy(), a.copy());
+		square = coefficient(difference(square, ast::make(Op::Pow, h->copy(), integer(2))));
+		ast *remainder = coefficient(difference(constant->copy(), ast::make(Op::Mult, slope->copy(), h->copy())));
+		bool zero;
+		const bool oscillating = is_positive(*square, &zero);
 
-		if (h != 0) {
-			ast *shifted = ast::make(Op::Add, s.copy(), number(h));
-			ast *completed = ast::make(Op::Add, ast::make(Op::Pow, shifted->copy(), integer(2)), number(square));
+		if (!h->isInt(0)) {
+			ast *shifted = ast::make(Op::Add, s.copy(), h->copy());
+			ast *completed = ast::make(Op::Add, ast::make(Op::Pow, shifted->copy(), integer(2)), square->copy());
 			if (term.power > 1)
 				completed = ast::make(Op::Pow, completed, integer(term.power));
 			ast *rewritten = ast::make(Op::Add);
-			if (slope != 0)
+			if (!slope->isInt(0))
 				rewritten->appendChild(
-					settle(ast::make(Op::Div, ast::make(Op::Mult, number(slope), shifted->copy()), completed->copy()))
+					settle(ast::make(Op::Div, ast::make(Op::Mult, slope->copy(), shifted->copy()), completed->copy()))
 				);
-			if (remainder != 0)
-				rewritten->appendChild(settle(ast::make(Op::Div, number(remainder), completed->copy())));
+			if (!remainder->isInt(0))
+				rewritten->appendChild(settle(ast::make(Op::Div, remainder->copy(), completed->copy())));
 			ast::dispose(shifted);
 			ast::dispose(completed);
 			work::pause();
@@ -787,30 +799,35 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 			ast::dispose(rewritten);
 		}
 
-		ast *k = root_of(square);
-		ast *kt = ast::make(Op::Mult, k->copy(), t.copy());
-		ast *damping = ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, number(-h), t.copy()));
-		const bool oscillating = square > 0;
+		ast *k = ast::make(Op::Pow, oscillating ? square : negate(square), ast::make(num::from(1, 2)));
+		work::pause();
+		simplify(*k, Simp::Basic);
+		work::resume();
 
-		if (term.power == 1) {
-			ast *sum = ast::make(Op::Mult, number(slope), ast::make(oscillating ? Op::Cos : Op::CosH, kt->copy()));
+		ast *kt = ast::make(Op::Mult, k->copy(), t.copy());
+		ast *damping = ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, negate(h), t.copy()));
+
+		if (zero) {
+			ast::dispose(damping);
+		} else if (term.power == 1) {
+			ast *sum = ast::make(Op::Mult, slope->copy(), ast::make(oscillating ? Op::Cos : Op::CosH, kt->copy()));
 			ast *second = ast::make(
 				Op::Mult,
-				ast::make(Op::Div, number(remainder), k->copy()),
+				ast::make(Op::Div, remainder->copy(), k->copy()),
 				ast::make(oscillating ? Op::Sin : Op::SinH, kt->copy())
 			);
 			f = ast::make(Op::Mult, damping, ast::make(Op::Add, sum, second));
 		} else if (term.power == 2 && oscillating) {
 			ast *first = ast::make(
 				Op::Div,
-				ast::make(Op::Mult, number(slope), ast::make(Op::Mult, t.copy(), ast::make(Op::Sin, kt->copy()))),
+				ast::make(Op::Mult, slope->copy(), ast::make(Op::Mult, t.copy(), ast::make(Op::Sin, kt->copy()))),
 				ast::make(Op::Mult, integer(2), k->copy())
 			);
 			ast *second = ast::make(
 				Op::Div,
 				ast::make(
 					Op::Mult,
-					number(remainder),
+					remainder->copy(),
 					difference(
 						ast::make(Op::Sin, kt->copy()), ast::make(Op::Mult, kt->copy(), ast::make(Op::Cos, kt->copy()))
 					)
@@ -824,7 +841,11 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 
 		ast::dispose(k);
 		ast::dispose(kt);
+		ast::dispose(remainder);
 	}
+
+	ast::dispose(slope);
+	ast::dispose(constant);
 
 	if (f != nullptr) {
 		work::pause();
@@ -841,12 +862,12 @@ static ast *inverse_term(const PartialFractions::Term &term, const ast &s, const
 static ast *inverse_rational(const ast &R, const ast &s, const ast &t, bool *whole) {
 	PartialFractions fractions;
 
-	if (!split_fractions(R, s, fractions) || fractions.quotient_degree >= 0)
+	if (!split_fractions(R, s, fractions) || fractions.quotient != nullptr)
 		return nullptr;
 
 	ast *f = ast::make(Op::Add);
 	for (unsigned i = 0; i < fractions.count && f != nullptr; i++) {
-		if (*fractions.terms[i].numerator[0] == 0 && *fractions.terms[i].numerator[1] == 0)
+		if (fractions.terms[i].numerator[0]->isInt(0) && fractions.terms[i].numerator[1]->isInt(0))
 			continue;
 
 		ast *term = inverse_term(fractions.terms[i], s, t);
@@ -927,6 +948,9 @@ ast *laplace_inverse(const ast &F, const ast &s, const ast &t) {
 	ast *shifts[max_groups], *groups[max_groups];
 	unsigned count = 0;
 	bool known = true;
+
+	if (involves(F, t))
+		return nullptr;
 
 	ast *G = F.copy();
 	work::pause();

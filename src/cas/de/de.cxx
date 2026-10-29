@@ -356,6 +356,90 @@ static void split_exponentials(ast &e) {
 		e.replace(exponential(*e.firstChild(), e.firstChild()->next()->copy()));
 }
 
+/*A factor base^exponent of a denominator*/
+struct Power {
+	const ast *base;
+	mp_small exponent;
+};
+
+constexpr unsigned max_powers = 16;
+
+/*Adds the factors of d, searching nested products, to powers, adding the exponents of equal bases. Returns false if there are too many.*/
+static bool powers_of(const ast &d, Power *powers, unsigned *count) {
+	if (d.isOp(Op::Mult)) {
+		for (const ast &child : d.children()) {
+			if (!powers_of(child, powers, count))
+				return false;
+		}
+		return true;
+	}
+
+	if (d.isInt(1))
+		return true;
+
+	const ast *base = &d;
+	mp_small exponent;
+	if (d.isOp(Op::Pow) && d.childAt(1)->isNumber() && d.childAt(1)->num().toInt(exponent) && exponent > 0)
+		base = d.childAt(0);
+	else
+		exponent = 1;
+
+	for (unsigned i = 0; i < *count; i++) {
+		if (powers[i].base->compare(*base)) {
+			powers[i].exponent += exponent;
+			return true;
+		}
+	}
+
+	if (*count == max_powers)
+		return false;
+
+	powers[(*count)++] = {base, exponent};
+	return true;
+}
+
+/*Returns the exponent of base in powers, or 0*/
+static mp_small exponent_of(const Power *powers, unsigned count, const ast &base) {
+	for (unsigned i = 0; i < count; i++) {
+		if (powers[i].base->compare(base))
+			return powers[i].exponent;
+	}
+
+	return 0;
+}
+
+/*Fills common with the least common multiple of the denominators, as factors to their highest exponents. Returns false if there are too many factors.*/
+static bool common_powers(const ast &denominators, Power *common, unsigned *count) {
+	for (const ast &d : denominators.children()) {
+		Power powers[max_powers];
+		unsigned found = 0;
+
+		if (!powers_of(d, powers, &found))
+			return false;
+
+		for (unsigned i = 0; i < found; i++) {
+			unsigned j = 0;
+			while (j < *count && !common[j].base->compare(*powers[i].base))
+				j++;
+
+			if (j == *count) {
+				if (*count == max_powers)
+					return false;
+				common[(*count)++] = {powers[i].base, 0};
+			}
+
+			if (powers[i].exponent > common[j].exponent)
+				common[j].exponent = powers[i].exponent;
+		}
+	}
+
+	return true;
+}
+
+static ast *power_of(const ast &base, mp_small exponent) {
+	return exponent == 1 ? base.copy() : ast::make(Op::Pow, base.copy(), integer(exponent));
+}
+
 void rational_parts(const ast &e, ast **numer, ast **denom) {
 	if (e.isOp(Op::Div)) {
 		ast *n1, *d1, *n2, *d2;
@@ -377,41 +461,51 @@ void rational_parts(const ast &e, ast **numer, ast **denom) {
 		}
 	} else if (e.isOp(Op::Add)) {
 		ast *nums = ast::make(Op::Add), *dens = ast::make(Op::Mult);
-		ast *distinct = ast::make(Op::Mult);
+		Power common[max_powers];
+		unsigned count = 0;
 
 		for (const ast &child : e.children()) {
 			ast *n, *d;
 			rational_parts(child, &n, &d);
 			nums->appendChild(n);
 			dens->appendChild(d);
-
-			const ast *other;
-			for (other = distinct->firstChild(); other != nullptr && !other->compare(*d); other = other->next())
-				;
-			if (other == nullptr)
-				distinct->appendChild(d->copy());
 		}
 
+		const bool fits = common_powers(*dens, common, &count);
 		*numer = ast::make(Op::Add);
 
 		for (const ast *n = nums->firstChild(), *d = dens->firstChild(); n != nullptr; n = n->next(), d = d->next()) {
-			ast *term = ast::make(Op::Mult);
+			ast *term = ast::make(Op::Mult, n->copy(), integer(1));
+			Power powers[max_powers];
+			unsigned found = 0;
 
-			term->appendChild(n->copy());
-			bool skipped = false;
-			for (const ast &other : distinct->children()) {
-				if (!skipped && other.compare(*d))
-					skipped = true;
-				else
-					term->appendChild(other.copy());
+			if (fits) {
+				powers_of(*d, powers, &found);
+				for (unsigned j = 0; j < count; j++) {
+					const mp_small missing = common[j].exponent - exponent_of(powers, found, *common[j].base);
+					if (missing > 0)
+						term->appendChild(power_of(*common[j].base, missing));
+				}
+			} else {
+				for (const ast &other : dens->children()) {
+					if (&other != d)
+						term->appendChild(other.copy());
+				}
 			}
 
 			(*numer)->appendChild(term);
 		}
 
+		if (fits) {
+			*denom = ast::make(Op::Mult, integer(1));
+			for (unsigned j = 0; j < count; j++)
+				(*denom)->appendChild(power_of(*common[j].base, common[j].exponent));
+		} else {
+			*denom = dens->copy();
+		}
+
 		ast::dispose(nums);
 		ast::dispose(dens);
-		*denom = distinct;
 	} else if (e.isOp(Op::Pow) && e.firstChild()->next()->isNumber()) {
 		ast *n, *d;
 		num *exponent = e.firstChild()->next()->num().copy();

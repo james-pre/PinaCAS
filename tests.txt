@@ -421,6 +421,10 @@ partial; 1/((S^2+1)(S^2+4)); S; 1/(3(S^2+1))_1/(3(S^2+4))
 partial; (S^3+2)/(S(S^2+1)^2); S; 2/S+(1_2S)/(S^2+1)+(-2S_1)/(S^2+1)^2
 partial; 1/(S^2(S^2+4)); S; 1/(4S^2)_1/(4(S^2+4))
 partial; (X+1)/(X^2+3X+2); X; 1/(X+2)
+partial; 1/(X^2_A^2); X; 1/(2A(X_A))_1/(2A(X+A))
+partial; X/((X_A)(X_B)); X; A/((A_B)(X_A))+B/((B_A)(X_B))
+partial; (X+1)/((X_A)(X^2+B^2)); X; (A+1)/((A^2+B^2)(X_A))+(B^2_AX_A_X)/((A^2+B^2)(X^2+B^2))
+partial; (X^3+A)/(X^2+B^2); X; X+(A_XB^2)/(X^2+B^2)
 deriv; integ(e^(X^2),X); X; e^(X^2)
 
 #Differential equations: order and linearity
@@ -600,3 +604,11 @@ lsolve; Y''_3Y'+2Y=e^(3T),Y(0)=1,Y'(0)=0; Y=5e^T/2_2e^(2T)+e^(3T)/2; T
 lsolve; Y'+Y=U(T_1),Y(0)=0; Y=(1_e^(-(T_1)))(T>=1); T
 lsolve; Y''+Y=sin(T),Y(0)=0,Y'(0)=0; Y=(sin(T)_Tcos(T))/2; T
 lsolve; Y'_Y=1+integ(Y(tau),tau,0,T),Y(0)=0; Y=2sqrt(5)e^(T/2)sinh(sqrt(5)T/2)/5; T
+ilaplace; (S+1)/(S^2+6X+10); S; cos(sqrt(6X+10)T)+sin(sqrt(6X+10)T)/sqrt(6X+10)
+ilaplace; S/(S^2+K^2); S; cos(KT)
+ilaplace; 1/(S^2+K^2)^2; S; (sin(KT)_KTcos(KT))/(2K^3)
+ilaplace; 1/(S^2_A); S; sinh(sqrt(A)T)/sqrt(A)
+ilaplace; 1/((S_A)^2(S_B)); S; Te^(AT)/(A_B)_e^(AT)/(A_B)^2+e^(BT)/(B_A)^2
+ilaplace; e^(-AS)/(S^2+K^2); S; (T>=A)sin(K(T_A))/K
+lsolve; Y''+K^2Y=0,Y(0)=0,Y'(0)=1; Y=sin(KT)/K; T
+lsolve; Y'_AY=delta(T_B),Y(0)=1; Y=e^(AT)+e^(A(T_B))(T>=B); T

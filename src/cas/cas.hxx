@@ -247,19 +247,18 @@ bool is_negative_for_sure(const ast &a);
 /*Returns true if changed. Expects completely simplified. Removes the negative in the multiplier or number.*/
 bool absolute_val(ast &e);
 
-/*A quotient of polynomials as a polynomial plus terms (numerator[1]x + numerator[0])/divisor^power, where each divisor has integer coefficients, constant first, and degree 1 or 2*/
+/*A quotient of polynomials as a polynomial plus terms (numerator[1]x + numerator[0])/divisor^power, where each divisor has coefficients free of x, constant first, and degree 1 or 2*/
 struct PartialFractions {
 	static constexpr unsigned max_degree = 8;
 
 	struct Term {
-		num *numerator[2];
-		num *divisor[3];
+		ast *numerator[2];
+		ast *divisor[3];
 		unsigned degree, power;
 	};
 
-	num *quotient[2 * max_degree + 1] = {};
-	/*-1 when the polynomial is zero*/
-	int quotient_degree = -1;
+	/*nullptr when the polynomial is zero*/
+	ast *quotient = nullptr;
 	Term terms[max_degree] = {};
 	unsigned count = 0;
 	/*True when splitting took a division or a decomposition*/
@@ -273,7 +272,7 @@ struct PartialFractions {
 	~PartialFractions();
 };
 
-/*Splits e, a quotient of polynomials in x with rational coefficients, into fractions over linear and quadratic factors and records the work. Returns false if e is not such a quotient or its denominator cannot be factored that way.*/
+/*Splits e, a quotient of polynomials in x, into fractions over linear and quadratic factors and records the work. With rational coefficients the denominator is factored and the constants found by equating coefficients, otherwise the factors are those of the denominator as written and the constants are found by the cover-up method. Returns false if e is not such a quotient or its denominator cannot be factored that way.*/
 bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions);
 
 /*Returns e written as partial fractions, or nullptr if split_fractions fails or leaves it unchanged*/

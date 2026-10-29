@@ -339,6 +339,32 @@ ast *polynomial(num *const *p, unsigned n, const ast &m, const num &divisor) {
 	return tidy(sum);
 }
 
+ast *polynomial(ast *const *c, unsigned n, const ast &m) {
+	ast *sum = ast::make(Op::Add);
+
+	for (unsigned k = n + 1; k-- > 0;) {
+		if (c[k]->isInt(0))
+			continue;
+
+		ast *term;
+		if (k == 0) {
+			term = c[k]->copy();
+		} else {
+			term = k == 1 ? m.copy() : ast::make(Op::Pow, m.copy(), integer(k));
+
+			if (!c[k]->isInt(1))
+				term = ast::make(Op::Mult, c[k]->copy(), term);
+		}
+
+		sum->appendChild(term);
+	}
+
+	if (sum->childCount() == 0)
+		sum->appendChild(integer(0));
+
+	return tidy(sum);
+}
+
 ast *factored_form(num **p, unsigned n, const Root *roots, unsigned count, const ast &m) {
 	ast *product = ast::make(Op::Mult);
 	num scale(1), t;

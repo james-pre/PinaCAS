@@ -15,9 +15,26 @@ struct Divisor {
 	unsigned degree, multiplicity;
 };
 
+/*A factor of a denominator with coefficients free of x, constant first, raised to multiplicity*/
+struct SymbolicDivisor {
+	ast *c[3];
+	unsigned degree, multiplicity;
+};
+
 static void dispose_coefficients(num **p, unsigned degree) {
 	for (unsigned k = 0; k <= degree; k++)
 		num::dispose(p[k]);
+}
+
+static void dispose_coefficients(ast **c, unsigned degree) {
+	for (unsigned k = 0; k <= degree; k++)
+		ast::dispose(c[k]);
+}
+
+/*Writes e as one fraction in lowest terms and returns it*/
+static ast *reduce(ast *e) {
+	single_fraction(*e);
+	return tidy(e);
 }
 
 static bool is_polynomial(const ast &e, const ast &x) {
@@ -44,8 +61,8 @@ static bool is_polynomial(const ast &e, const ast &x) {
 	return false;
 }
 
-/*Fills p with the coefficients of the polynomial e in x, constant first, and returns its degree, or -1 if e is not a polynomial with rational coefficients of at most degree max*/
-static int coefficients(const ast &e, const ast &x, num **p, unsigned max) {
+/*Fills c with the coefficients of the polynomial e in x, constant first, and returns its degree, or -1 if e is not a polynomial of at most degree max*/
+static int coefficients(const ast &e, const ast &x, ast **c, unsigned max) {
 	if (!is_polynomial(e, x))
 		return -1;
 
@@ -58,19 +75,9 @@ static int coefficients(const ast &e, const ast &x, num **p, unsigned max) {
 	simplify(*remaining, Simp::Basic);
 
 	for (unsigned k = 0; !remaining->isInt(0); k++) {
-		ast *value = nullptr;
-
-		if (k <= max) {
-			value = remaining->copy();
-			substitute(*value, x, *zero);
-			simplify(*value, Simp::Basic);
-			p[k] = rational_value(*value);
-			ast::dispose(value);
-		}
-
-		if (k > max || p[k] == nullptr) {
+		if (k > max) {
 			if (k > 0)
-				dispose_coefficients(p, k - 1);
+				dispose_coefficients(c, k - 1);
 			degree = -2;
 			break;
 		}
@@ -79,7 +86,11 @@ static int coefficients(const ast &e, const ast &x, num **p, unsigned max) {
 			mp_rat_set_value(&index, static_cast<mp_small>(k), 1);
 			factorial *= index;
 		}
-		*p[k] /= factorial;
+
+		c[k] = remaining->copy();
+		substitute(*c[k], x, *zero);
+		c[k] = ast::make(Op::Div, c[k], ast::make(factorial.copy()));
+		simplify(*c[k], Simp::Basic);
 		degree = static_cast<int>(k);
 
 		derivative(*remaining, x, x);
@@ -95,11 +106,32 @@ static int coefficients(const ast &e, const ast &x, num **p, unsigned max) {
 		return -1;
 
 	if (degree == -1) {
-		p[0] = num::from(0);
+		c[0] = integer(0);
 		degree = 0;
 	}
 
 	return degree;
+}
+
+/*Fills p with the coefficients of the polynomial e in x, constant first, and returns its degree, or -1 if e is not a polynomial with rational coefficients of at most degree max*/
+static int coefficients(const ast &e, const ast &x, num **p, unsigned max) {
+	ast *c[MAX_NUMERATOR + 1];
+	const int degree = coefficients(e, x, c, max);
+	int converted = 0;
+
+	while (converted <= degree && (p[converted] = rational_value(*c[converted])) != nullptr)
+		converted++;
+
+	if (degree >= 0)
+		dispose_coefficients(c, static_cast<unsigned>(degree));
+
+	if (converted > degree)
+		return degree;
+
+	while (converted-- > 0)
+		num::dispose(p[converted]);
+
+	return -1;
 }
 
 /*Scales p to integer coefficients with no common factor and a positive leading coefficient*/
@@ -324,6 +356,12 @@ static ast *factor_power(const Divisor &f, unsigned power, const ast &x) {
 	return power == 1 ? base : ast::make(Op::Pow, base, integer(power));
 }
 
+static ast *factor_power(const SymbolicDivisor &f, unsigned power, const ast &x) {
+	ast *base = polynomial(f.c, f.degree, x);
+
+	return power == 1 ? base : ast::make(Op::Pow, base, integer(power));
+}
+
 /*Returns lead times the product of the factors, each to its multiplicity*/
 static ast *factored(const Divisor *factors, unsigned count, const num &lead, const ast &x) {
 	ast *product = ast::make(Op::Mult);
@@ -338,22 +376,23 @@ static ast *factored(const Divisor *factors, unsigned count, const num &lead, co
 }
 
 /*Returns the numerator of the term with unknowns starting at u: u for a linear factor and ux + v for a quadratic one*/
-static ast *term_numerator(const Divisor &f, ast *const *u, const ast &x) {
-	if (f.degree == 1)
+static ast *term_numerator(unsigned degree, ast *const *u, const ast &x) {
+	if (degree == 1)
 		return u[0]->copy();
 
 	return ast::make(Op::Add, ast::make(Op::Mult, u[0]->copy(), x.copy()), u[1]->copy());
 }
 
 /*Returns the sum over the factors and their powers of the term numerators, given by the unknowns, over the powers*/
-static ast *fraction_sum(const Divisor *factors, unsigned count, ast *const *unknowns, const ast &x) {
+template <typename Factor>
+static ast *fraction_sum(const Factor *factors, unsigned count, ast *const *unknowns, const ast &x) {
 	ast *sum = ast::make(Op::Add);
 	unsigned u = 0;
 
 	for (unsigned i = 0; i < count; i++) {
 		for (unsigned j = 1; j <= factors[i].multiplicity; j++) {
 			sum->appendChild(
-				ast::make(Op::Div, term_numerator(factors[i], unknowns + u, x), factor_power(factors[i], j, x))
+				ast::make(Op::Div, term_numerator(factors[i].degree, unknowns + u, x), factor_power(factors[i], j, x))
 			);
 			u += factors[i].degree;
 		}
@@ -408,7 +447,18 @@ static void record_rows(num *(*m)[MAX_DEGREE + 1], unsigned size, ast *const *un
 	}
 }
 
-/*Adds the term numerator/divisor^power, where numerator is slope x + constant*/
+/*Adds the term numerator/divisor^power, where numerator is slope x + constant. Takes ownership of slope and constant.*/
+static void add_term(PartialFractions &fractions, const SymbolicDivisor &f, unsigned power, ast *slope, ast *constant) {
+	PartialFractions::Term &term = fractions.terms[fractions.count++];
+
+	term.numerator[0] = constant;
+	term.numerator[1] = slope;
+	for (unsigned k = 0; k <= f.degree; k++)
+		term.divisor[k] = f.c[k]->copy();
+	term.degree = f.degree;
+	term.power = power;
+}
+
 static void add_term(
 	PartialFractions &fractions,
 	const Divisor &f,
@@ -416,20 +466,18 @@ static void add_term(
 	const num &slope,
 	const num &constant
 ) {
-	PartialFractions::Term &term = fractions.terms[fractions.count++];
+	SymbolicDivisor divisor = {{}, f.degree, f.multiplicity};
 
-	term.numerator[0] = constant.copy();
-	term.numerator[1] = slope.copy();
 	for (unsigned k = 0; k <= f.degree; k++)
-		term.divisor[k] = f.c[k]->copy();
-	term.degree = f.degree;
-	term.power = power;
+		divisor.c[k] = ast::make(f.c[k]->copy());
+
+	add_term(fractions, divisor, power, ast::make(slope.copy()), ast::make(constant.copy()));
+	dispose_coefficients(divisor.c, divisor.degree);
 }
 
 static ast *term_ast(const PartialFractions::Term &term, const ast &x) {
-	const num one(1);
-	ast *numerator = polynomial(term.numerator, 1, x, one);
-	ast *divisor = polynomial(term.divisor, term.degree, x, one);
+	ast *numerator = reduce(polynomial(term.numerator, 1, x));
+	ast *divisor = polynomial(term.divisor, term.degree, x);
 
 	if (term.power > 1)
 		divisor = ast::make(Op::Pow, divisor, integer(term.power));
@@ -544,8 +592,7 @@ static bool decompose(
 }
 
 PartialFractions::~PartialFractions() {
-	if (quotient_degree >= 0)
-		dispose_coefficients(quotient, static_cast<unsigned>(quotient_degree));
+	ast::dispose(quotient);
 
 	for (unsigned i = 0; i < count; i++) {
 		dispose_coefficients(terms[i].numerator, 1);
@@ -652,8 +699,495 @@ static bool fraction_coefficients(const ast &e, const ast &x, num **n, int *nd, 
 	return true;
 }
 
+/*Sets the sum of the fractions to the quotient plus the terms, and records that e equals it when show*/
+static void collect_sum(PartialFractions &fractions, const ast &e, const ast &x, bool show) {
+	fractions.sum = ast::make(Op::Add);
+
+	if (fractions.quotient != nullptr)
+		fractions.sum->appendChild(fractions.quotient->copy());
+	for (unsigned i = 0; i < fractions.count; i++) {
+		if (!fractions.terms[i].numerator[0]->isInt(0) || !fractions.terms[i].numerator[1]->isInt(0))
+			fractions.sum->appendChild(term_ast(fractions.terms[i], x));
+	}
+	if (fractions.sum->childCount() == 0)
+		fractions.sum->appendChild(integer(0));
+
+	work::pause();
+	simplify(*fractions.sum, Simp::Commutative);
+	work::resume();
+
+	if (show)
+		work::step(work::Step::Type::Equation, nullptr, &e, fractions.sum);
+}
+
+/*Adds f to the factors, or adds its multiplicity to an equal factor, and adds its multiplicity to multiplicities. Takes ownership of the coefficients of f. Returns false if there are too many factors.*/
+static bool merge_factor(SymbolicDivisor f, SymbolicDivisor *factors, unsigned *count, unsigned *multiplicities) {
+	for (unsigned i = 0; i < *count; i++) {
+		bool same = factors[i].degree == f.degree;
+		for (unsigned k = 0; same && k <= f.degree; k++)
+			same = factors[i].c[k]->compare(*f.c[k]);
+
+		if (same) {
+			multiplicities[i] += f.multiplicity;
+			dispose_coefficients(f.c, f.degree);
+			return true;
+		}
+	}
+
+	if (*count == MAX_DEGREE) {
+		dispose_coefficients(f.c, f.degree);
+		return false;
+	}
+
+	multiplicities[*count] += f.multiplicity;
+	factors[(*count)++] = f;
+	return true;
+}
+
+/*True if e has a root or i, which a factor of a polynomial with these coefficients would carry*/
+static bool irrational(const ast &e) {
+	if (e.symbol() == Sym::Imag || e.isOp(Op::Root))
+		return true;
+
+	if (e.isOp(Op::Pow) && !(e.childAt(1)->isNumber() && e.childAt(1)->num().isInteger()))
+		return true;
+
+	if (e.isOperator()) {
+		for (const ast &child : e.children()) {
+			if (irrational(child))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+/*Adds base^power, a polynomial in x, to the factors, splitting it into linear and quadratic factors and multiplying lead by its constant factor. Sets split if base was split. Returns false if it cannot be split that way.*/
+static bool add_factors(
+	const ast &base,
+	unsigned power,
+	const ast &x,
+	SymbolicDivisor *factors,
+	unsigned *count,
+	unsigned *multiplicities,
+	ast *lead,
+	bool *split
+) {
+	ast *c[MAX_DEGREE + 1];
+	num *p[MAX_DEGREE + 1];
+	const int degree = coefficients(base, x, c, MAX_DEGREE);
+
+	if (degree < 1) {
+		if (degree == 0)
+			ast::dispose(c[0]);
+		return false;
+	}
+
+	int converted = 0;
+	while (converted <= degree && (p[converted] = rational_value(*c[converted])) != nullptr)
+		converted++;
+
+	if (converted > degree) {
+		Divisor divisors[MAX_DEGREE];
+		num constant;
+		const unsigned found = factor_polynomial(p, static_cast<unsigned>(degree), divisors, constant);
+		bool fits = found > 0;
+		*split |= found > 1 ||
+				  (found == 1 && (divisors[0].multiplicity > 1 || static_cast<int>(divisors[0].degree) < degree));
+
+		dispose_coefficients(c, static_cast<unsigned>(degree));
+		lead->appendChild(ast::make(Op::Pow, ast::make(constant.copy()), integer(power)));
+
+		for (unsigned i = 0; i < found && fits; i++) {
+			SymbolicDivisor f = {{}, divisors[i].degree, divisors[i].multiplicity * power};
+			for (unsigned k = 0; k <= f.degree; k++)
+				f.c[k] = ast::make(divisors[i].c[k]->copy());
+			fits = merge_factor(f, factors, count, multiplicities);
+		}
+
+		dispose_factors(divisors, found);
+		return fits;
+	}
+
+	while (converted-- > 0)
+		num::dispose(p[converted]);
+
+	if (degree > 2) {
+		dispose_coefficients(c, static_cast<unsigned>(degree));
+		return false;
+	}
+
+	if (degree == 1)
+		return merge_factor({{c[0], c[1]}, 1, power}, factors, count, multiplicities);
+
+	ast *discriminant = difference(
+		ast::make(Op::Pow, c[1]->copy(), integer(2)),
+		ast::make(Op::Mult, integer(4), ast::make(Op::Mult, c[2]->copy(), c[0]->copy()))
+	);
+	ast *root = ast::make(Op::Pow, discriminant, ast::make(num::from(1, 2)));
+	work::pause();
+	simplify(*root, Simp::Basic);
+	work::resume();
+
+	if (irrational(*root)) {
+		ast::dispose(root);
+		return merge_factor({{c[0], c[1], c[2]}, 2, power}, factors, count, multiplicities);
+	}
+
+	bool fits = true;
+	*split = true;
+	for (int sign = -1; sign <= 1 && fits; sign += 2) {
+		ast *shift = ast::make(Op::Add, c[1]->copy(), ast::make(Op::Mult, integer(sign), root->copy()));
+		ast *constant = reduce(ast::make(Op::Div, shift, ast::make(Op::Mult, integer(2), c[2]->copy())));
+		fits = merge_factor({{constant, integer(1)}, 1, power}, factors, count, multiplicities);
+	}
+
+	lead->appendChild(ast::make(Op::Pow, c[2], integer(power)));
+	ast::dispose(c[0]);
+	ast::dispose(c[1]);
+	ast::dispose(root);
+
+	return fits;
+}
+
+/*Returns the product of the factors, each to its multiplicity, leaving out factor skip*/
+static ast *product_except(const SymbolicDivisor *factors, unsigned count, unsigned skip, const ast &x) {
+	ast *product = ast::make(Op::Mult, integer(1));
+
+	for (unsigned i = 0; i < count; i++) {
+		if (i != skip)
+			product->appendChild(factor_power(factors[i], factors[i].multiplicity, x));
+	}
+
+	return tidy(product);
+}
+
+/*Sets residue to the remainder of p of degree n divided by x^2 + slope x + constant, as residue[1]x + residue[0]. Takes ownership of p.*/
+static void residue_of(ast **p, unsigned n, const ast &slope, const ast &constant, ast **residue) {
+	for (unsigned k = n; k >= 2; k--) {
+		p[k - 1] = reduce(difference(p[k - 1], ast::make(Op::Mult, slope.copy(), p[k]->copy())));
+		p[k - 2] = reduce(difference(p[k - 2], ast::make(Op::Mult, constant.copy(), p[k])));
+	}
+
+	residue[0] = p[0];
+	residue[1] = n >= 1 ? p[1] : integer(0);
+}
+
+/*Sets a to a times b modulo x^2 + slope x + constant, where both are linear*/
+static void multiply_residues(ast **a, ast *const *b, const ast &slope, const ast &constant) {
+	ast *square = ast::make(Op::Mult, a[1]->copy(), b[1]->copy());
+	ast *linear = ast::make(
+		Op::Add,
+		ast::make(Op::Mult, a[1]->copy(), b[0]->copy()),
+		difference(ast::make(Op::Mult, a[0]->copy(), b[1]->copy()), ast::make(Op::Mult, slope.copy(), square->copy()))
+	);
+	ast *constant_part =
+		difference(ast::make(Op::Mult, a[0], b[0]->copy()), ast::make(Op::Mult, constant.copy(), square));
+
+	ast::dispose(a[1]);
+	a[1] = reduce(linear);
+	a[0] = reduce(constant_part);
+}
+
+/*Finds the numerator of each term of r/(the product of the factors) by the cover-up method, with the constant of a linear factor (ax + b)^m from derivatives of r/(a^m times the other factors) at x = -b/a, and the numerator of a quadratic factor q from r divided by the other factors modulo q. Adds the terms and records the work. Returns false if a quadratic factor is repeated.*/
+static bool cover_up(
+	const ast &e,
+	ast *const *r,
+	unsigned size,
+	const SymbolicDivisor *factors,
+	unsigned count,
+	const ast &denominator,
+	const ast &x,
+	PartialFractions &fractions
+) {
+	for (unsigned i = 0; i < count; i++) {
+		if (factors[i].degree == 2 && factors[i].multiplicity > 1)
+			return false;
+	}
+
+	ast *unknowns[MAX_DEGREE];
+	if (!choose_unknowns(e, x, unknowns, size))
+		return false;
+
+	ast *remainder = polynomial(r, size - 1, x);
+	ast *left = ast::make(Op::Div, remainder->copy(), denominator.copy());
+	ast *form = fraction_sum(factors, count, unknowns, x);
+	work::step(work::Step::Type::Equation, "Partial fractions", left, form);
+	ast::dispose(left);
+	ast::dispose(form);
+
+	unsigned column = 0;
+
+	for (unsigned i = 0; i < count; i++) {
+		const SymbolicDivisor &f = factors[i];
+		ast *other = product_except(factors, count, i, x);
+
+		if (f.degree == 1) {
+			ast *scale = ast::make(Op::Pow, f.c[1]->copy(), integer(f.multiplicity));
+			ast *quotient = ast::make(Op::Div, remainder->copy(), ast::make(Op::Mult, other, scale));
+			ast *root = reduce(negate(ast::make(Op::Div, f.c[0]->copy(), f.c[1]->copy())));
+			ast *values[MAX_DEGREE];
+			num factorial(1), index;
+
+			for (unsigned k = 0; k < f.multiplicity; k++) {
+				if (k > 0) {
+					work::pause();
+					derivative(*quotient, x, x);
+					simplify(*quotient, Simp::Basic);
+					work::resume();
+					mp_rat_set_value(&index, static_cast<mp_small>(k), 1);
+					factorial *= index;
+				}
+
+				ast *value = quotient->copy();
+				work::pause();
+				substitute(*value, x, *root);
+				work::resume();
+				values[k] = reduce(
+					ast::make(
+						Op::Mult,
+						ast::make(Op::Div, value, ast::make(factorial.copy())),
+						ast::make(Op::Pow, f.c[1]->copy(), integer(f.multiplicity - k))
+					)
+				);
+			}
+
+			for (unsigned power = 1; power <= f.multiplicity; power++)
+				add_term(fractions, f, power, integer(0), values[f.multiplicity - power]);
+
+			ast::dispose(quotient);
+			ast::dispose(root);
+		} else {
+			ast *slope = reduce(ast::make(Op::Div, f.c[1]->copy(), f.c[2]->copy()));
+			ast *constant = reduce(ast::make(Op::Div, f.c[0]->copy(), f.c[2]->copy()));
+			ast *p[MAX_DEGREE], *residue[2], *divisor[2] = {integer(1), integer(0)};
+
+			for (unsigned k = 0; k < size; k++)
+				p[k] = r[k]->copy();
+			residue_of(p, size - 1, *slope, *constant, residue);
+
+			for (unsigned j = 0; j < count; j++) {
+				if (j == i)
+					continue;
+
+				for (unsigned m = 0; m < factors[j].multiplicity; m++) {
+					ast *c[3], *factor[2];
+					for (unsigned k = 0; k <= factors[j].degree; k++)
+						c[k] = factors[j].c[k]->copy();
+					residue_of(c, factors[j].degree, *slope, *constant, factor);
+					multiply_residues(divisor, factor, *slope, *constant);
+					ast::dispose(factor[0]);
+					ast::dispose(factor[1]);
+				}
+			}
+
+			ast *determinant = reduce(
+				ast::make(
+					Op::Add,
+					difference(
+						ast::make(Op::Mult, ast::make(Op::Pow, divisor[1]->copy(), integer(2)), constant->copy()),
+						ast::make(Op::Mult, divisor[0]->copy(), ast::make(Op::Mult, divisor[1]->copy(), slope->copy()))
+					),
+					ast::make(Op::Pow, divisor[0]->copy(), integer(2))
+				)
+			);
+			ast *adjugate[2] = {
+				reduce(difference(divisor[0], ast::make(Op::Mult, divisor[1]->copy(), slope->copy()))),
+				reduce(negate(divisor[1])),
+			};
+
+			multiply_residues(residue, adjugate, *slope, *constant);
+			add_term(
+				fractions,
+				f,
+				1,
+				reduce(ast::make(Op::Div, residue[1], determinant->copy())),
+				reduce(ast::make(Op::Div, residue[0], determinant))
+			);
+
+			ast::dispose(adjugate[0]);
+			ast::dispose(adjugate[1]);
+			ast::dispose(slope);
+			ast::dispose(constant);
+			ast::dispose(other);
+		}
+	}
+
+	for (unsigned i = 0; i < fractions.count; i++) {
+		const PartialFractions::Term &term = fractions.terms[i];
+
+		for (unsigned k = term.degree; k-- > 0;) {
+			work::step(
+				work::Step::Type::Equation, column == 0 ? "Solve" : nullptr, unknowns[column], term.numerator[k]
+			);
+			ast::dispose(unknowns[column++]);
+		}
+	}
+
+	ast::dispose(remainder);
+	return true;
+}
+
+/*Splits e over the factors of its denominators as written, by the cover-up method. Returns false if they are not linear or quadratic in x, or if e is not a quotient of polynomials.*/
+static bool split_symbolic(const ast &e, const ast &x, PartialFractions &fractions) {
+	const unsigned term_count = e.isOp(Op::Add) ? e.childCount() : 1;
+	if (term_count > MAX_DEGREE)
+		return false;
+
+	SymbolicDivisor factors[MAX_DEGREE];
+	unsigned multiplicities[MAX_DEGREE][MAX_DEGREE] = {}, count = 0, made = 0;
+	ast *numerators[MAX_DEGREE], *written = nullptr;
+	bool fits = true, split = false;
+
+	for (; made < term_count && fits; made++) {
+		ast *numerator, *denominator;
+		rational_parts(e.isOp(Op::Add) ? *e.childAt(made) : e, &numerator, &denominator);
+		tidy(numerator);
+		tidy(denominator);
+
+		ast *lead = ast::make(Op::Mult, integer(1));
+		const unsigned parts = denominator->isOp(Op::Mult) ? denominator->childCount() : 1;
+		fits = is_polynomial(*numerator, x);
+
+		for (unsigned j = 0; j < parts && fits; j++) {
+			const ast &factor = denominator->isOp(Op::Mult) ? *denominator->childAt(j) : *denominator;
+			const ast *base = &factor;
+			mp_small power = 1;
+
+			if (factor.isOp(Op::Pow) && factor.childAt(1)->isNumber() && factor.childAt(1)->num().toInt(power) &&
+				power > 0)
+				base = factor.childAt(0);
+			else
+				power = 1;
+
+			if (!involves(*base, x))
+				lead->appendChild(factor.copy());
+			else
+				fits = add_factors(
+					*base, static_cast<unsigned>(power), x, factors, &count, multiplicities[made], lead, &split
+				);
+		}
+
+		numerators[made] = ast::make(Op::Mult, numerator, ast::make(Op::Pow, lead, integer(-1)));
+
+		if (term_count == 1)
+			written = denominator;
+		else
+			ast::dispose(denominator);
+	}
+
+	unsigned size = 0;
+	for (unsigned i = 0; i < count; i++) {
+		factors[i].multiplicity = 0;
+		for (unsigned j = 0; j < made; j++) {
+			if (multiplicities[j][i] > factors[i].multiplicity)
+				factors[i].multiplicity = multiplicities[j][i];
+		}
+		size += factors[i].degree * factors[i].multiplicity;
+	}
+
+	ast *n[MAX_NUMERATOR + 1], *d[MAX_DEGREE + 1];
+	ast *numerator = ast::make(Op::Add), *denominator = product_except(factors, count, count, x);
+	int nd = -1, dd = -1;
+
+	for (unsigned j = 0; j < made; j++) {
+		ast *term = ast::make(Op::Mult, numerators[j]);
+		for (unsigned i = 0; i < count; i++) {
+			if (factors[i].multiplicity > multiplicities[j][i])
+				term->appendChild(factor_power(factors[i], factors[i].multiplicity - multiplicities[j][i], x));
+		}
+		numerator->appendChild(term);
+	}
+
+	if (fits && count > 0 && size <= MAX_DEGREE) {
+		nd = coefficients(*numerator, x, n, MAX_NUMERATOR);
+		dd = nd < 0 ? -1 : coefficients(*denominator, x, d, MAX_DEGREE);
+	}
+
+	fits = nd >= 0 && dd >= 1;
+
+	if (fits) {
+		const unsigned divisor_degree = static_cast<unsigned>(dd);
+
+		if (written != nullptr && split) {
+			ast *product = ast::make(Op::Mult, numerators[0]->childAt(1)->childAt(0)->copy(), denominator->copy());
+			work::step(work::Step::Type::Equation, "Factor the denominator", written, tidy(product));
+			ast::dispose(product);
+		}
+
+		if (nd >= dd) {
+			ast *q[MAX_NUMERATOR + 1];
+			const unsigned quotient_degree = static_cast<unsigned>(nd - dd);
+
+			for (unsigned k = quotient_degree + 1; k-- > 0;) {
+				q[k] = reduce(ast::make(Op::Div, n[k + divisor_degree]->copy(), d[divisor_degree]->copy()));
+				for (unsigned j = 0; j <= divisor_degree; j++)
+					n[k + j] = reduce(difference(n[k + j], ast::make(Op::Mult, q[k]->copy(), d[j]->copy())));
+			}
+
+			fractions.quotient = polynomial(q, quotient_degree, x);
+			dispose_coefficients(q, quotient_degree);
+			for (unsigned k = divisor_degree; k <= static_cast<unsigned>(nd); k++)
+				ast::dispose(n[k]);
+		}
+
+		for (int k = nd + 1; k < dd; k++)
+			n[k] = integer(0);
+
+		int rd = dd - 1;
+		while (rd >= 0 && n[rd]->isInt(0))
+			rd--;
+
+		ast *remainder = polynomial(n, divisor_degree - 1, x);
+		if (fractions.quotient != nullptr) {
+			ast *right = ast::make(
+				Op::Add, fractions.quotient->copy(), ast::make(Op::Div, remainder->copy(), denominator->copy())
+			);
+			work::step(work::Step::Type::Equation, "Divide", &e, tidy(right));
+			ast::dispose(right);
+		}
+		ast::dispose(remainder);
+
+		const bool decomposed =
+			count == 1 && (factors[0].multiplicity == 1 || rd < static_cast<int>(factors[0].degree));
+
+		if (rd >= 0 && decomposed) {
+			add_term(
+				fractions,
+				factors[0],
+				factors[0].multiplicity,
+				factors[0].degree == 2 && divisor_degree > 1 ? n[1]->copy() : integer(0),
+				n[0]->copy()
+			);
+		} else if (rd >= 0) {
+			fits = cover_up(e, n, divisor_degree, factors, count, *denominator, x, fractions);
+		}
+
+		if (fits) {
+			fractions.changed = fractions.quotient != nullptr || (rd >= 0 && !decomposed);
+			collect_sum(fractions, e, x, rd >= 0 && !decomposed);
+		}
+
+		dispose_coefficients(n, divisor_degree - 1);
+		dispose_coefficients(d, divisor_degree);
+	} else {
+		if (nd >= 0)
+			dispose_coefficients(n, static_cast<unsigned>(nd));
+		if (dd >= 0)
+			dispose_coefficients(d, static_cast<unsigned>(dd));
+	}
+
+	for (unsigned i = 0; i < count; i++)
+		dispose_coefficients(factors[i].c, factors[i].degree);
+	ast::dispose(numerator);
+	ast::dispose(denominator);
+	ast::dispose(written);
+
+	return fits;
+}
+
 bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
-	num *n[MAX_NUMERATOR + 1], *d[MAX_DEGREE + 1], *r[MAX_DEGREE];
+	num *n[MAX_NUMERATOR + 1], *d[MAX_DEGREE + 1], *r[MAX_DEGREE], *q[MAX_NUMERATOR + 1];
 	ast *numerator, *denominator;
 	Divisor factors[MAX_DEGREE];
 	num lead;
@@ -661,7 +1195,7 @@ bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 	int nd, dd;
 
 	if (!fraction_coefficients(e, x, n, &nd, d, &dd))
-		return false;
+		return split_symbolic(e, x, fractions);
 
 	if (dd < 1) {
 		dispose_coefficients(n, static_cast<unsigned>(nd));
@@ -680,7 +1214,7 @@ bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 	}
 
 	const unsigned size = static_cast<unsigned>(dd);
-	fractions.quotient_degree = divide(n, static_cast<unsigned>(nd), d, size, fractions.quotient, r);
+	const int quotient_degree = divide(n, static_cast<unsigned>(nd), d, size, q, r);
 
 	num *copy[MAX_DEGREE + 1];
 	for (unsigned k = 0; k <= size; k++)
@@ -697,9 +1231,7 @@ bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 	if (split) {
 		const num one(1);
 		ast *remainder = polynomial(r, size - 1, x, one);
-		ast *quotient = fractions.quotient_degree >= 0
-							? polynomial(fractions.quotient, static_cast<unsigned>(fractions.quotient_degree), x, one)
-							: nullptr;
+		ast *quotient = quotient_degree >= 0 ? polynomial(q, static_cast<unsigned>(quotient_degree), x, one) : nullptr;
 
 		if (quotient != nullptr) {
 			ast *right =
@@ -724,24 +1256,9 @@ bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 		}
 
 		if (split) {
+			fractions.quotient = quotient;
 			fractions.changed = quotient != nullptr || (rd >= 0 && !decomposed);
-			fractions.sum = ast::make(Op::Add);
-
-			if (quotient != nullptr)
-				fractions.sum->appendChild(quotient);
-			for (unsigned i = 0; i < fractions.count; i++) {
-				if (*fractions.terms[i].numerator[0] != 0 || *fractions.terms[i].numerator[1] != 0)
-					fractions.sum->appendChild(term_ast(fractions.terms[i], x));
-			}
-			if (fractions.sum->childCount() == 0)
-				fractions.sum->appendChild(integer(0));
-
-			work::pause();
-			simplify(*fractions.sum, Simp::Commutative);
-			work::resume();
-
-			if (rd >= 0 && !decomposed)
-				work::step(work::Step::Type::Equation, nullptr, &e, fractions.sum);
+			collect_sum(fractions, e, x, rd >= 0 && !decomposed);
 		} else {
 			ast::dispose(quotient);
 		}
@@ -753,6 +1270,8 @@ bool split_fractions(const ast &e, const ast &x, PartialFractions &fractions) {
 
 	for (unsigned k = 0; k < size; k++)
 		num::dispose(r[k]);
+	if (quotient_degree >= 0)
+		dispose_coefficients(q, static_cast<unsigned>(quotient_degree));
 	dispose_coefficients(d, size);
 	ast::dispose(numerator);
 	ast::dispose(denominator);
