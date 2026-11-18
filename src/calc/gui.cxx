@@ -62,7 +62,7 @@ static bool is_ans(unsigned variable) {
 }
 
 struct Element {
-	enum class Type : unsigned char { End, Text, Checkbox, Variable, Character, Button };
+	enum class Type : unsigned char { End, Text, Checkbox, Variable, Character, Select, Button };
 
 	Type type;
 	const char *text;
@@ -76,6 +76,12 @@ struct Element {
 			/*Returns the character for a key, or 0 if the key does not set one*/
 			char (*from_key)(uint8_t key);
 		} character;
+		struct {
+			/*Index in names*/
+			unsigned *value;
+			const char *const *names;
+			unsigned count;
+		} select;
 		void (*action)(void);
 	};
 };
@@ -109,6 +115,10 @@ static constexpr Element letter(const char *label, char *state) {
 
 static constexpr Element digit(const char *label, char *state) {
 	return {.type = Element::Type::Character, .text = label, .character = {state, digit_key}};
+}
+
+static constexpr Element select(const char *label, unsigned *state, const char *const *names, unsigned count) {
+	return {.type = Element::Type::Select, .text = label, .select = {state, names, count}};
 }
 
 static constexpr Element button(const char *label, void (*action)()) {
@@ -442,6 +452,16 @@ static void draw_form(const Element *content, Rect area, int focused) {
 				y += SELECT_ROW;
 				break;
 
+			case Element::Type::Select: {
+				const int label = static_cast<int>(gfx_GetStringWidth(e->text)) + GAP;
+				r = (Rect){area.x + label, y + (SELECT_ROW - BOX_HEIGHT) / 2, area.w - label, BOX_HEIGHT};
+				gfx_PrintStringXY(e->text, area.x, r.y + r.h / 2 - TEXT_HEIGHT / 2);
+				draw_box(r, e->select.names[*e->select.value]);
+				marker_x = area.x;
+				y += SELECT_ROW;
+				break;
+			}
+
 			case Element::Type::Button:
 				r = (Rect){button_x, area.y + area.h - BUTTON_HEIGHT, button_width(e), BUTTON_HEIGHT};
 				draw_box(r, e->text);
@@ -561,6 +581,9 @@ static void activate(const Element *e, int step) {
 		case Element::Type::Checkbox: *e->checked = !*e->checked; break;
 		case Element::Type::Variable:
 			*e->variable = (*e->variable + countof(variables) + static_cast<unsigned>(step)) % countof(variables);
+			break;
+		case Element::Type::Select:
+			*e->select.value = (*e->select.value + e->select.count + static_cast<unsigned>(step)) % e->select.count;
 			break;
 		case Element::Type::Button: e->action(); break;
 		default: break;
