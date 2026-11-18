@@ -124,7 +124,7 @@ static ast *growth(const ast &rate, const ast &t) {
 	if (rate.isInt(0))
 		return integer(1);
 
-	return tidy(ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, rate.copy(), t.copy())));
+	return ast::make(Op::Pow, ast::make(Sym::Euler), tidy(ast::make(Op::Mult, rate.copy(), t.copy())));
 }
 
 static ast *subscripted(Sym name, ast *subscript) {
