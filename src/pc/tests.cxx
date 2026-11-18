@@ -221,7 +221,8 @@ static void simplify_solution(ast &e) {
 }
 
 static Error solve_test(DiffEq *de, const Test *t, ast **solution) {
-	de->series = t->type == TestType::DeSeries;
+	if (t->type == TestType::DeSeries)
+		de->requested = Method::PowerSeries;
 	return de->solve(solution);
 }
 

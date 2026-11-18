@@ -650,7 +650,8 @@ int run_de(int argc, char **argv) {
 		err = de.loadList(items, count, *x);
 
 		if (err == Error::Success) {
-			de.series = !strcmp(argv[1], "series");
+			if (!strcmp(argv[1], "series"))
+				de.requested = Method::PowerSeries;
 			if (argc >= 5 && atoi(argv[4]) > 0)
 				de.terms = static_cast<unsigned>(atoi(argv[4]));
 

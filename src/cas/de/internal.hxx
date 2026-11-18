@@ -116,5 +116,35 @@ ast *factored_form(Num **p, unsigned n, const Root *roots, unsigned count, const
 /*Fills constants with n letters that do not appear in the equation or in exclude unless it is nullptr. Returns false if there are not enough.*/
 bool choose_constants(const DiffEq *de, const ast *exclude, ast **constants, unsigned n);
 
+/*Returns preferred, or a symbol that does not appear in the equation or taken if preferred does*/
+ast *pick_symbol(const DiffEq *de, Sym preferred, const ast &taken);
+
+/*Simplifies e with every identity, without recording work, and returns it*/
+ast *reduced(ast *e);
+
+/*Simplifies e, keeping the smallest of its simplified, expanded and identity-reduced forms*/
+ast *simplest(ast *e);
+
+/*Returns a/b simplified as one fraction with common factors cancelled and an expanded denominator*/
+ast *quotient(const ast &a, const ast &b);
+
+/*Returns a times b, expanded term by term when that leaves fewer nodes*/
+ast *distribute(const ast &a, const ast &b);
+
+/*Reduces the augmented matrix with Gauss-Jordan elimination, setting pivots to the column of each pivot row, and returns the number of pivot rows*/
+unsigned eliminate(ast *matrix[][DiffEq::max_order + 1], unsigned rows, unsigned n, unsigned *pivots);
+
+/*Reads term as a constant times x^degree e^(rate*x), times cos or sin of frequency*x unless frequency is zero. Returns false if it has another form.*/
+bool forcing_form(const DiffEq *de, const ast *term, unsigned *degree, ast **rate, ast **frequency);
+
+/*Returns the multiplicity of rate + frequency*i as a characteristic root*/
+unsigned root_multiplicity(const Root *roots, unsigned count, const ast &rate, const ast &frequency);
+
+/*Returns op(frequency*x)*/
+ast *oscillation(const DiffEq *de, Op op, const ast &frequency);
+
+/*Equates the coefficients of each function of x in each residual to zero and solves for the unknowns, recording the work. Sets values to the unknowns when it succeeds.*/
+Error solve_coefficients(DiffEq *de, ast *const *residuals, unsigned count, ast **unknowns, unsigned size, ast **values);
+
 /*Solves a linear equation with polynomial coefficients and right side with a power series about an ordinary point, recording the recurrence relation and the coefficients*/
 Error solve_power_series(DiffEq *de, ast **solution);

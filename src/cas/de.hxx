@@ -3,6 +3,18 @@
 #include "../ast.hxx"
 #include "../error.hxx"
 
+/*How to solve an equation or a system*/
+enum class Method : unsigned char {
+	Automatic,
+	UndeterminedCoefficients,
+	VariationOfParameters,
+	PowerSeries,
+	/*Laplace transforms, or for a system the matrix exponential found with them*/
+	Laplace,
+	/*Elimination with the differential operator D, for a system*/
+	Elimination
+};
+
 class DiffEq {
   public:
 	static constexpr unsigned max_order = 8;
@@ -33,8 +45,10 @@ class DiffEq {
 
 	/*Point to expand a power series about, or nullptr*/
 	ast *center = nullptr;
-	/*True to solve with a power series, which solve() also uses when no other method applies*/
-	bool series = false;
+	/*Method chosen by the user. solve() also uses a power series when no other method applies.*/
+	Method requested = Method::Automatic;
+	/*Symbols the constants of the solution must not be, or nullptr*/
+	ast *reserved = nullptr;
 	/*Number of nonzero terms of each power series solution*/
 	unsigned terms = default_terms;
 
@@ -82,5 +96,44 @@ class DiffEq {
 	Error verify(const ast &solution, bool *satisfied, ast **general = nullptr);
 
 	/*Solves the equation, using the initial conditions, and records the work. The solution is y = f when explicit and an implicit equation otherwise.*/
+	Error solve(ast **solution);
+};
+
+/*A system x' = Ax + f of two linear first order equations with constant coefficients*/
+class DiffEqSystem {
+  public:
+	static constexpr unsigned size = 2;
+
+	/*Independent variable*/
+	ast *variable = nullptr;
+	/*Unknown functions, or nullptr when the system is entered in matrix form*/
+	ast *unknowns[size] = {};
+	/*Unknown vector when the system is entered in matrix form, otherwise nullptr*/
+	ast *vector = nullptr;
+	ast *matrix[size][size] = {};
+	ast *forcing[size] = {};
+	/*Point of the initial conditions and the values of the unknowns there, or nullptr without conditions*/
+	ast *point = nullptr;
+	ast *values[size] = {};
+
+	Method requested = Method::Automatic;
+	/*Name of the method solve() used*/
+	const char *method = nullptr;
+
+	DiffEqSystem() = default;
+	DiffEqSystem(const DiffEqSystem &) = delete;
+	DiffEqSystem &operator=(const DiffEqSystem &) = delete;
+	~DiffEqSystem();
+
+	void clear();
+
+	/*True if items, as parse_list returns them, hold a system rather than one equation*/
+	static bool detect(ast *const *items, unsigned count);
+
+	/* Loads two equations like X'=X+Y and Y'=4X+Y, or one in matrix form like X'=[[1,1][4,1]]X,
+	followed by initial conditions like X(0)=1 and Y(0)=0, or X(0)=[[1][0]] in matrix form */
+	Error load(ast *const *items, unsigned count, const ast &variable);
+
+	/*Solves the system and records the work. The solution is a list like X = f, Y = g, or X = F in matrix form.*/
 	Error solve(ast **solution);
 };

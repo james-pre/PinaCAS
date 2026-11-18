@@ -135,7 +135,7 @@ Error DiffEq::load(const ast &entered, const ast &variable) {
 	x = variable.copy();
 	order = 0;
 	linear = false;
-	series = false;
+	requested = Method::Automatic;
 	terms = default_terms;
 	method = nullptr;
 	nested = false;
@@ -198,6 +198,7 @@ void DiffEq::clear() {
 	ast::dispose(g);
 	ast::dispose(known);
 	ast::dispose(center);
+	ast::dispose(reserved);
 
 	for (ast *&coefficient : a) {
 		ast::dispose(coefficient);
@@ -209,7 +210,7 @@ void DiffEq::clear() {
 		ast::dispose(conditions[k].value);
 	}
 
-	equation = x = y = g = known = center = nullptr;
+	equation = x = y = g = known = center = reserved = nullptr;
 	condition_count = 0;
 
 	canonical_SetFunction(Sym::Invalid);
@@ -924,7 +925,7 @@ Error DiffEq::solve(ast **solution) {
 			return Error::DeBadCondition;
 	}
 
-	if (series)
+	if (requested == Method::PowerSeries)
 		return solve_power_series(this, solution);
 
 	if (order == 1)
