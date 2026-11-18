@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include "../cas/de.hxx"
+
 /*Max length for one parameter*/
 constexpr int MAX_PAR = 256;
 /*Max length for a line in the file*/
@@ -32,6 +34,8 @@ enum class TestType : unsigned char {
 	DeSolve,
 	/*Like DeSolve with the power series method*/
 	DeSeries,
+	/*Like DeSolve for a system, with the method named after "system" in the type*/
+	DeSystem,
 
 	Invalid
 };
@@ -40,6 +44,7 @@ struct Test {
 	TestType type;
 
 	char arg1[MAX_PAR], arg2[MAX_PAR], arg3[MAX_PAR];
+	Method method;
 
 	unsigned line;
 };

@@ -321,7 +321,9 @@ static Error load_equations(DiffEqSystem &system, ast *const *items, unsigned co
 
 	for (unsigned i = 0; i < SIZE && err == Error::Success; i++) {
 		const ast &equation = *items[i];
+		canonical_SetFunction(system.unknowns[i]->symbol());
 		record_equation(equation);
+		canonical_SetFunction(Sym::Invalid);
 
 		ast *f = equation.isOp(Op::Equals) ? difference(equation.firstChild()->copy(), equation.firstChild()->next()->copy())
 										   : equation.copy();
@@ -1355,6 +1357,16 @@ static Error solve_with_matrices(DiffEqSystem &system, DiffEq &context, ast **so
 		ast *form = combine(constants, forms, particular_form);
 		ast *name = vector_name(system);
 
+		if (exponential) {
+			ast *exponential_form = ast::make(
+				Op::Mult,
+				ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, ast::make(Sym::A), system.variable->copy())),
+				column_of(constants)
+			);
+			work::step(work::Step::Type::Equation, nullptr, name, exponential_form);
+			ast::dispose(exponential_form);
+		}
+
 		if (system.point != nullptr) {
 			work::step(work::Step::Type::Equation, "General solution", name, form);
 			combine_entries(constants, fundamental, particular, entries);
@@ -1453,6 +1465,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 	ast *operators[SIZE];
 	for (unsigned i = 0; i < SIZE; i++) {
 		operators[i] = operator_minus(*system.matrix[i][i]);
+		canonical_SetFunction(system.unknowns[i]->symbol());
 
 		ast *left = ast::make(Op::Mult, operators[i]->copy(), system.unknowns[i]->copy());
 		if (!system.matrix[i][1 - i]->isInt(0)) {
@@ -1465,6 +1478,8 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		ast::dispose(left);
 	}
 
+	canonical_SetFunction(Sym::Invalid);
+
 	const unsigned first = !is_zero(*system.matrix[0][1]) || is_zero(*system.matrix[1][0]) ? 0 : 1, second = 1 - first;
 	const bool coupled = !is_zero(*system.matrix[first][second]);
 	const ast &t = *system.variable;
@@ -1476,6 +1491,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 				  &d = *system.matrix[second][second], &f = *system.forcing[first], &g = *system.forcing[second];
 		const ast &u = *system.unknowns[first], &v = *system.unknowns[second];
 
+		canonical_SetFunction(u.symbol());
 		ast *left = ast::make(
 			Op::Mult,
 			difference(
@@ -1562,6 +1578,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		ast::dispose(constant);
 
 		if (err == Error::Success) {
+			canonical_SetFunction(u.symbol());
 			ast *expression = ast::make(Op::Add, DiffEq::derivative(u, 1), negate(ast::make(Op::Mult, a.copy(), u.copy())));
 			expression->appendChild(negate(f.copy()));
 			expression = tidy(ast::make(Op::Div, expression, b.copy()));
@@ -1578,6 +1595,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 			expression = ast::make(Op::Add, slope, negate(ast::make(Op::Mult, a.copy(), solved[first]->copy())));
 			expression->appendChild(negate(f.copy()));
 			solved[second] = simplest(ast::make(Op::Div, expression, b.copy()));
+			canonical_SetFunction(Sym::Invalid);
 			work::step(work::Step::Type::Equation, nullptr, &v, solved[second]);
 		}
 	} else {

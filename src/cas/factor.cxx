@@ -113,14 +113,14 @@ ast *gcd(const ast &a, const ast &b) {
 		ret = gcd_add(a, b);
 	else if (b.isOp(Op::Add))
 		ret = gcd_add(b, a);
-	else if (a.isOp(Op::Pow))
-		ret = gcd_pow(a, b);
-	else if (b.isOp(Op::Pow))
-		ret = gcd_pow(b, a);
 	else if (a.isOp(Op::Div))
 		ret = gcd_div(a, b);
 	else if (b.isOp(Op::Div))
 		ret = gcd_div(b, a);
+	else if (a.isOp(Op::Pow))
+		ret = gcd_pow(a, b);
+	else if (b.isOp(Op::Pow))
+		ret = gcd_pow(b, a);
 
 	if (ret != nullptr) {
 		/*Don't simplify identities*/
@@ -182,6 +182,40 @@ static bool same_symbolic_part(ast &a, ast &b) {
 	return same;
 }
 
+/*Returns the product of the numeric factors of e, divided by those of its divisors*/
+static Num numeric_coefficient(const ast &e) {
+	if (e.isNumber())
+		return e.num();
+
+	if (e.isOp(Op::Mult)) {
+		Num product(1);
+		for (const ast &child : e.children())
+			product *= numeric_coefficient(child);
+		return product;
+	}
+
+	if (e.isOp(Op::Div))
+		return numeric_coefficient(*e.firstChild()) / numeric_coefficient(*e.firstChild()->next());
+
+	return Num(1);
+}
+
+/*Returns a + b for like terms, which differ only by numeric factors*/
+static ast *like_sum(const ast &a, const ast &b) {
+	const Num coefficient_a = numeric_coefficient(a), coefficient_b = numeric_coefficient(b);
+
+	if (coefficient_a == 0 && coefficient_b == 0)
+		return ast::make(Num::from(0));
+
+	const bool from_a = coefficient_a != 0;
+	ast *part = ast::make(Op::Div, (from_a ? a : b).copy(), ast::make((from_a ? coefficient_a : coefficient_b).copy()));
+	ast *sum = ast::make(Op::Mult, ast::make((coefficient_a + coefficient_b).copy()), part);
+
+	simplify(*sum, Simp::Normalize | Simp::Commutative | Simp::Rational | Simp::Eval);
+
+	return sum;
+}
+
 bool factor_addition(ast &e, Factor flags) {
 	bool changed = false;
 
@@ -198,7 +232,17 @@ bool factor_addition(ast &e, Factor flags) {
 			for (unsigned j = i + 1; j < e.childCount(); j++) {
 				ast &b = *e.childAt(j);
 
-				if (!has(flags, Factor::SimpleAdditionNonevaluateable) && !same_symbolic_part(a, b))
+				const bool like = same_symbolic_part(a, b);
+
+				if (like && has(flags, Factor::SimpleAdditionEvaluateable)) {
+					e.appendChild(like_sum(a, b));
+					ast::dispose(e.removeChild(a));
+					ast::dispose(e.removeChild(b));
+					changed = true;
+					break;
+				}
+
+				if (!has(flags, Factor::SimpleAdditionNonevaluateable) && !like)
 					continue;
 
 				ast *g = gcd(a, b);

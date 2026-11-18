@@ -10,6 +10,7 @@
 #include "../cas/cas.hxx"
 
 #include "../dbg.hxx"
+#include "../cas/de/internal.hxx"
 
 /*Trim null terminated string*/
 static char *trim(char *str) {
@@ -65,6 +66,8 @@ TestType resolve_type(char *type) {
 		return TestType::DeSolve;
 	if (!strcmp(type, "series"))
 		return TestType::DeSeries;
+	if (!strncmp(type, "system", 6))
+		return TestType::DeSystem;
 
 	return TestType::Invalid;
 }
@@ -95,8 +98,10 @@ Test *test_Parse(char *line) {
 
 		char *trimmed = trim(pt);
 
-		if (i == 0)
+		if (i == 0) {
 			t->type = resolve_type(trimmed);
+			t->method = t->type == TestType::DeSystem ? method_named(trimmed + 6) : Method::Automatic;
+		}
 		else if (i == 1)
 			strncpy(t->arg1, trimmed, MAX_PAR);
 		else if (i == 2)
@@ -284,6 +289,110 @@ static bool run_solve(Test *t) {
 	return passed;
 }
 
+/*Returns the entry in row of the column vector that form stands for, where form is made of column vectors, sums and scalar factors*/
+static ast *vector_entry(const ast &form, unsigned row) {
+	if (form.isOp(Op::Matrix))
+		return form.childAt(row)->firstChild()->copy();
+
+	if (!form.isOp(Op::Add) && !form.isOp(Op::Mult))
+		return form.copy();
+
+	ast *result = ast::make(form.op());
+	for (const ast &child : form.children()) {
+		const bool vector = child.isOp(Op::Matrix) || child.isOp(Op::Add) || child.isOp(Op::Mult);
+		result->appendChild(form.isOp(Op::Add) || vector ? vector_entry(child, row) : child.copy());
+	}
+
+	return result;
+}
+
+/*True if the components satisfy x' = Ax + f and the initial conditions*/
+static bool system_satisfied(const DiffEqSystem &system, ast *const *components) {
+	const ast &t = *system.variable;
+	bool satisfied = true;
+
+	for (unsigned k = 0; k < DiffEqSystem::size && satisfied; k++) {
+		ast *residual = components[k]->copy();
+		derivative(*residual, t, t);
+		residual = difference(residual, system.forcing[k]->copy());
+		for (unsigned j = 0; j < DiffEqSystem::size; j++)
+			residual = difference(residual, ast::make(Op::Mult, system.matrix[k][j]->copy(), components[j]->copy()));
+
+		satisfied = is_zero(*residual);
+		ast::dispose(residual);
+
+		if (satisfied && system.point != nullptr) {
+			ast *at = components[k]->copy();
+			substitute(*at, t, *system.point);
+			at = difference(at, system.values[k]->copy());
+			satisfied = is_zero(*at);
+			ast::dispose(at);
+		}
+	}
+
+	return satisfied;
+}
+
+/*arg1 is a system with initial conditions, arg2 the expected solution, and arg3 the independent variable. The solution must also satisfy the system.*/
+static bool run_system(Test *t) {
+	ast *items[MAX_ITEMS], *answers[MAX_ITEMS], *solution = nullptr, *components[DiffEqSystem::size] = {};
+	Error err;
+	DiffEqSystem system;
+	bool passed = false;
+
+	const unsigned count =
+		parse_list(reinterpret_cast<uint8_t *>(t->arg1), strlen(t->arg1), str_table, items, MAX_ITEMS, &err);
+	const unsigned answer_count =
+		parse_list(reinterpret_cast<uint8_t *>(t->arg2), strlen(t->arg2), str_table, answers, MAX_ITEMS, &err);
+	ast *x = parse(reinterpret_cast<uint8_t *>(t->arg3), strlen(t->arg3), str_table, &err);
+
+	if (count == 0 || answer_count == 0 || x == nullptr) {
+		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
+	} else if ((err = system.load(items, count, *x)) != Error::Success ||
+			   (system.requested = t->method, err = system.solve(&solution)) != Error::Success) {
+		printf("Test failed on line %u. %s\n", t->line, error_text(err));
+	} else {
+		for (unsigned k = 0; k < DiffEqSystem::size; k++) {
+			components[k] = solution->isOp(Op::List) ? solution->childAt(k)->childAt(1)->copy()
+													 : vector_entry(*solution->childAt(1), k);
+		}
+
+		ast *expected;
+		if (answer_count == 1) {
+			expected = answers[0];
+		} else {
+			expected = ast::make(Op::List);
+			for (unsigned i = 0; i < answer_count; i++)
+				expected->appendChild(answers[i]);
+		}
+
+		simplify_solution(*solution);
+		simplify_solution(*expected);
+		passed = check(t, *solution, *expected);
+		ast::dispose(expected);
+
+		if (passed && !system_satisfied(system, components)) {
+			passed = false;
+			printf("Test failed on line %u. The solution does not satisfy the system.\n", t->line);
+		}
+
+		for (unsigned k = 0; k < DiffEqSystem::size; k++)
+			ast::dispose(components[k]);
+	}
+
+	if (answer_count == 0 || count == 0 || x == nullptr || err != Error::Success) {
+		for (unsigned i = 0; i < answer_count; i++)
+			ast::dispose(answers[i]);
+	}
+
+	for (unsigned i = 0; i < count; i++)
+		ast::dispose(items[i]);
+	ast::dispose(x);
+	ast::dispose(solution);
+
+	return passed;
+}
+
 /*arg1 is an equation with initial conditions, arg2 the expected solution, and arg3 the independent variable*/
 static bool run_laplace_solve(Test *t) {
 	ast *items[MAX_ITEMS], *solution = nullptr;
@@ -322,6 +431,8 @@ bool test_Run(Test *t) {
 		return run_solve(t);
 	if (t->type == TestType::LaplaceSolve)
 		return run_laplace_solve(t);
+	if (t->type == TestType::DeSystem)
+		return run_system(t);
 
 	Error err;
 	ast *a = parse(reinterpret_cast<uint8_t *>(t->arg1), strlen(t->arg1), str_table, &err);

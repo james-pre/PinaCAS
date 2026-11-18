@@ -59,6 +59,9 @@ simplify; X^3 * 2X^49; 2X^52
 simplify; 1sin(XX)^3 * 5sin(X^2) + sin(X^2); 5sin(X^2)^4 + sin(X^2)
 simplify; A_A; 0
 simplify; A + B _ (A + B); 0
+simplify; A+BX+X^2; X^2+A+BX
+simplify; A+BX+cos(X); cos(X)+A+BX
+simplify; (3T^2)/4_T^2_T; -T^2/4_T
 simplify; A + B _ 2(A _ B); 3B _ A
 
 #Identities; definition
@@ -539,10 +542,11 @@ solve; X^2Y''_3XY'+3Y=2X^4e^X; Y=AX^3+BX+2X^2e^X_2Xe^X; X
 solve; X^2Y''+5XY'+4Y=0,Y(1)=1,Y'(1)=0; Y=1/X^2+(2ln(X))/X^2; X
 
 #Differential equations: undetermined coefficients and variation of parameters
+solve; Y''=X; Y=X^3/6+A+BX; X
 solve; 1/4Y''+Y'+Y=X^2_2X; Y=Ae^(-2X)+BXe^(-2X)+X^2_4X+7/2; X
 solve; Y''_2Y'+5Y=e^Xcos(2X); Y=Ae^Xcos(2X)+Be^Xsin(2X)+Xe^Xsin(2X)/4; X
 solve; Y''+Y=1/cos(X)^2; Y=Acos(X)+Bsin(X)+sin(X)ln(abs(1/cos(X)+tan(X)))_1; X
-solve; Y''_2Y'+Y=e^Tatan(T); Y=Ae^T+BTe^T+e^T(T/2_T^2atan(T)/2_atan(T)/2)+Te^T(Tatan(T)_ln(abs(T^2+1))/2); T
+solve; Y''_2Y'+Y=e^Tatan(T); Y=Ae^T+BTe^T+Te^T/2_Te^Tln(abs(T^2+1))/2_e^Tatan(T)/2+T^2e^Tatan(T)/2; T
 solve; X''+W^2X=Fcos(GT),X(0)=0,X'(0)=0; X=Fcos(GT)/(W^2_G^2)_Fcos(WT)/(W^2_G^2); T
 solve; 1/2Q''+10Q'+100Q=150,Q(0)=1,Q'(0)=1; Q=3/2_e^(-10T)cos(10T)/2_2e^(-10T)sin(10T)/5; T
 solve; Y''_Y=e^X; Y=Ae^X+Be^(-X)+Xe^X/2; X
@@ -612,3 +616,26 @@ ilaplace; 1/((S_A)^2(S_B)); S; Te^(AT)/(A_B)_e^(AT)/(A_B)^2+e^(BT)/(B_A)^2
 ilaplace; e^(-AS)/(S^2+K^2); S; (T>=A)sin(K(T_A))/K
 lsolve; Y''+K^2Y=0,Y(0)=0,Y'(0)=1; Y=sin(KT)/K; T
 lsolve; Y'_AY=delta(T_B),Y(0)=1; Y=e^(AT)+e^(A(T_B))(T>=B); T
+
+#Systems of linear equations
+systemd; X'=X+Y+2e^(T),Y'=4X+Y_e^(T); X=Ae^(3T)+Be^(-T)+e^T/4,Y=2Ae^(3T)_2Be^(-T)_2e^T; T
+systemd; X'=X_Y_T^2,Y'=X+3Y+2T; X=Ae^(2T)+BTe^(2T)+(3T^2)/4+T/2+1/8,Y=-Ae^(2T)_BTe^(2T)_Be^(2T)_T^2/4_T_3/8; T
+systemd; X'=4X_2Y+2T,Y'=8X_4Y+1; X=(4T^3)/3+A+BT,Y=(8T^3)/3_2T^2+2A+2BT_B/2+T; T
+system; X'=[[3,-2][2,-2]]X; X=A[[2][1]]e^(2T)+B[[1][2]]e^(-T); T
+system; X'=[[3,-2][4,-1]]X; X=A([[1][1]]cos(2T)_[[0][-1]]sin(2T))e^T+B([[0][-1]]cos(2T)+[[1][1]]sin(2T))e^T; T
+system; X'=[[3,-4][1,-1]]X; X=A[[2][1]]e^T+B([[2][1]]Te^T+[[1][0]]e^T); T
+systemuc; X'=[[5,9][-1,11]]X+[[2][6]]; X=A[[3][1]]e^(8T)+B([[3][1]]Te^(8T)+[[-1][0]]e^(8T))+[[1/2][-1/2]]; T
+systemvop; X'=[[0,2][-1,3]]X+[[1][-1]]e^(T); X=A[[1][1]]e^(2T)+B[[2][1]]e^T+[[4Te^T+3e^T][2Te^T+3e^T]]; T
+systemlaplace; X'=[[4,-3][8,-6]]X; X=B[[3_2e^(-2T)][4_4e^(-2T)]]+C[[(3e^(-2T))/2_3/2][3e^(-2T)_2]]; T
+system; X'=[[3,-2][2,-2]]X,X(0)=[[1][2]]; X=[[1][2]]e^(-T); T
+systemd; X'=3X_2Y,Y'=2X_2Y,X(0)=1,Y(0)=2; X=e^(-T),Y=2e^(-T); T
+systemlaplace; X'=3X_2Y,Y'=2X_2Y,X(0)=1,Y(0)=2; X=e^(-T),Y=2e^(-T); T
+system; X'=[[3,-2][4,-1]]X,X(0)=[[1][0]]; X=([[1][1]]cos(2T)_[[0][-1]]sin(2T))e^T+([[0][-1]]cos(2T)+[[1][1]]sin(2T))e^T; T
+systemvop; X'=X+Y+2e^(T),Y'=4X+Y_e^(T),X(0)=0,Y(0)=0; X=e^T/4_(5e^(-T))/8+(3e^(3T))/8,Y=-2e^T+(5e^(-T))/4+(3e^(3T))/4; T
+systemd; X'=2X,Y'=3Y; X=Ce^(2T),Y=Ke^(3T); T
+systemd; X'=2X+T,Y'=3Y+1,X(0)=1,Y(0)=0; X=(5e^(2T))/4_T/2_1/4,Y=e^(3T)/3_1/3; T
+system; X'=[[1,2][2,1]]X+[[T][1]]; X=A[[1][1]]e^(3T)+B[[1][-1]]e^(-T)+[[T/3_11/9][(-2T)/3+7/9]]; T
+system; X'=[[1,1][-1,1]]X+[[cos(T)][0]]; X=A([[1][0]]cos(T)_[[0][1]]sin(T))e^T+B([[0][1]]cos(T)+[[1][0]]sin(T))e^T+[[sin(T)/5_(3cos(T))/5][(2sin(T))/5_cos(T)/5]]; T
+system; X'=[[2,0][0,2]]X+[[1][1]]; X=A[[1][0]]e^(2T)+B[[0][1]]e^(2T)+[[-1/2][-1/2]]; T
+system; X'=[[0,2][-1,3]]X+[[1][-1]]e^(T); X=A[[1][1]]e^(2T)+B[[2][1]]e^T+[[4Te^T_3e^T][2Te^T]]; T
+systemlaplace; X'=[[1,0][0,2]]X+[[1][T]]; X=B[[e^T][0]]+C[[0][e^(2T)]]+[[-1][(-T)/2_1/4]]; T

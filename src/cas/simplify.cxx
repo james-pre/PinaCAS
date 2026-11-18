@@ -354,21 +354,6 @@ static int function_degree(const ast &e) {
 	return -1;
 }
 
-/*Returns e if it is a symbol, the first symbol factor if it is a product, otherwise Sym::Invalid*/
-static Sym leading_symbol(const ast &e) {
-	if (e.isSymbol())
-		return e.symbol();
-
-	if (e.isOp(Op::Mult)) {
-		for (const ast &child : e.children()) {
-			if (child.isSymbol())
-				return child.symbol();
-		}
-	}
-
-	return Sym::Invalid;
-}
-
 static ast *factors_or_self(const ast &e) {
 	return e.isOp(Op::Mult) ? e.copy() : ast::make(Op::Mult, e.copy());
 }
@@ -462,48 +447,175 @@ static bool is_constant_of_integration(const ast &e) {
 	return e.isSymbol() && e.symbol() == Sym::C;
 }
 
-/*Returns negative if a sorts before b, 0 if they are equal and positive if a sorts after b*/
-static int sort_order(const ast *a, const ast *b, bool add) {
+/*Orders a and b by type, then by value, symbol or operator and children*/
+static int structure_order(const ast &a, const ast &b) {
+	if (a.type() != b.type())
+		return static_cast<int>(a.type()) - static_cast<int>(b.type());
+
+	switch (a.type()) {
+		case ast::Type::Number: return Num::compare(a.num(), b.num());
+		case ast::Type::Symbol: return static_cast<int>(a.symbol()) - static_cast<int>(b.symbol());
+		case ast::Type::Operator: break;
+	}
+
+	if (a.op() != b.op())
+		return static_cast<int>(a.op()) - static_cast<int>(b.op());
+
+	const ast *x = a.firstChild(), *y = b.firstChild();
+	for (; x != nullptr && y != nullptr; x = x->next(), y = y->next()) {
+		const int order = structure_order(*x, *y);
+		if (order != 0)
+			return order;
+	}
+
+	return (x != nullptr) - (y != nullptr);
+}
+
+/*Returns the node whose factors are those of term, which is the numerator when term is divided by a number*/
+static const ast &factor_source(const ast &term) {
+	if (term.isOp(Op::Div) && term.childAt(1)->isNumber())
+		return *term.childAt(0);
+	return term;
+}
+
+static unsigned factor_total(const ast &source) {
+	return source.isOp(Op::Mult) ? source.childCount() : 1;
+}
+
+static const ast &factor_at(const ast &source, unsigned i) {
+	return source.isOp(Op::Mult) ? *source.childAt(i) : source;
+}
+
+/*Other terms sort first, then products of letters and their positive integer powers, then numbers*/
+static int term_class(const ast &term) {
+	const ast &source = factor_source(term);
+	bool number = true;
+
+	for (unsigned i = 0; i < factor_total(source); i++) {
+		const ast &factor = factor_at(source, i);
+
+		if (factor.isNumber())
+			continue;
+
+		number = false;
+		if (!factor.isSymbol() && !(factor.isOp(Op::Pow) && factor.childAt(0)->isSymbol() && small_exponent(factor, 1000) > 0))
+			return 0;
+	}
+
+	return number ? 2 : 1;
+}
+
+/*Returns the power of symbol in a product of letters and their powers*/
+static int symbol_power(const ast &term, Sym symbol) {
+	const ast &source = factor_source(term);
+	int power = 0;
+
+	for (unsigned i = 0; i < factor_total(source); i++) {
+		const ast &factor = factor_at(source, i);
+
+		if (factor.isSymbol() && factor.symbol() == symbol)
+			power++;
+		else if (factor.isOp(Op::Pow) && factor.childAt(0)->isSymbol() && factor.childAt(0)->symbol() == symbol)
+			power += small_exponent(factor, 1000);
+	}
+
+	return power;
+}
+
+/*Returns the highest power of a letter in a product of letters and their powers*/
+static int highest_power(const ast &term) {
+	const ast &source = factor_source(term);
+	int highest = 0;
+
+	for (unsigned i = 0; i < factor_total(source); i++) {
+		const ast &factor = factor_at(source, i);
+		const int power = factor.isSymbol() ? 1 : factor.isOp(Op::Pow) ? small_exponent(factor, 1000) : 0;
+		if (power > highest)
+			highest = power;
+	}
+
+	return highest;
+}
+
+/*Orders the factors of a and b that are not numbers by their structure, in the order they are written*/
+static int factors_order(const ast &a, const ast &b) {
+	const ast &source_a = factor_source(a), &source_b = factor_source(b);
+	const unsigned total_a = factor_total(source_a), total_b = factor_total(source_b);
+	unsigned i = 0, j = 0;
+
+	while (true) {
+		while (i < total_a && factor_at(source_a, i).isNumber())
+			i++;
+		while (j < total_b && factor_at(source_b, j).isNumber())
+			j++;
+
+		if (i == total_a || j == total_b)
+			return (i < total_a) - (j < total_b);
+
+		const int order = structure_order(factor_at(source_a, i++), factor_at(source_b, j++));
+		if (order != 0)
+			return order;
+	}
+}
+
+/*Returns negative if the term a sorts before the term b in a sum, 0 if they are equal and positive otherwise*/
+static int term_order(const ast &a, const ast &b) {
+	const int rank_a = static_cast<int>(function_rank(a)), rank_b = static_cast<int>(function_rank(b));
+
+	/*An added constant of integration goes last*/
+	if (is_constant_of_integration(a) != is_constant_of_integration(b))
+		return is_constant_of_integration(a) ? 1 : -1;
+
+	/*Highest derivatives first*/
+	if (rank_a != rank_b)
+		return rank_b - rank_a;
+
+	/*Power series after the other terms, by ascending degree*/
+	const int series_a = ascending_series ? series_degree(a) : -1;
+	const int series_b = ascending_series ? series_degree(b) : -1;
+	if (series_a != series_b)
+		return series_a < 0 || series_b < 0 ? series_b - series_a : series_a - series_b;
+
+	/*Terms with the unknown function by descending degree in it*/
+	if (rank_a > 0 && function_degree(a) != function_degree(b))
+		return function_degree(b) - function_degree(a);
+
+	/*Imaginary parts after real parts*/
+	const bool imaginary_a = contains_symbol(a, Sym::Imag), imaginary_b = contains_symbol(b, Sym::Imag);
+	if (imaginary_a != imaginary_b)
+		return imaginary_a ? 1 : -1;
+
+	const int class_a = term_class(a), class_b = term_class(b);
+	if (class_a != class_b)
+		return class_a - class_b;
+
+	/*Products of letters by their highest power, then by descending powers of each letter in alphabetical order*/
+	if (class_a == 1) {
+		if (highest_power(a) != highest_power(b))
+			return highest_power(b) - highest_power(a);
+
+		for (unsigned s = static_cast<unsigned>(Sym::A); s < static_cast<unsigned>(Sym::Invalid); s++) {
+			const int difference = symbol_power(b, static_cast<Sym>(s)) - symbol_power(a, static_cast<Sym>(s));
+			if (difference != 0)
+				return difference;
+		}
+	}
+
+	const int order = factors_order(a, b);
+	return order != 0 ? order : structure_order(a, b);
+}
+
+/*Returns negative if the factor a sorts before the factor b in a product, 0 if they are equal and positive otherwise*/
+static int sort_order(const ast *a, const ast *b) {
 	int multiplier = 1;
 	const int rank_a = static_cast<int>(function_rank(*a)), rank_b = static_cast<int>(function_rank(*b));
 
-	/*An added constant of integration goes last*/
-	if (add && is_constant_of_integration(*a) != is_constant_of_integration(*b))
-		return is_constant_of_integration(*a) ? 1 : -1;
-
-	/*Highest derivatives first in sums, and the unknown function last in products*/
+	/*The unknown function last*/
 	if (rank_a != rank_b)
-		return add ? rank_b - rank_a : rank_a - rank_b;
+		return rank_a - rank_b;
 
-	if (!add && (a->isOp(Op::Subscript) || b->isOp(Op::Subscript)) && factor_class(*a) != factor_class(*b))
+	if ((a->isOp(Op::Subscript) || b->isOp(Op::Subscript)) && factor_class(*a) != factor_class(*b))
 		return factor_class(*a) - factor_class(*b);
-
-	if (add) {
-		const int degree_a = function_degree(*a), degree_b = function_degree(*b);
-		const int series_a = ascending_series ? series_degree(*a) : -1;
-		const int series_b = ascending_series ? series_degree(*b) : -1;
-		const bool imaginary_a = contains_symbol(*a, Sym::Imag), imaginary_b = contains_symbol(*b, Sym::Imag);
-		const Sym symbol_a = leading_symbol(*a), symbol_b = leading_symbol(*b);
-
-		/*Power series after the other terms, by ascending degree*/
-		if ((series_a >= 0) != (series_b >= 0))
-			return series_a >= 0 ? 1 : -1;
-		if (series_a != series_b)
-			return series_a - series_b;
-
-		/*Polynomials in the unknown function by descending degree*/
-		if (degree_a >= 0 && degree_b >= 0 && degree_a != degree_b)
-			return degree_b - degree_a;
-
-		/*Imaginary parts after real parts*/
-		if (imaginary_a != imaginary_b)
-			return imaginary_a ? 1 : -1;
-
-		/*A symbol and a product alphabetically*/
-		if (a->isSymbol() != b->isSymbol() && symbol_a != Sym::Invalid && symbol_b != Sym::Invalid &&
-			symbol_a != symbol_b)
-			return static_cast<int>(symbol_a) - static_cast<int>(symbol_b);
-	}
 
 	if (b->isOp(Op::Mult)) {
 		std::swap(a, b);
@@ -514,7 +626,7 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 		ast *rest_a, *rest_b;
 
 		if (remove_common_factors(*a, *b, &rest_a, &rest_b)) {
-			const int order = sort_order(rest_a, rest_b, add);
+			const int order = sort_order(rest_a, rest_b);
 
 			ast::dispose(rest_a);
 			ast::dispose(rest_b);
@@ -523,30 +635,25 @@ static int sort_order(const ast *a, const ast *b, bool add) {
 		}
 	}
 
-	/*Compare power bases to sort alphabetically when multiplying, and by degree when adding*/
+	/*Compare power bases to sort alphabetically*/
 	if (b->isOp(Op::Pow)) {
 		std::swap(a, b);
 		multiplier = -multiplier;
 	}
 
-	if (a->isOp(Op::Pow) && b->isOp(Op::Pow)) {
-		const int order =
-			add ? -sort_order(a->childAt(1), b->childAt(1), add) : sort_order(a->childAt(0), b->childAt(0), add);
-		return multiplier * order;
-	}
+	if (a->isOp(Op::Pow) && b->isOp(Op::Pow))
+		return multiplier * sort_order(a->childAt(0), b->childAt(0));
 
 	const bool negative_a = is_negative_for_sure(*a), negative_b = is_negative_for_sure(*b);
 
 	if (negative_a && !negative_b)
-		return multiplier * (add ? 1 : -1);
+		return -multiplier;
 	if (negative_b && !negative_a)
-		return multiplier * (add ? -1 : 1);
+		return multiplier;
 
 	/*Numbers, then symbols, then operators*/
-	if (a->type() < b->type())
-		return multiplier * (add ? 1 : -1);
-	if (a->type() > b->type())
-		return multiplier * (add ? -1 : 1);
+	if (a->type() != b->type())
+		return multiplier * (a->type() < b->type() ? -1 : 1);
 
 	/*Don't deal with sorting multivariable polynomials*/
 	if (a->isOp(Op::Pow))
@@ -662,28 +769,65 @@ static bool rationalize(ast &e) {
 	return true;
 }
 
-/*Orders the terms of a sum or product by insertion sort*/
+static bool has_matrix(const ast &e) {
+	if (e.isOp(Op::Matrix))
+		return true;
+
+	if (!e.isOperator())
+		return false;
+
+	for (const ast &child : e.children()) {
+		if (has_matrix(child))
+			return true;
+	}
+
+	return false;
+}
+
+/*Orders the terms of a sum or product by insertion sort, writing a negative term and a positive number as the number minus the term. Returns true if the order changed.*/
 static bool sort_children(ast &e) {
 	if (!e.isOp(Op::Mult) && !e.isOp(Op::Add))
 		return false;
 
 	const bool add = e.isOp(Op::Add);
-	bool changed = false;
+	const unsigned count = e.childCount();
+
+	/*Matrices do not commute, and sums of vectors are written in the order they are built*/
+	for (const ast &child : e.children()) {
+		if (add ? has_matrix(child) : child.isOp(Op::Matrix))
+			return false;
+	}
+
+	const ast **before = static_cast<const ast **>(malloc(count * sizeof(const ast *)));
+	unsigned i = 0;
+	for (const ast &child : e.children())
+		before[i++] = &child;
 
 	ascending_series = is_series_sum(e);
 
-	for (unsigned i = 0; i < e.childCount(); i++) {
+	for (i = 1; i < count; i++) {
 		const ast *child = e.childAt(i);
+		unsigned j = i;
 
-		for (unsigned j = 0; j < i; j++) {
-			if (sort_order(child, e.childAt(j), add) < 0) {
-				e.insertChild(e.removeChildAt(i), j);
-				changed = true;
-			}
-		}
+		while (j > 0 && (add ? term_order(*child, *e.childAt(j - 1)) : sort_order(child, e.childAt(j - 1))) < 0)
+			j--;
+
+		if (j != i)
+			e.insertChild(e.removeChildAt(i), j);
 	}
 
+	if (add && count == 2 && is_negative_for_sure(*e.firstChild()) && e.lastChild()->isNumber() &&
+		!is_negative_for_sure(*e.lastChild()))
+		e.insertChild(e.removeChildAt(1), 0);
+
 	ascending_series = false;
+
+	bool changed = false;
+	i = 0;
+	for (const ast &child : e.children())
+		changed |= &child != before[i++];
+
+	free(before);
 
 	return changed;
 }

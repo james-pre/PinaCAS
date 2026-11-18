@@ -38,6 +38,23 @@ static bool need_paren(const ast *parent, const ast *child) {
 		   (is_right_operator(parent->op()) && child->isNumber() && child->num() < 0);
 }
 
+/*Returns the only factor of e that is not 1, or e*/
+static const ast *without_ones(const ast *e) {
+	if (!e->isOp(Op::Mult))
+		return e;
+
+	const ast *only = nullptr;
+	for (const ast &child : e->children()) {
+		if (child.isInt(1))
+			continue;
+		if (only != nullptr)
+			return e;
+		only = &child;
+	}
+
+	return only != nullptr ? only : e;
+}
+
 static const ast *rightmost(const ast &e) {
 	if (e.isOperator()) {
 		switch (e.op()) {
@@ -201,8 +218,8 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 				}
 				case Op::Div:
 				case Op::Pow: {
-					const ast *a = e->childAt(0);
-					const ast *b = e->childAt(1);
+					const ast *a = without_ones(e->childAt(0));
+					const ast *b = without_ones(e->childAt(1));
 
 					if (need_paren(e, a))
 						add_token(Tok::OpenPar);
