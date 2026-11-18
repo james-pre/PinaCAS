@@ -132,9 +132,9 @@ struct CalculusOptions {
 	bool show_work;
 	bool verify;
 	unsigned solution;
-	bool series;
+	/*A Method*/
+	unsigned method;
 	char terms;
-	bool laplace;
 };
 
 static unsigned input = 0, output = 1;
@@ -211,14 +211,16 @@ static constexpr Element integral_content[] = {
 	end
 };
 
+/*Names of the methods in the order of Method*/
+static const char *const method_names[] = {"Automatic", "Undetermined", "Variation", "Power series", "Laplace", "D method"};
+
 static constexpr Element de_content[] = {
 	letter("Respect to:", &de_options.respect_to),
 	checkbox("Show work", &de_options.show_work),
 	checkbox("Verify solution", &de_options.verify),
 	variable("Solution in:", &de_options.solution),
-	checkbox("Power series", &de_options.series),
+	select("Method:", &de_options.method, method_names, countof(method_names)),
 	digit("Series terms:", &de_options.terms),
-	checkbox("Laplace transform", &de_options.laplace),
 	button("Solve", [] { execute_calculus(calculus::Kind::DiffEq, &de_options, "Differential equation"); }),
 	end
 };
@@ -1093,7 +1095,7 @@ static void execute_calculus(calculus::Kind kind, const CalculusOptions *options
 			);
 			const unsigned terms = kind == calculus::Kind::DiffEq ? static_cast<unsigned>((options->terms - '0')) : 0;
 			err = calculus::run(
-				kind, items, count, *respect_to, transform, options->series, options->laplace, terms, buffer
+				kind, items, count, *respect_to, transform, static_cast<Method>(options->method), terms, buffer
 			);
 
 			if (err == Error::Success && kind == calculus::Kind::DiffEq)

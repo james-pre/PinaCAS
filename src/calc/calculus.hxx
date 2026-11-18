@@ -10,7 +10,7 @@
 /*Most expressions in one input: an equation and its initial conditions*/
 constexpr unsigned MAX_ITEMS = DiffEq::max_conditions + 1;
 
-/*Replaces items[0] with the result of kind with respect to respect_to, ready to export. A transform is to the variable transform. The other items are initial conditions for Kind::DiffEq, which uses a power series with terms nonzero terms per solution when series is true, and Laplace transforms when laplace is true or the equation needs them. Writes a one line summary to summary if it is not nullptr.*/
+/*Replaces items[0] with the result of kind with respect to respect_to, ready to export. A transform is to the variable transform. For Kind::DiffEq the items are an equation or a system with initial conditions, solved with method when it applies, with terms nonzero terms per power series solution and with Laplace transforms when the equation needs them. Writes a one line summary to summary if it is not nullptr.*/
 namespace calculus {
 
 enum class Kind : unsigned char { Derivative, Integral, PartialFractions, Laplace, LaplaceInverse, DiffEq };
@@ -21,8 +21,7 @@ Error run(
 	unsigned count,
 	ast &respect_to,
 	const ast *transform,
-	bool series,
-	bool laplace,
+	Method method,
 	unsigned terms,
 	char *summary
 );

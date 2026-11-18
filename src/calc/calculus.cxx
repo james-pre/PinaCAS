@@ -13,8 +13,7 @@ Error calculus::run(
 	unsigned count,
 	ast &respect_to,
 	const ast *transform,
-	bool series,
-	bool laplace,
+	Method method,
 	unsigned terms,
 	char *summary
 ) {
@@ -64,7 +63,26 @@ Error calculus::run(
 			return err;
 		}
 		case calculus::Kind::DiffEq: {
-			if (laplace || laplace_needed(e)) {
+			if (DiffEqSystem::detect(items, count)) {
+				DiffEqSystem system;
+				ast *solution;
+
+				err = system.load(items, count, respect_to);
+				system.requested = method;
+				if (err == Error::Success)
+					err = system.solve(&solution);
+
+				if (err == Error::Success) {
+					if (summary != nullptr)
+						sprintf(summary, "Solved. %s.", system.method);
+					e.replace(solution);
+					simplify_canonical_form(e, Canonical::All);
+				}
+
+				return err;
+			}
+
+			if (method == Method::Laplace || laplace_needed(e)) {
 				ast *solution;
 				err = laplace_solve(items, count, respect_to, &solution);
 
@@ -85,7 +103,7 @@ Error calculus::run(
 			if (err == Error::Success) {
 				ast *solution;
 
-				de.series = series;
+				de.requested = method;
 				de.terms = terms;
 				de.classify();
 				err = de.solve(&solution);
