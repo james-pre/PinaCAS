@@ -96,6 +96,7 @@ static const char *os_char(uint8_t c) {
 	switch (c) {
 		case 0x1B: return "E";
 		case 0x1D: return "10";
+		case 0xC1: return "[";
 		case 0xD7: return "i";
 		case 0xDB: return "e";
 		case 0xF6: return "/";
