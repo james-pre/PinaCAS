@@ -505,7 +505,7 @@ bool test_Run(Test *t) {
 			if (err != Error::Success) {
 				printf("Test failed on line %u. %s\n", t->line, error_text(err));
 			} else if (t->type == TestType::DeOrder) {
-				actual = ast::make(num::from(de.order));
+				actual = ast::make(Num::from(de.order));
 				passed = check(t, *actual, *c);
 				ast::dispose(actual);
 			} else if (t->type == TestType::DeNonlinear) {
