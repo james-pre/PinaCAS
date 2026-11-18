@@ -13,6 +13,7 @@ constexpr char ScriptL = '\x05';
 constexpr char Delta = '\x06';
 constexpr char Tau = '\x07';
 constexpr char Lambda = '\x08';
+constexpr char Phi = '\x0B';
 
 struct Box {
 	enum class Type : unsigned char {

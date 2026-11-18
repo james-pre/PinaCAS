@@ -84,6 +84,7 @@ static Box *symbol_box(Sym symbol) {
 		case Sym::Theta: name[0] = Theta; break;
 		case Sym::Tau: name[0] = Tau; break;
 		case Sym::Lambda: name[0] = Lambda; break;
+		case Sym::Phi: name[0] = Phi; break;
 		case Sym::Euler: name[0] = 'e'; break;
 		case Sym::Imag: name[0] = 'i'; break;
 		default: name[0] = static_cast<char>(symbol); break;

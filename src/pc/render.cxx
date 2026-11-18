@@ -25,6 +25,7 @@ static uint32_t symbol(char c) {
 		case ts::Delta: return 0x03B4;
 		case ts::Tau: return 0x03C4;
 		case ts::Lambda: return 0x03BB;
+		case ts::Phi: return 0x03A6;
 		default: return static_cast<unsigned char>(c);
 	}
 }

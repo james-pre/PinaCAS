@@ -124,6 +124,7 @@ enum class Sym : unsigned char {
 	Tau,
 	/*Shown in work only*/
 	Lambda,
+	Phi,
 
 	Invalid
 };

@@ -29,6 +29,7 @@ static const Glyph *special_glyph(char c) {
 		case ts::Delta: return &glyph_delta;
 		case ts::Tau: return &glyph_tau;
 		case ts::Lambda: return &glyph_lambda;
+		case ts::Phi: return &glyph_phi;
 		default: return nullptr;
 	}
 }
