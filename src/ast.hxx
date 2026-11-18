@@ -37,6 +37,10 @@ enum class Op : unsigned char {
 	/*Shown in work only: the Laplace transform and the inverse Laplace transform of the child*/
 	Laplace,
 	LaplaceInverse,
+	/*Children are the rows, each a Matrix of its entries*/
+	Matrix,
+	/*Children separated by commas*/
+	List,
 
 	/*Unary*/
 	Factorial,
@@ -118,6 +122,8 @@ enum class Sym : unsigned char {
 	Euler,
 	Theta,
 	Tau,
+	/*Shown in work only*/
+	Lambda,
 
 	Invalid
 };

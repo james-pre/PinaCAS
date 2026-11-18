@@ -40,6 +40,7 @@ const TokenTable ti_table = {{
 
     {1, {0x10}}, {1, {0x11}},   /*Tok::OpenPar, Tok::ClosePar*/
     {1, {0x2B}}, {1, {0x3A}},   /*Tok::Comma, Tok::Period*/
+    {1, {0x06}}, {1, {0x07}},   /*Tok::OpenBracket, Tok::CloseBracket*/
 
     {1, {0x2C}},                /*Tok::Imag*/
 
@@ -85,6 +86,7 @@ const TokenTable str_table = {{
 
     {1, "("}, {1, ")"},             /*Tok::OpenPar, Tok::ClosePar*/
     {1, ","}, {1, "."},             /*Tok::Comma, Tok::Period*/
+    {1, "["}, {1, "]"},             /*Tok::OpenBracket, Tok::CloseBracket*/
 
     {1, "i"},                       /*Tok::Imag */
 
@@ -306,6 +308,10 @@ bool should_multiply_by_next_token(Tokenizer *tokenizer, unsigned index) {
 	if (index + 1 < tokenizer->amount) {
 		const Token next = tokenizer->tokens[index + 1];
 
+		/*The next row of a matrix*/
+		if (tokenizer->tokens[index].type == Tok::CloseBracket && next.type == Tok::OpenBracket)
+			return false;
+
 		/*5(2 + x)*/
 		return next.type == Tok::OpenPar
 			   /*5x or x5. We can infer two number tokens will never follow each other.*/
@@ -426,6 +432,7 @@ void translate(ast &e, Tok type) {
 		case Tok::TanH: e.setOp(Op::TanH); break;
 		case Tok::TanH_Inv: e.setOp(Op::TanH_Inv); break;
 		case Tok::Delta: e.setOp(Op::Delta); break;
+		case Tok::OpenBracket: e.setOp(Op::Matrix); break;
 		default: break;
 	}
 }
@@ -451,7 +458,7 @@ bool collapse_precedence(Stack<const Token *> &operators, Stack<ast *> &expressi
 
 		const unsigned operands = is_tok_nary_function(op->type) ? op->arguments : operand_count(op->type);
 		if (is_tok_nary_function(op->type) && operands != operand_count(op->type) &&
-			!(op->type == Tok::Integral && operands == 4))
+			!(op->type == Tok::Integral && operands == 4) && op->type != Tok::OpenBracket)
 			return false;
 
 		/*Store the token type into the operand type. This will
@@ -504,7 +511,7 @@ unsigned parse_list(
 
 			if (tok.type == Tok::OpenPar || is_tok_function(tok.type))
 				depth++;
-			else if (tok.type == Tok::ClosePar && depth > 0)
+			else if ((tok.type == Tok::ClosePar || tok.type == Tok::CloseBracket) && depth > 0)
 				depth--;
 			else if (tok.type == Tok::Comma && depth == 0)
 				end = true;
@@ -598,10 +605,19 @@ ast *parse(const uint8_t *equation, unsigned length, const TokenTable &lookup, E
 				return fail(Error::ParseBadOperator);
 			operators.push(tok);
 		} else if (is_tok_function(tok->type)) {
+			/*A row that follows another row is the next argument of the matrix*/
+			if (tok->type == Tok::OpenBracket && i > 0 && tokenizer.tokens[i - 1].type == Tok::CloseBracket) {
+				if (!collapse_precedence(operators, expressions, Tok::Comma))
+					return fail(Error::ParseBadOperator);
+				if (operators.empty() || operators.peek()->type != Tok::OpenBracket)
+					return fail(Error::ParseBadComma);
+				const_cast<Token *>(operators.peek())->arguments++;
+			}
+
 			/*Insert a ( to correspond with the other closing ) following the parameters*/
 			operators.push(&open_par);
 			operators.push(tok);
-		} else if (tok->type == Tok::ClosePar) {
+		} else if (tok->type == Tok::ClosePar || tok->type == Tok::CloseBracket) {
 			if (!collapse_precedence(operators, expressions, Tok::ClosePar))
 				return fail(Error::ParseBadOperator);
 			if (operators.empty() || operators.peek()->type != Tok::OpenPar)

@@ -17,11 +17,11 @@ void ti_debug(const char *format, ...) {
 
 const char *operators[static_cast<size_t>(Op::Amount)] = {"+",     "*",    "/",     "^",    "root", "log",   "deriv",
 														  "integ", "=",    "'",     "at",   "step", "sum",   "sub",
-														  "L",     "L^-1", "!",     "int",  "abs",  "sin",   "asin",
+														  "L",     "L^-1", "matrix", "list", "!",    "int",  "abs",  "sin",   "asin",
 														  "cos",   "acos", "tan",   "atan", "sinh", "asinh", "cosh",
 														  "acosh", "tanh", "atanh", "delta"};
 
-const char *symbols[] = {"i", "pi", "e", "theta", "tau"};
+const char *symbols[] = {"i", "pi", "e", "theta", "tau", "lambda"};
 
 void _print_tree(const ast *e, unsigned indent, unsigned index) {
 	if (e == nullptr)
@@ -38,7 +38,7 @@ void _print_tree(const ast *e, unsigned indent, unsigned index) {
 			break;
 		}
 		case ast::Type::Symbol:
-			if (e->symbol() >= Sym::Imag && e->symbol() <= Sym::Tau)
+			if (e->symbol() >= Sym::Imag && e->symbol() <= Sym::Lambda)
 				DBG(("SYMBOL: %s\n", symbols[static_cast<unsigned>(e->symbol()) - static_cast<unsigned>(Sym::Imag)]));
 			else
 				DBG(("SYMBOL: %c\n", static_cast<char>(e->symbol())));

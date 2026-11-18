@@ -315,6 +315,19 @@ static unsigned _to_binary(const ast *e, uint8_t *data, unsigned index, const To
 					add_token(Tok::ClosePar);
 					break;
 				}
+				case Op::Matrix:
+				case Op::List: {
+					if (e->isOp(Op::Matrix))
+						add_token(Tok::OpenBracket);
+					for (const ast &child : e->children()) {
+						if (&child != e->firstChild() && !child.isOp(Op::Matrix))
+							add_token(Tok::Comma);
+						index = _to_binary(&child, data, index, lookup, err);
+					}
+					if (e->isOp(Op::Matrix))
+						add_token(Tok::CloseBracket);
+					break;
+				}
 				case Op::At: {
 					index = _to_binary(e->childAt(0), data, index, lookup, err);
 					add_token(Tok::OpenPar);

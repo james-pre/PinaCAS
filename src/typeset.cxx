@@ -83,6 +83,7 @@ static Box *symbol_box(Sym symbol) {
 		case Sym::Pi: name[0] = Pi; break;
 		case Sym::Theta: name[0] = Theta; break;
 		case Sym::Tau: name[0] = Tau; break;
+		case Sym::Lambda: name[0] = Lambda; break;
 		case Sym::Euler: name[0] = 'e'; break;
 		case Sym::Imag: name[0] = 'i'; break;
 		default: name[0] = static_cast<char>(symbol); break;
@@ -97,7 +98,8 @@ static bool is_atom(const ast &e) {
 		case ast::Type::Number: return e.num().isInteger() && e.num() >= 0;
 		case ast::Type::Symbol: return true;
 		case ast::Type::Operator:
-			return e.op() == Op::Prime || e.op() == Op::Log || e.op() == Op::Subscript || is_op_function(e.op());
+			return e.op() == Op::Prime || e.op() == Op::Log || e.op() == Op::Subscript || e.op() == Op::Matrix ||
+				   is_op_function(e.op());
 	}
 
 	return false;
@@ -241,6 +243,31 @@ static Box *log_box(const ast &e) {
 	return row2(name, delimited(convert(*e.childAt(1)), '(', ')'));
 }
 
+static Box *grid(const ast &e) {
+	Box *b = new Box(Box::Type::Matrix);
+
+	for (const ast &entries : e.children()) {
+		Box *line = row();
+		for (const ast &entry : entries.children())
+			line->append(convert(entry));
+		b->append(line);
+	}
+
+	return b;
+}
+
+static Box *list_box(const ast &e) {
+	Box *line = row();
+
+	for (const ast &item : e.children()) {
+		if (&item != e.firstChild())
+			line->append(text(", "));
+		line->append(convert(item));
+	}
+
+	return line;
+}
+
 static Box *operator_box(const ast &e) {
 	const ast *a = e.firstChild();
 	const ast *b = a != nullptr ? a->next() : nullptr;
@@ -310,7 +337,9 @@ static Box *operator_box(const ast &e) {
 			return row2(transform, delimited(convert(*a), '{', '}'));
 		}
 		case Op::Factorial: return row2(parenthesized(*a, !is_atom(*a)), text("!"));
-		case Op::Abs: return delimited(convert(*a), '|', '|');
+		case Op::Abs: return delimited(a->isOp(Op::Matrix) ? grid(*a) : convert(*a), '|', '|');
+		case Op::Matrix: return delimited(grid(e), '[', ']');
+		case Op::List: return list_box(e);
 		default: return function_box(e);
 	}
 }
@@ -343,6 +372,25 @@ static int max(int a, int b) {
 
 static int height(const Box *b) {
 	return b->ascent + b->descent;
+}
+
+static int column_spacing(const Metrics &m) {
+	return static_cast<int>(m.text_width("  "));
+}
+
+/*Width of the widest entry in the column of a matrix*/
+static int column_width(const Box *matrix, unsigned column) {
+	int width = 0;
+
+	for (const Box *line = matrix->first; line != nullptr; line = line->next) {
+		const Box *entry = line->first;
+		for (unsigned k = 0; k < column && entry != nullptr; k++)
+			entry = entry->next;
+		if (entry != nullptr)
+			width = max(width, entry->width);
+	}
+
+	return width;
 }
 
 /*Distance from the baseline of a superscript's base up to the baseline of its script*/
@@ -414,6 +462,26 @@ void measure(Box *b, const Metrics &m) {
 			b->ascent = m.ascent + m.gap + height(second);
 			b->descent = m.descent + m.gap + height(first);
 			break;
+		case Box::Type::Matrix: {
+			int total = -m.gap;
+			unsigned columns = 0;
+
+			for (Box *line = first; line != nullptr; line = line->next) {
+				unsigned count = 0;
+				for (Box *entry = line->first; entry != nullptr; entry = entry->next)
+					count++;
+				if (count > columns)
+					columns = count;
+				total += height(line) + m.gap;
+			}
+
+			b->width = columns > 0 ? static_cast<int>(columns - 1) * column_spacing(m) : 0;
+			for (unsigned k = 0; k < columns; k++)
+				b->width += column_width(b, k);
+			b->ascent = (total + 1) / 2 + m.axis;
+			b->descent = total - b->ascent;
+			break;
+		}
 	}
 }
 
@@ -479,6 +547,23 @@ void draw(const Box *b, int x, int baseline, const Metrics &m, const Renderer &r
 			r.summation(x + (b->width - m.summation_width) / 2, sign_top, sign_bottom - sign_top);
 			draw(second, x + (b->width - second->width) / 2, sign_top - second->descent, m, r);
 			draw(first, x + (b->width - first->width) / 2, sign_bottom + first->ascent, m, r);
+			break;
+		}
+		case Box::Type::Matrix: {
+			int y = top;
+
+			for (const Box *line = first; line != nullptr; line = line->next) {
+				int left = x;
+				unsigned k = 0;
+
+				for (const Box *entry = line->first; entry != nullptr; entry = entry->next, k++) {
+					const int width = column_width(b, k);
+					draw(entry, left + (width - entry->width) / 2, y + line->ascent, m, r);
+					left += width + column_spacing(m);
+				}
+
+				y += height(line) + m.gap;
+			}
 			break;
 		}
 	}

@@ -24,6 +24,7 @@ static uint32_t symbol(char c) {
 		case ts::ScriptL: return 0x2112;
 		case ts::Delta: return 0x03B4;
 		case ts::Tau: return 0x03C4;
+		case ts::Lambda: return 0x03BB;
 		default: return static_cast<unsigned char>(c);
 	}
 }
@@ -76,6 +77,8 @@ static void draw_delimiter(int x, int y, int height, char kind) {
 	switch (kind) {
 		case '(': column(x, y, height, '(', 0x239B, 0x239C, 0x239D); break;
 		case ')': column(x, y, height, ')', 0x239E, 0x239F, 0x23A0); break;
+		case '[': column(x, y, height, '[', 0x23A1, 0x23A2, 0x23A3); break;
+		case ']': column(x, y, height, ']', 0x23A4, 0x23A5, 0x23A6); break;
 		case '{':
 		case '}':
 			column(

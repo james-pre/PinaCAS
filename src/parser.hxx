@@ -61,6 +61,8 @@ enum class Tok : unsigned char {
 	ClosePar,
 	Comma,
 	Period,
+	OpenBracket,
+	CloseBracket,
 
 	Imag,
 
@@ -90,7 +92,7 @@ constexpr bool is_tok_unary_function(Tok tok) {
 }
 
 constexpr bool is_tok_nary_function(Tok tok) {
-	return tok == Tok::LogBase || tok == Tok::Deriv || tok == Tok::Integral;
+	return tok == Tok::LogBase || tok == Tok::Deriv || tok == Tok::Integral || tok == Tok::OpenBracket;
 }
 
 constexpr bool is_tok_function(Tok tok) {

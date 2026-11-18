@@ -12,6 +12,7 @@ constexpr char Infinity = '\x04';
 constexpr char ScriptL = '\x05';
 constexpr char Delta = '\x06';
 constexpr char Tau = '\x07';
+constexpr char Lambda = '\x08';
 
 struct Box {
 	enum class Type : unsigned char {
@@ -29,7 +30,9 @@ struct Box {
 		/*First child preceded by an integral sign, with the second and third children as its lower and upper limits when present*/
 		Integral,
 		/*Summation sign with the first child below it and the second above it*/
-		Summation
+		Summation,
+		/*Children are rows of entries, drawn in aligned columns*/
+		Matrix
 	};
 
 	Type type;
