@@ -633,6 +633,21 @@ static bool numerator_vanishes(const ast &e, Simp flags) {
 }
 
 bool is_zero(const ast &e) {
+	if (e.isNumber())
+		return e.num() == 0;
+
+	ast *basic = e.copy();
+	work::pause();
+	simplify(*basic, Simp::Basic);
+	work::resume();
+	Num *value = rational_value(*basic);
+	const bool number = value != nullptr, vanishes = number && *value == 0;
+	Num::dispose(value);
+	ast::dispose(basic);
+
+	if (number)
+		return vanishes;
+
 	work::pause();
 	const bool zero = numerator_vanishes(e, Simp::Basic) || numerator_vanishes(e, Simp::All);
 	work::resume();

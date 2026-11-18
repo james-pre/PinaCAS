@@ -13,6 +13,25 @@ static ast *basic(ast *e) {
 	return e;
 }
 
+/*Simplifies e without identities, expanding it when that leaves fewer nodes, and returns it*/
+static ast *compact(ast *e) {
+	work::pause();
+	simplify(*e, Simp::Basic);
+	expand_if_smaller(*e);
+	work::resume();
+
+	return e;
+}
+
+static bool has_op(const ast &e, Op op);
+
+/*Simplifies e like compact, also with identities when it has a sine or cosine, and returns it*/
+static ast *settle(ast *e) {
+	if (has_op(*e, Op::Sin) || has_op(*e, Op::Cos))
+		return simplest(e);
+	return compact(e);
+}
+
 static bool has_op(const ast &e, Op op) {
 	if (e.isOp(op))
 		return true;
@@ -525,7 +544,7 @@ static void shift(const DiffEqSystem &system, const ast &value, ast *shifted[][S
 			shifted[i][j] = system.matrix[i][j]->copy();
 			if (i == j)
 				shifted[i][j] = difference(shifted[i][j], value.copy());
-			reduced(shifted[i][j]);
+			basic(shifted[i][j]);
 		}
 	}
 }
@@ -568,7 +587,7 @@ static void normalize(ast **parts, unsigned count) {
 		return;
 
 	for (unsigned i = 0; i < count; i++)
-		parts[i] = reduced(ast::make(Op::Mult, ast::make(Num::from(sign * denominators, numerators)), parts[i]));
+		parts[i] = basic(ast::make(Op::Mult, ast::make(Num::from(sign * denominators, numerators)), parts[i]));
 }
 
 /*Records the eigenvalue and the equation (A - λI)K = 0, and sets row to the coefficients of its first nonzero row. Returns false if A - λI is zero.*/
@@ -636,7 +655,7 @@ static bool real_eigenvector(const DiffEqSystem &system, const ast &eigenvalue, 
 		return false;
 
 	vector[0] = row[1];
-	vector[1] = reduced(negate(row[0]));
+	vector[1] = basic(negate(row[0]));
 	normalize(vector, SIZE);
 
 	ast *name = subscripted(Sym::K, integer(index)), *value = column_of(vector);
@@ -661,7 +680,7 @@ static void generalized_eigenvector(
 
 	const unsigned free = is_zero(*row[0]) ? 0 : 1;
 	generalized[free] = integer(0);
-	generalized[1 - free] = reduced(ast::make(Op::Div, vector[which]->copy(), row[1 - free]->copy()));
+	generalized[1 - free] = basic(ast::make(Op::Div, vector[which]->copy(), row[1 - free]->copy()));
 
 	ast *name = ast::make(Sym::P), *value = column_of(generalized);
 	work::step(work::Step::Type::Equation, nullptr, name, value);
@@ -743,7 +762,7 @@ static Error eigen_solutions(DiffEqSystem &system, Root *roots, unsigned *count,
 			/*Parts of K = (b, λ - a) as real and imaginary parts*/
 			ast *parts[2 * SIZE] = {
 				system.matrix[0][1]->copy(),
-				reduced(difference(root.re->copy(), system.matrix[0][0]->copy())),
+				basic(difference(root.re->copy(), system.matrix[0][0]->copy())),
 				integer(0),
 				root.im->copy()
 			};
@@ -876,8 +895,8 @@ static Error exponential_solutions(
 
 	for (unsigned i = 0; i < SIZE; i++) {
 		for (unsigned j = 0; j < SIZE; j++) {
-			ast *adjugate = adjugate_entry(shifted, i, j);
-			resolvent[i][j] = quotient(*adjugate, *det);
+			ast *adjugate = basic(adjugate_entry(shifted, i, j));
+			resolvent[i][j] = adjugate->isInt(0) ? integer(0) : quotient(*adjugate, *det);
 			ast::dispose(adjugate);
 		}
 	}
@@ -892,7 +911,7 @@ static Error exponential_solutions(
 
 	for (unsigned i = 0; i < SIZE && err == Error::Success; i++) {
 		for (unsigned j = 0; j < SIZE && err == Error::Success; j++) {
-			if (is_zero(*resolvent[i][j])) {
+			if (resolvent[i][j]->isInt(0)) {
 				exponential[i][j] = integer(0);
 				continue;
 			}
@@ -905,7 +924,7 @@ static Error exponential_solutions(
 			if (exponential[i][j] == nullptr)
 				err = Error::DeUnsolved;
 			else
-				simplest(exponential[i][j]);
+				compact(exponential[i][j]);
 		}
 	}
 
@@ -926,7 +945,7 @@ static Error exponential_solutions(
 				work::pause();
 				substitute(*inverse[i][j], t, *negative);
 				work::resume();
-				simplest(inverse[i][j]);
+				compact(inverse[i][j]);
 			}
 		}
 
@@ -973,10 +992,10 @@ static Error variation_of_parameters(
 				inverse[i][j] = given[i][j]->copy();
 		}
 	} else {
-		ast *det = simplest(determinant(phi));
+		ast *det = settle(determinant(phi));
 		for (unsigned i = 0; i < SIZE; i++) {
 			for (unsigned j = 0; j < SIZE; j++)
-				inverse[i][j] = simplest(ast::make(Op::Div, adjugate_entry(phi, i, j), det->copy()));
+				inverse[i][j] = compact(ast::make(Op::Div, adjugate_entry(phi, i, j), det->copy()));
 		}
 		ast::dispose(det);
 	}
@@ -990,7 +1009,7 @@ static Error variation_of_parameters(
 		ast *sum = ast::make(Op::Add);
 		for (unsigned k = 0; k < SIZE; k++)
 			sum->appendChild(ast::make(Op::Mult, inverse[i][k]->copy(), system.forcing[k]->copy()));
-		rates[i] = simplest(sum);
+		rates[i] = compact(sum);
 	}
 
 	ast *integrand = ast::make(Op::Mult, named_inverse->copy(), column_of(system.forcing));
@@ -1021,7 +1040,7 @@ static Error variation_of_parameters(
 			ast *sum = ast::make(Op::Add);
 			for (unsigned k = 0; k < SIZE; k++)
 				sum->appendChild(distribute(*phi[i][k], *parameters[k]));
-			particular[i] = simplest(sum);
+			particular[i] = settle(sum);
 		}
 
 		*form = column_of(particular);
@@ -1199,7 +1218,7 @@ static Error undetermined_coefficients(
 				substitute(*particular[k], *unknowns[j], *values[j]);
 			work::resume();
 
-			simplest(particular[k]);
+			compact(particular[k]);
 		}
 
 		for (unsigned j = 0; j < SIZE * size; j++)
@@ -1260,7 +1279,7 @@ static void combine_entries(
 			sum->appendChild(ast::make(Op::Mult, coefficients[i]->copy(), fundamental[i][k]->copy()));
 		if (particular[k] != nullptr)
 			sum->appendChild(particular[k]->copy());
-		entries[k] = simplest(sum);
+		entries[k] = compact(sum);
 	}
 }
 
@@ -1362,7 +1381,7 @@ static Error solve_with_matrices(DiffEqSystem &system, DiffEq &context, ast **so
 
 	for (unsigned i = 0; i < SIZE && err == Error::Success; i++) {
 		for (unsigned k = 0; k < SIZE; k++)
-			fundamental[i][k] = simplest(entry_of(*forms[i], k));
+			fundamental[i][k] = compact(entry_of(*forms[i], k));
 	}
 
 	if (err == Error::Success && !homogeneous(system)) {
@@ -1554,7 +1573,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		work::pause();
 		derivative(*slope, t, t);
 		work::resume();
-		right = simplest(
+		right = settle(
 			ast::make(
 				Op::Add,
 				difference(slope, ast::make(Op::Mult, d.copy(), f.copy())),
@@ -1632,7 +1651,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 
 			expression = ast::make(Op::Add, slope, negate(ast::make(Op::Mult, a.copy(), solved[first]->copy())));
 			expression->appendChild(negate(f.copy()));
-			solved[second] = simplest(ast::make(Op::Div, expression, b.copy()));
+			solved[second] = settle(ast::make(Op::Div, expression, b.copy()));
 			canonical_SetFunction(Sym::Invalid);
 			work::step(work::Step::Type::Equation, nullptr, &v, solved[second]);
 		}

@@ -4,7 +4,12 @@
 
 ast *reduced(ast *e) {
 	work::pause();
-	simplify(*e, Simp::All);
+	simplify(*e, Simp::Basic);
+	Num *value = rational_value(*e);
+	if (value != nullptr)
+		e->replace(ast::make(value));
+	else if (e->isOperator())
+		simplify(*e, Simp::All);
 	work::resume();
 
 	return e;
