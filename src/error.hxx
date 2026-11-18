@@ -34,6 +34,8 @@ enum class Error : unsigned char {
 	DeNoSolution,
 	DeNotSolution,
 	DeSingular,
+	DeSystem,
+	DeElimination,
 
 	Amount
 };

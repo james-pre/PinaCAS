@@ -49,6 +49,10 @@ void display_help(void) {
 		"\tverify [equation,conditions] [solution] [(optional) respect to]\tChecks a solution of a differential "
 		"equation\n"
 	);
+	printf(
+		"\tsystem [equations,conditions] [(optional) respect to] [(optional) method]\tSolves a system of two linear "
+		"equations, with method auto, uc, vop, laplace or d\n"
+	);
 }
 
 /*Trim null terminated string*/
@@ -761,6 +765,53 @@ int run_verify(int argc, char **argv) {
 	return err == Error::Success && satisfied ? 0 : -1;
 }
 
+int run_system(int argc, char **argv) {
+	if (argc <= 2) {
+		display_help();
+		return -1;
+	}
+
+	ast *items[MAX_ITEMS], *t = nullptr, *solution = nullptr;
+	unsigned trimmed_len;
+	uint8_t *trimmed = trim(argv[2], &trimmed_len);
+	Error err;
+	const unsigned count = parse_list(trimmed, trimmed_len, str_table, items, MAX_ITEMS, &err);
+	free(trimmed);
+
+	if (err == Error::Success) {
+		trimmed = trim(argc >= 4 ? argv[3] : const_cast<char *>("T"), &trimmed_len);
+		t = parse(trimmed, trimmed_len, str_table, &err);
+		free(trimmed);
+	}
+
+	if (err == Error::Success && count > 0 && t != nullptr) {
+		DiffEqSystem system;
+		err = system.load(items, count, *t);
+		system.requested = argc >= 5 ? method_named(argv[4]) : Method::Automatic;
+
+		if (err == Error::Success)
+			err = system.solve(&solution);
+
+		if (err == Error::Success) {
+			simplify_canonical_form(*solution, Canonical::All);
+			printf("Method: %s\n", system.method);
+			printf("Solution: ");
+			print_ast(*solution);
+			printf("\n");
+		}
+	}
+
+	if (err != Error::Success)
+		printf("%s\n", error_text(err));
+
+	for (unsigned i = 0; i < count; i++)
+		ast::dispose(items[i]);
+	ast::dispose(t);
+	ast::dispose(solution);
+
+	return err == Error::Success ? 0 : -1;
+}
+
 int main(int argc, char **argv) {
 	work::Record work;
 	const bool show_work = argc > 1 && !strcmp(argv[1], "--work");
@@ -797,6 +848,8 @@ int main(int argc, char **argv) {
 			ret = run_de(argc, argv);
 		else if (!strcmp(argv[1], "verify"))
 			ret = run_verify(argc, argv);
+		else if (!strcmp(argv[1], "system"))
+			ret = run_system(argc, argv);
 		else {
 			display_help();
 			return -1;

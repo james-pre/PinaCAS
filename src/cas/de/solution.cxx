@@ -538,7 +538,11 @@ void conclude(DiffEq *de, ast *lhs, ast *rhs, const ast &constant, DiffEq::Condi
 
 void finish(DiffEq *de, ast *lhs, ast *antiderivative, ast **solution) {
 	DiffEq::Condition *c = de->condition_count > 0 ? &de->conditions[0] : nullptr;
-	ast *constant = ast::make(constant_symbol(*de->equation));
+	ast *scope = ast::make(Op::Add, de->equation->copy());
+	if (de->reserved != nullptr)
+		scope->appendChild(de->reserved->copy());
+	ast *constant = ast::make(constant_symbol(*scope));
+	ast::dispose(scope);
 
 	work::pause();
 	simplify(*lhs, Simp::Basic);

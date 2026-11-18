@@ -44,6 +44,9 @@ struct Test {
 	unsigned line;
 };
 
+/*Returns the method named auto, uc, vop, series, laplace or d, or Method::Automatic for another name*/
+Method method_named(const char *name);
+
 /*Returns one test from a line*/
 Test *test_Parse(char *line);
 /*Returns an array of tests from a file*/

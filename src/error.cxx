@@ -31,6 +31,8 @@ static const char *const messages[] = {
 	"No solution meets the conditions",
 	"Given function is not a solution",
 	"Not an ordinary point",
+	"Not a linear system of 2 equations",
+	"Elimination needs equations",
 };
 
 static_assert(countof(messages) == static_cast<unsigned>(Error::Amount));

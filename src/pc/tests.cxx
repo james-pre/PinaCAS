@@ -69,6 +69,20 @@ TestType resolve_type(char *type) {
 	return TestType::Invalid;
 }
 
+Method method_named(const char *name) {
+	if (!strcmp(name, "uc"))
+		return Method::UndeterminedCoefficients;
+	if (!strcmp(name, "vop"))
+		return Method::VariationOfParameters;
+	if (!strcmp(name, "series"))
+		return Method::PowerSeries;
+	if (!strcmp(name, "laplace"))
+		return Method::Laplace;
+	if (!strcmp(name, "d"))
+		return Method::Elimination;
+	return Method::Automatic;
+}
+
 Test *test_Parse(char *line) {
 	Test *t = static_cast<Test *>(malloc(sizeof(Test)));
 
