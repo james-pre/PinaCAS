@@ -474,8 +474,7 @@ Error solve_coefficients(
 		const ast *residual = residuals[r];
 		const unsigned first = groups;
 
-		for (unsigned i = 0; i < (residual->isOp(Op::Add) ? residual->childCount() : 1) && err == Error::Success;
-			 i++) {
+		for (unsigned i = 0; i < (residual->isOp(Op::Add) ? residual->childCount() : 1) && err == Error::Success; i++) {
 			const ast *term = residual->isOp(Op::Add) ? residual->childAt(i) : residual;
 			ast *function = function_part(de, *term);
 

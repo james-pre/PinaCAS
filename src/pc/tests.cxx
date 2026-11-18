@@ -101,8 +101,7 @@ Test *test_Parse(char *line) {
 		if (i == 0) {
 			t->type = resolve_type(trimmed);
 			t->method = t->type == TestType::DeSystem ? method_named(trimmed + 6) : Method::Automatic;
-		}
-		else if (i == 1)
+		} else if (i == 1)
 			strncpy(t->arg1, trimmed, MAX_PAR);
 		else if (i == 2)
 			strncpy(t->arg2, trimmed, MAX_PAR);
@@ -348,8 +347,10 @@ static bool run_system(Test *t) {
 
 	if (count == 0 || answer_count == 0 || x == nullptr) {
 		printf("Test failed on line %u. Unable to parse arguments.\n", t->line);
-	} else if ((err = system.load(items, count, *x)) != Error::Success ||
-			   (system.requested = t->method, err = system.solve(&solution)) != Error::Success) {
+	} else if (
+		(err = system.load(items, count, *x)) != Error::Success ||
+		(system.requested = t->method, err = system.solve(&solution)) != Error::Success
+	) {
 		printf("Test failed on line %u. %s\n", t->line, error_text(err));
 	} else {
 		for (unsigned k = 0; k < DiffEqSystem::size; k++) {

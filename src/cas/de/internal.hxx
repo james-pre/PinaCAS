@@ -144,7 +144,14 @@ unsigned root_multiplicity(const Root *roots, unsigned count, const ast &rate, c
 ast *oscillation(const DiffEq *de, Op op, const ast &frequency);
 
 /*Equates the coefficients of each function of x in each residual to zero and solves for the unknowns, recording the work. Sets values to the unknowns when it succeeds.*/
-Error solve_coefficients(DiffEq *de, ast *const *residuals, unsigned count, ast **unknowns, unsigned size, ast **values);
+Error solve_coefficients(
+	DiffEq *de,
+	ast *const *residuals,
+	unsigned count,
+	ast **unknowns,
+	unsigned size,
+	ast **values
+);
 
 /*Solves a linear equation with polynomial coefficients and right side with a power series about an ordinary point, recording the recurrence relation and the coefficients*/
 Error solve_power_series(DiffEq *de, ast **solution);

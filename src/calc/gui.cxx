@@ -212,7 +212,8 @@ static constexpr Element integral_content[] = {
 };
 
 /*Names of the methods in the order of Method*/
-static const char *const method_names[] = {"Automatic", "Undetermined", "Variation", "Power series", "Laplace", "D method"};
+static const char *const method_names[] =
+	{"Automatic", "Undetermined", "Variation", "Power series", "Laplace", "D method"};
 
 static constexpr Element de_content[] = {
 	letter("Respect to:", &de_options.respect_to),

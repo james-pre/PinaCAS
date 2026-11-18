@@ -69,7 +69,9 @@ static void dispose_square(ast *entries[][SIZE]) {
 }
 
 static ast *determinant(ast *const m[][SIZE]) {
-	return difference(ast::make(Op::Mult, m[0][0]->copy(), m[1][1]->copy()), ast::make(Op::Mult, m[0][1]->copy(), m[1][0]->copy()));
+	return difference(
+		ast::make(Op::Mult, m[0][0]->copy(), m[1][1]->copy()), ast::make(Op::Mult, m[0][1]->copy(), m[1][0]->copy())
+	);
 }
 
 /*Returns the entry of the adjugate of m, which is its inverse times its determinant*/
@@ -325,8 +327,9 @@ static Error load_equations(DiffEqSystem &system, ast *const *items, unsigned co
 		record_equation(equation);
 		canonical_SetFunction(Sym::Invalid);
 
-		ast *f = equation.isOp(Op::Equals) ? difference(equation.firstChild()->copy(), equation.firstChild()->next()->copy())
-										   : equation.copy();
+		ast *f = equation.isOp(Op::Equals)
+					 ? difference(equation.firstChild()->copy(), equation.firstChild()->next()->copy())
+					 : equation.copy();
 
 		work::pause();
 		for (unsigned k = 0; k < SIZE; k++) {
@@ -490,7 +493,8 @@ Error DiffEqSystem::load(ast *const *items, unsigned count, const ast &t) {
 	if (count == 0)
 		return Error::DeSystem;
 
-	Error err = has_op(*items[0], Op::Matrix) ? load_matrix_form(*this, items, count) : load_equations(*this, items, count);
+	Error err =
+		has_op(*items[0], Op::Matrix) ? load_matrix_form(*this, items, count) : load_equations(*this, items, count);
 
 	if (err == Error::Success && point != nullptr && (values[0] == nullptr || values[1] == nullptr))
 		err = Error::DeBadCondition;
@@ -591,11 +595,13 @@ static bool eigen_equation(
 		work::step(work::Step::Type::Equation, text, left, right != nullptr ? right : zero);
 		ast::dispose(left);
 
-		left = tidy(ast::make(
-			Op::Add,
-			ast::make(Op::Mult, shifted[i][0]->copy(), unknown->childAt(0)->firstChild()->copy()),
-			ast::make(Op::Mult, shifted[i][1]->copy(), unknown->childAt(1)->firstChild()->copy())
-		));
+		left = tidy(
+			ast::make(
+				Op::Add,
+				ast::make(Op::Mult, shifted[i][0]->copy(), unknown->childAt(0)->firstChild()->copy()),
+				ast::make(Op::Mult, shifted[i][1]->copy(), unknown->childAt(1)->firstChild()->copy())
+			)
+		);
 		ast *value = right != nullptr ? right->childAt(i)->firstChild()->copy() : integer(0);
 		work::step(work::Step::Type::Equation, nullptr, left, value);
 
@@ -642,7 +648,12 @@ static bool real_eigenvector(const DiffEqSystem &system, const ast &eigenvalue, 
 }
 
 /*Finds P with (A - λI)P = K, recording the work*/
-static void generalized_eigenvector(const DiffEqSystem &system, const ast &eigenvalue, ast *const *vector, ast **generalized) {
+static void generalized_eigenvector(
+	const DiffEqSystem &system,
+	const ast &eigenvalue,
+	ast *const *vector,
+	ast **generalized
+) {
 	ast *row[SIZE], *right = column_of(vector);
 	unsigned which;
 
@@ -719,9 +730,8 @@ static Error eigen_solutions(DiffEqSystem &system, Root *roots, unsigned *count,
 		const Root &root = roots[r];
 
 		if (root.im != nullptr) {
-			ast *eigenvalue = tidy(ast::make(
-				Op::Add, root.re->copy(), ast::make(Op::Mult, root.im->copy(), ast::make(Sym::Imag))
-			));
+			ast *eigenvalue =
+				tidy(ast::make(Op::Add, root.re->copy(), ast::make(Op::Mult, root.im->copy(), ast::make(Sym::Imag))));
 			record_eigenvalue(*eigenvalue, made + 1);
 
 			ast *row[SIZE];
@@ -732,16 +742,20 @@ static Error eigen_solutions(DiffEqSystem &system, Root *roots, unsigned *count,
 
 			/*Parts of K = (b, λ - a) as real and imaginary parts*/
 			ast *parts[2 * SIZE] = {
-				system.matrix[0][1]->copy(), reduced(difference(root.re->copy(), system.matrix[0][0]->copy())), integer(0),
+				system.matrix[0][1]->copy(),
+				reduced(difference(root.re->copy(), system.matrix[0][0]->copy())),
+				integer(0),
 				root.im->copy()
 			};
 			normalize(parts, 2 * SIZE);
 
 			ast *vector[SIZE];
 			for (unsigned k = 0; k < SIZE; k++) {
-				vector[k] = tidy(ast::make(
-					Op::Add, parts[k]->copy(), ast::make(Op::Mult, parts[SIZE + k]->copy(), ast::make(Sym::Imag))
-				));
+				vector[k] = tidy(
+					ast::make(
+						Op::Add, parts[k]->copy(), ast::make(Op::Mult, parts[SIZE + k]->copy(), ast::make(Sym::Imag))
+					)
+				);
 			}
 
 			ast *name = subscripted(Sym::K, integer(made + 1)), *value = column_of(vector);
@@ -820,7 +834,13 @@ static Error eigen_solutions(DiffEqSystem &system, Root *roots, unsigned *count,
 }
 
 /*Finds e^(At) as the inverse Laplace transform of (sI - A)^-1, recording the work, and fills forms with its columns and inverse with e^(-At)*/
-static Error exponential_solutions(DiffEqSystem &system, DiffEq &context, const ast &taken, ast **forms, ast *inverse[][SIZE]) {
+static Error exponential_solutions(
+	DiffEqSystem &system,
+	DiffEq &context,
+	const ast &taken,
+	ast **forms,
+	ast *inverse[][SIZE]
+) {
 	system.method = "Matrix exponential";
 
 	const ast &t = *system.variable;
@@ -1036,8 +1056,8 @@ static Error undetermined_coefficients(
 	ast **particular
 ) {
 	constexpr unsigned max_functions = DiffEq::max_order / SIZE;
-	ast *rates[max_functions], *frequencies[max_functions], *functions[max_functions],
-		*unknowns[DiffEq::max_order], *values[DiffEq::max_order];
+	ast *rates[max_functions], *frequencies[max_functions], *functions[max_functions], *unknowns[DiffEq::max_order],
+		*values[DiffEq::max_order];
 	unsigned degrees[max_functions], groups = 0, size = 0;
 	Error err = Error::Success;
 
@@ -1096,7 +1116,8 @@ static Error undetermined_coefficients(
 					break;
 				}
 
-				ast *f = oscillations == 1 ? nullptr : oscillation(&context, o == 0 ? Op::Cos : Op::Sin, *frequencies[i]);
+				ast *f =
+					oscillations == 1 ? nullptr : oscillation(&context, o == 0 ? Op::Cos : Op::Sin, *frequencies[i]);
 				functions[size++] = basis_function(&context, j, *rates[i], f);
 			}
 		}
@@ -1148,7 +1169,8 @@ static Error undetermined_coefficients(
 	}
 
 	ast *left = column_of(derivatives);
-	ast *right = ast::make(Op::Add, ast::make(Op::Mult, square(system.matrix), column_of(entries)), column_of(system.forcing));
+	ast *right =
+		ast::make(Op::Add, ast::make(Op::Mult, square(system.matrix), column_of(entries)), column_of(system.forcing));
 	work::step(work::Step::Type::Equation, "Substitute", left, right);
 	ast::dispose(left);
 	ast::dispose(right);
@@ -1156,7 +1178,8 @@ static Error undetermined_coefficients(
 	for (unsigned k = 0; k < SIZE; k++) {
 		residuals[k] = difference(derivatives[k]->copy(), system.forcing[k]->copy());
 		for (unsigned j = 0; j < SIZE; j++)
-			residuals[k] = difference(residuals[k], ast::make(Op::Mult, system.matrix[k][j]->copy(), entries[j]->copy()));
+			residuals[k] =
+				difference(residuals[k], ast::make(Op::Mult, system.matrix[k][j]->copy(), entries[j]->copy()));
 
 		work::pause();
 		simplify(*residuals[k], Simp::Basic);
@@ -1225,7 +1248,12 @@ static ast *combine(ast *const *coefficients, ast *const *forms, const ast *part
 }
 
 /*Fills entries with the components of the combination of the fundamental solutions with the coefficients plus particular*/
-static void combine_entries(ast *const *coefficients, ast *const fundamental[][SIZE], ast *const *particular, ast **entries) {
+static void combine_entries(
+	ast *const *coefficients,
+	ast *const fundamental[][SIZE],
+	ast *const *particular,
+	ast **entries
+) {
 	for (unsigned k = 0; k < SIZE; k++) {
 		ast *sum = ast::make(Op::Add);
 		for (unsigned i = 0; i < SIZE; i++)
@@ -1279,7 +1307,9 @@ static Error apply_conditions(const DiffEqSystem &system, ast **constants, ast *
 	for (unsigned i = 0; i < rank && err == Error::Success; i++) {
 		ast *value = matrix[i][SIZE]->copy();
 		single_fraction(*value);
-		work::step(work::Step::Type::Equation, i == 0 ? "Solve for the constants" : nullptr, constants[pivots[i]], value);
+		work::step(
+			work::Step::Type::Equation, i == 0 ? "Solve for the constants" : nullptr, constants[pivots[i]], value
+		);
 		ast::dispose(constants[pivots[i]]);
 		constants[pivots[i]] = value;
 	}
@@ -1327,8 +1357,8 @@ static Error solve_with_matrices(DiffEqSystem &system, DiffEq &context, ast **so
 
 	record_matrix_form(system);
 
-	Error err =
-		exponential ? exponential_solutions(system, context, *taken, forms, inverse) : eigen_solutions(system, roots, &count, forms);
+	Error err = exponential ? exponential_solutions(system, context, *taken, forms, inverse)
+							: eigen_solutions(system, roots, &count, forms);
 
 	for (unsigned i = 0; i < SIZE && err == Error::Success; i++) {
 		for (unsigned k = 0; k < SIZE; k++)
@@ -1360,7 +1390,9 @@ static Error solve_with_matrices(DiffEqSystem &system, DiffEq &context, ast **so
 		if (exponential) {
 			ast *exponential_form = ast::make(
 				Op::Mult,
-				ast::make(Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, ast::make(Sym::A), system.variable->copy())),
+				ast::make(
+					Op::Pow, ast::make(Sym::Euler), ast::make(Op::Mult, ast::make(Sym::A), system.variable->copy())
+				),
 				column_of(constants)
 			);
 			work::step(work::Step::Type::Equation, nullptr, name, exponential_form);
@@ -1470,7 +1502,9 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		ast *left = ast::make(Op::Mult, operators[i]->copy(), system.unknowns[i]->copy());
 		if (!system.matrix[i][1 - i]->isInt(0)) {
 			left = ast::make(
-				Op::Add, left, tidy(ast::make(Op::Mult, negate(system.matrix[i][1 - i]->copy()), system.unknowns[1 - i]->copy()))
+				Op::Add,
+				left,
+				tidy(ast::make(Op::Mult, negate(system.matrix[i][1 - i]->copy()), system.unknowns[1 - i]->copy()))
 			);
 		}
 
@@ -1487,8 +1521,9 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 	Error err = Error::Success;
 
 	if (coupled) {
-		const ast &a = *system.matrix[first][first], &b = *system.matrix[first][second], &c = *system.matrix[second][first],
-				  &d = *system.matrix[second][second], &f = *system.forcing[first], &g = *system.forcing[second];
+		const ast &a = *system.matrix[first][first], &b = *system.matrix[first][second],
+				  &c = *system.matrix[second][first], &d = *system.matrix[second][second], &f = *system.forcing[first],
+				  &g = *system.forcing[second];
 		const ast &u = *system.unknowns[first], &v = *system.unknowns[second];
 
 		canonical_SetFunction(u.symbol());
@@ -1512,23 +1547,24 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		ast::dispose(right);
 
 		ast *trace = basic(ast::make(Op::Add, a.copy(), d.copy()));
-		ast *constant = basic(difference(ast::make(Op::Mult, a.copy(), d.copy()), ast::make(Op::Mult, b.copy(), c.copy())));
+		ast *constant =
+			basic(difference(ast::make(Op::Mult, a.copy(), d.copy()), ast::make(Op::Mult, b.copy(), c.copy())));
 
 		ast *slope = f.copy();
 		work::pause();
 		derivative(*slope, t, t);
 		work::resume();
-		right = simplest(ast::make(
-			Op::Add,
-			difference(slope, ast::make(Op::Mult, d.copy(), f.copy())),
-			ast::make(Op::Mult, b.copy(), g.copy())
-		));
+		right = simplest(
+			ast::make(
+				Op::Add,
+				difference(slope, ast::make(Op::Mult, d.copy(), f.copy())),
+				ast::make(Op::Mult, b.copy(), g.copy())
+			)
+		);
 
 		ast *D = ast::make(Sym::D);
 		left = ast::make(
-			Op::Add,
-			ast::make(Op::Pow, D->copy(), integer(2)),
-			ast::make(Op::Mult, negate(trace->copy()), D->copy())
+			Op::Add, ast::make(Op::Pow, D->copy(), integer(2)), ast::make(Op::Mult, negate(trace->copy()), D->copy())
 		);
 		left->appendChild(constant->copy());
 		left = ast::make(Op::Mult, tidy(left), u.copy());
@@ -1536,9 +1572,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		ast::dispose(left);
 
 		left = ast::make(
-			Op::Add,
-			DiffEq::derivative(u, 2),
-			ast::make(Op::Mult, negate(trace->copy()), DiffEq::derivative(u, 1))
+			Op::Add, DiffEq::derivative(u, 2), ast::make(Op::Mult, negate(trace->copy()), DiffEq::derivative(u, 1))
 		);
 		left->appendChild(ast::make(Op::Mult, constant->copy(), u.copy()));
 
@@ -1551,11 +1585,13 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 			substitute(*at, t, *system.point);
 			work::resume();
 
-			ast *expression = tidy(ast::make(
-				Op::Add,
-				ast::make(Op::Mult, a.copy(), system.values[first]->copy()),
-				ast::make(Op::Mult, b.copy(), system.values[second]->copy())
-			));
+			ast *expression = tidy(
+				ast::make(
+					Op::Add,
+					ast::make(Op::Mult, a.copy(), system.values[first]->copy()),
+					ast::make(Op::Mult, b.copy(), system.values[second]->copy())
+				)
+			);
 			if (!is_zero(*at))
 				expression = ast::make(Op::Add, expression, tidy(at->copy()));
 			conditions[1] = reduced(expression->copy());
@@ -1568,9 +1604,7 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 			ast::dispose(at);
 		}
 
-		err = solve_scalar(
-			system, ast::make(Op::Equals, tidy(left), right), u, conditions, SIZE, D, &solved[first]
-		);
+		err = solve_scalar(system, ast::make(Op::Equals, tidy(left), right), u, conditions, SIZE, D, &solved[first]);
 
 		ast::dispose(conditions[0]);
 		ast::dispose(conditions[1]);
@@ -1579,11 +1613,15 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 
 		if (err == Error::Success) {
 			canonical_SetFunction(u.symbol());
-			ast *expression = ast::make(Op::Add, DiffEq::derivative(u, 1), negate(ast::make(Op::Mult, a.copy(), u.copy())));
+			ast *expression =
+				ast::make(Op::Add, DiffEq::derivative(u, 1), negate(ast::make(Op::Mult, a.copy(), u.copy())));
 			expression->appendChild(negate(f.copy()));
 			expression = tidy(ast::make(Op::Div, expression, b.copy()));
 			work::step(
-				work::Step::Type::Equation, first == 0 ? "From the first equation" : "From the second equation", &v, expression
+				work::Step::Type::Equation,
+				first == 0 ? "From the first equation" : "From the second equation",
+				&v,
+				expression
 			);
 			ast::dispose(expression);
 
@@ -1601,9 +1639,13 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 	} else {
 		for (unsigned k = 0; k < SIZE && err == Error::Success; k++) {
 			const ast &u = *system.unknowns[k];
-			ast *left = tidy(ast::make(
-				Op::Add, DiffEq::derivative(u, 1), negate(ast::make(Op::Mult, system.matrix[k][k]->copy(), u.copy()))
-			));
+			ast *left = tidy(
+				ast::make(
+					Op::Add,
+					DiffEq::derivative(u, 1),
+					negate(ast::make(Op::Mult, system.matrix[k][k]->copy(), u.copy()))
+				)
+			);
 			ast *reserved = ast::make(Op::Add, ast::make(Sym::D));
 			if (k > 0)
 				reserved->appendChild(solved[0]->copy());

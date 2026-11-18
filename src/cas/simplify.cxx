@@ -498,7 +498,8 @@ static int term_class(const ast &term) {
 			continue;
 
 		number = false;
-		if (!factor.isSymbol() && !(factor.isOp(Op::Pow) && factor.childAt(0)->isSymbol() && small_exponent(factor, 1000) > 0))
+		if (!factor.isSymbol() &&
+			!(factor.isOp(Op::Pow) && factor.childAt(0)->isSymbol() && small_exponent(factor, 1000) > 0))
 			return 0;
 	}
 

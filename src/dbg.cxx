@@ -15,11 +15,11 @@ void ti_debug(const char *format, ...) {
 #endif
 #endif
 
-const char *operators[static_cast<size_t>(Op::Amount)] = {"+",     "*",    "/",     "^",    "root", "log",   "deriv",
-														  "integ", "=",    "'",     "at",   "step", "sum",   "sub",
-														  "L",     "L^-1", "matrix", "list", "!",    "int",  "abs",  "sin",   "asin",
-														  "cos",   "acos", "tan",   "atan", "sinh", "asinh", "cosh",
-														  "acosh", "tanh", "atanh", "delta"};
+const char *operators[static_cast<size_t>(Op::Amount)] = {"+",     "*",    "/",      "^",    "root",  "log",  "deriv",
+														  "integ", "=",    "'",      "at",   "step",  "sum",  "sub",
+														  "L",     "L^-1", "matrix", "list", "!",     "int",  "abs",
+														  "sin",   "asin", "cos",    "acos", "tan",   "atan", "sinh",
+														  "asinh", "cosh", "acosh",  "tanh", "atanh", "delta"};
 
 const char *symbols[] = {"i", "pi", "e", "theta", "tau", "lambda", "phi"};
 

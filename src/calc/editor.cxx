@@ -43,7 +43,7 @@ static const struct key_tokens {
 	{sk_0, '0', 0, 0},           {sk_1, '1', 0, 'Y'},          {sk_2, '2', 0, 'Z'},        {sk_3, '3', 0, 0x5B},
 	{sk_4, '4', 0, 'T'},         {sk_5, '5', 0, 'U'},          {sk_6, '6', 0, 'V'},        {sk_7, '7', 0, 'O'},
 	{sk_8, '8', 0, 'P'},         {sk_9, '9', 0, 'Q'},          {sk_DecPnt, 0x3A, 0x2C, 0}, {sk_Chs, 0xB0, 0, 0},
-	{sk_Add, 0x70, 0, 0},        {sk_Sub, 0x71, 0x07, 'W'},       {sk_Mul, 0x82, 0x06, 'R'},     {sk_Div, 0x83, 0xBB31, 'M'},
+	{sk_Add, 0x70, 0, 0},        {sk_Sub, 0x71, 0x07, 'W'},    {sk_Mul, 0x82, 0x06, 'R'},  {sk_Div, 0x83, 0xBB31, 'M'},
 	{sk_Power, 0xF0, 0xAC, 'H'}, {sk_Square, 0x0D, 0xBC, 'I'}, {sk_Recip, 0x0C, 0, 'D'},   {sk_LParen, 0x10, 0, 'K'},
 	{sk_RParen, 0x11, 0, 'L'},   {sk_Comma, 0x2B, 0x3B, 'J'},  {sk_Sin, 0xC2, 0xC3, 'E'},  {sk_Cos, 0xC4, 0xC5, 'F'},
 	{sk_Tan, 0xC6, 0xC7, 'G'},   {sk_Ln, 0xBE, 0xBF, 'S'},     {sk_Log, 0xC0, 0xC1, 'N'},  {sk_GraphVar, 'X', 0, 0},
