@@ -309,6 +309,34 @@ static Error load_condition(DiffEqSystem &system, const ast &condition) {
 	return Error::Success;
 }
 
+/*Replaces the independent variable with T, or a symbol not in the items if T is an unknown, when it is an unknown*/
+static void choose_variable(DiffEqSystem &system, ast *const *items, unsigned count) {
+	const ast *names[SIZE + 1] = {system.unknowns[0], system.unknowns[1], system.vector};
+	bool unknown = false, taken = false;
+	ast *t = ast::make(Sym::T);
+
+	for (const ast *name : names) {
+		unknown |= name != nullptr && name->compare(*system.variable);
+		taken |= name != nullptr && name->compare(*t);
+	}
+
+	if (!unknown) {
+		ast::dispose(t);
+		return;
+	}
+
+	if (taken) {
+		ast *scope = ast::make(Op::Add);
+		for (unsigned i = 0; i < count; i++)
+			scope->appendChild(items[i]->copy());
+		t->replace(ast::make(fresh_symbol(*scope)));
+		ast::dispose(scope);
+	}
+
+	ast::dispose(system.variable);
+	system.variable = t;
+}
+
 /*Reads two linear first order equations as x' = Ax + f, solving B x' + C x + r = 0 for x'*/
 static Error load_equations(DiffEqSystem &system, ast *const *items, unsigned count) {
 	unsigned found = 0;
@@ -324,10 +352,7 @@ static Error load_equations(DiffEqSystem &system, ast *const *items, unsigned co
 	if (found != SIZE)
 		return Error::DeSystem;
 
-	for (unsigned k = 0; k < SIZE; k++) {
-		if (system.unknowns[k]->compare(*system.variable))
-			return Error::DeBadFunction;
-	}
+	choose_variable(system, items, count);
 
 	ast *slots[SIZE], *derivatives[SIZE][SIZE] = {}, *coefficients[SIZE][SIZE] = {}, *rest[SIZE] = {};
 	ast *scope = ast::make(Op::Add, items[0]->copy(), items[1]->copy());
@@ -434,10 +459,11 @@ static Error load_matrix_form(DiffEqSystem &system, ast *const *items, unsigned 
 		return Error::DeSystem;
 
 	const ast &vector = *equation.firstChild()->firstChild();
-	if (!vector.isSymbol() || vector.compare(*system.variable))
+	if (!vector.isSymbol())
 		return Error::DeSystem;
 
 	system.vector = vector.copy();
+	choose_variable(system, items, count);
 	record_equation(equation);
 
 	ast *sums[SIZE][SIZE + 1];
@@ -1548,9 +1574,10 @@ static Error solve_by_elimination(DiffEqSystem &system, ast **solution) {
 		canonical_SetFunction(u.symbol());
 		ast *left = ast::make(
 			Op::Mult,
-			difference(
+			ast::make(
+				Op::Add,
 				ast::make(Op::Mult, operators[first]->copy(), operators[second]->copy()),
-				tidy(ast::make(Op::Mult, b.copy(), c.copy()))
+				tidy(negate(ast::make(Op::Mult, b.copy(), c.copy())))
 			),
 			u.copy()
 		);
