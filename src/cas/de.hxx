@@ -131,7 +131,8 @@ class DiffEqSystem {
 	static bool detect(ast *const *items, unsigned count);
 
 	/* Loads two equations like X'=X+Y and Y'=4X+Y, or one in matrix form like X'=[[1,1][4,1]]X,
-	followed by initial conditions like X(0)=1 and Y(0)=0, or X(0)=[[1][0]] in matrix form */
+	followed by initial conditions like X(0)=1 and Y(0)=0, or X(0)=[[1][0]] in matrix form.
+	The independent variable is T instead of variable when variable is an unknown. */
 	Error load(ast *const *items, unsigned count, const ast &variable);
 
 	/*Solves the system and records the work. The solution is a list like X = f, Y = g, or X = F in matrix form.*/

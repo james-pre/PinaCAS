@@ -36,6 +36,7 @@ enum class Error : unsigned char {
 	DeSingular,
 	DeSystem,
 	DeElimination,
+	DeOneEquation,
 
 	Amount
 };

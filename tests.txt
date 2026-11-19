@@ -639,3 +639,11 @@ system; X'=[[1,1][-1,1]]X+[[cos(T)][0]]; X=A([[1][0]]cos(T)_[[0][1]]sin(T))e^T+B
 system; X'=[[2,0][0,2]]X+[[1][1]]; X=A[[1][0]]e^(2T)+B[[0][1]]e^(2T)+[[-1/2][-1/2]]; T
 system; X'=[[0,2][-1,3]]X+[[1][-1]]e^(T); X=A[[1][1]]e^(2T)+B[[2][1]]e^T+[[4Te^T_3e^T][2Te^T]]; T
 systemlaplace; X'=[[1,0][0,2]]X+[[1][T]]; X=B[[e^T][0]]+C[[0][e^(2T)]]+[[-1][(-T)/2_1/4]]; T
+systemd; X'=X+Y,Y'=-2X_Y; X=Acos(T)+Bsin(T),Y=-Asin(T)_Acos(T)_Bsin(T)+Bcos(T); X
+system; X'=X+Y,Y'=-2X_Y; X=Acos(T)+Bsin(T),Y=-Asin(T)_Acos(T)_Bsin(T)+Bcos(T); X
+system; X'=-6X+5Y,Y'=-5X+4Y; X=Ae^(-T)+B(Te^(-T)_e^(-T)/5),Y=Ae^(-T)+BTe^(-T); X
+systemd; X'=-6X+5Y,Y'=-5X+4Y; X=Ae^(-T)+BTe^(-T),Y=Ae^(-T)+BTe^(-T)+(Be^(-T))/5; X
+systemlaplace; X'=-6X+5Y,Y'=-5X+4Y; X=-5BTe^(-T)+Be^(-T)+5CTe^(-T),Y=-5BTe^(-T)+5CTe^(-T)+Ce^(-T); X
+systemd; X'=X+Y+2e^(T),Y'=4X+Y_e^(T); X=Ae^(3T)+Be^(-T)+e^T/4,Y=2Ae^(3T)_2Be^(-T)_2e^T; X
+system; X'=[[3,-2][2,-2]]X; X=A[[2][1]]e^(2T)+B[[1][2]]e^(-T); X
+system; T'=T+X,X'=X; T=Ae^U+BUe^U,X=Be^U; X

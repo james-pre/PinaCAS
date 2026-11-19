@@ -245,6 +245,9 @@ static int derivative_order(const ast *e, const ast &y) {
 }
 
 Error DiffEq::loadList(ast **items, unsigned count, const ast &variable) {
+	if (DiffEqSystem::detect(items, count))
+		return Error::DeOneEquation;
+
 	Error err = load(*items[0], variable);
 
 	for (unsigned i = 1; i < count && err == Error::Success; i++) {

@@ -40,7 +40,7 @@ To check a solution, put it in another variable, either as `Y=2cos(4X)-1/2sin(4X
 
 ## Systems of equations
 
-Enter a system of two linear first order equations with constant coefficients as two equations, like x' = x + y + 2eᵗ, y' = 4x + y - eᵗ as `X'=X+Y+2e^(T),Y'=4X+Y-e^(T)` with respect to T, or in matrix form X' = AX + F with OS matrix brackets, like `X'=[[0,2][-1,3]]X+[[1][-1]]e^(T)`. Initial conditions follow, like `X(0)=1,Y(0)=0`, or `X(0)=[[1][0]]` in matrix form. Solve DE writes the solution as `X=…,Y=…`, or as `X=…` with column vectors in matrix form.
+Enter a system of two linear first order equations with constant coefficients as two equations, like x' = x + y + 2eᵗ, y' = 4x + y - eᵗ as `X'=X+Y+2e^(T),Y'=4X+Y-e^(T)`, or in matrix form X' = AX + F with OS matrix brackets, like `X'=[[0,2][-1,3]]X+[[1][-1]]e^(T)`. Initial conditions follow, like `X(0)=1,Y(0)=0`, or `X(0)=[[1][0]]` in matrix form. The independent variable is "Respect to", or T when that is one of the unknowns, as with the default X. Solve DE writes the solution as `X=…,Y=…`, or as `X=…` with column vectors in matrix form.
 
 "Method" chooses how:
 
